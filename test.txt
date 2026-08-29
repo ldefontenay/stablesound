@@ -1,0 +1,213 @@
+STABLESOUND - MILESTONE 1 HARDWARE TESTS
+========================================
+
+Created: 2026-08-30
+Status:  NOT STARTED
+
+
+HOW TO USE THIS FILE
+--------------------
+
+Each test below has one or more lines beginning with "ANSWER:".
+Type your notes after the colon. Free text is fine - there is no
+format to follow, and short is fine.
+
+If something unexpected happens, use the "ANYTHING ODD:" line in that
+section. Those are often the most useful notes, so please do not skip
+them if something felt off.
+
+If a test cannot be run, write why on the ANSWER line rather than
+leaving it blank. "Could not tell" and "not sure" are useful answers.
+
+When you are done, tell me and I will read this file.
+
+
+SETUP - DO THIS FIRST
+---------------------
+
+1. Turn on the AeroClips and make sure they are connected to BOTH
+   this laptop and your iPhone.
+
+2. Set the AeroClips as the DEFAULT output device in Windows.
+   This matters: the test program uses whatever is default, and
+   right now that is your Realtek speakers.
+
+3. Turn OFF the JAWS built-in setting while testing, so we are not
+   measuring both at once:
+   Insert+6, then Ctrl+Shift+D, then search for "avoid".
+   The setting is "Avoid speech cut-off when using Bluetooth
+   headphones or some cards". Make sure it is UNCHECKED.
+
+4. Start the test program. In the Claude Code prompt, type:
+       !cd spike; cargo run
+
+   On startup it prints which device it picked. Check that it says
+   the AeroClips and not Realtek.
+
+ANSWER - what device name did it print?
+
+
+ANSWER - was the JAWS bluetooth setting successfully turned off?
+
+
+COMMANDS YOU CAN TYPE IN THE PROGRAM
+------------------------------------
+
+   on       start keep-alive
+   off      stop keep-alive and release the device
+   zeros    use pure silence
+   fluct    use silence with a tiny blip each second (the default)
+   sine     use an inaudible 20 kHz tone
+   watch    toggle reporting of when other audio starts and stops
+   status   show current state
+   quit     exit
+
+Type the command, then press Enter.
+
+
+===========================================================
+TEST 1 - DOES RELEASING FREE THE HEADSET FOR THE IPHONE?
+===========================================================
+
+This is the most important test. The whole design assumes that when
+we stop playing, your phone can take over. If that is wrong, the
+plan changes significantly, so it is worth doing carefully.
+
+Steps:
+
+1. Type: on
+   (You should hear nothing. That is correct.)
+
+2. With keep-alive still running, play something on your iPhone -
+   music, a podcast, VoiceOver, anything.
+
+ANSWER - did the iPhone audio come through the AeroClips, or did the
+laptop keep control?
+
+
+3. Now type: off
+
+4. Try the iPhone again.
+
+ANSWER - did the iPhone take over this time?
+
+
+ANSWER - roughly how long did the handover take? A rough count in
+seconds is fine.
+
+
+5. Repeat steps 1-4 once more, to check it was not a fluke.
+
+ANSWER - did it behave the same the second time?
+
+
+ANYTHING ODD:
+
+
+===========================================================
+TEST 2 - DOES JAWS SPEECH SHOW UP ON THE AUDIO METER?
+===========================================================
+
+This decides how the app detects that you are still using the
+laptop. If JAWS speech is invisible to it, we need a more complex
+approach.
+
+Steps:
+
+1. Type: watch
+   It should say it is watching for audio.
+
+2. Leave keep-alive OFF for this test.
+
+3. Let JAWS speak - read a paragraph, arrow around, anything.
+
+The program should print lines like:
+       AUDIO DETECTED (peak 0.04210)
+       AUDIO STOPPED after 2.3 s (highest peak 0.06180)
+
+ANSWER - did it report audio detected when JAWS spoke? Yes or no.
+
+
+ANSWER - if yes, roughly what peak numbers did you see?
+
+
+4. Now stay quiet for about 10 seconds and let JAWS say nothing.
+
+ANSWER - did it report audio stopped? Did the timing seem about
+right?
+
+
+5. Now type: on
+   Then let JAWS speak again, with keep-alive running.
+
+ANSWER - did it still correctly report JAWS speech starting and
+stopping, or did it get confused by our own signal?
+
+
+ANYTHING ODD:
+
+
+===========================================================
+TEST 3 - WHICH SIGNAL ACTUALLY KEEPS THE AEROCLIPS AWAKE?
+===========================================================
+
+We need to find the quietest signal that works. Quieter is better,
+because a loud signal interferes with Test 2's detection.
+
+Try each mode in the order below. For each one:
+
+  - Type the mode name, then type: on
+  - Then use the laptop normally for 3-5 minutes, with pauses.
+    The important thing is to leave GAPS of 20-30 seconds of
+    silence, then have JAWS speak again. That is when clipping
+    happens.
+  - Note whether the start of speech gets clipped.
+
+Please try them in this order - the first one that works is the one
+we want.
+
+MODE 1 - type: fluct     then: on
+ANSWER - was speech clipped?
+
+
+MODE 2 - type: zeros     then: on
+ANSWER - was speech clipped?
+
+
+MODE 3 - type: sine      then: on
+ANSWER - was speech clipped?
+
+
+ANSWER - for comparison, type "off" and use the laptop for a few
+minutes with no keep-alive at all. How bad is the clipping normally?
+This gives us a baseline.
+
+
+ANYTHING ODD:
+
+
+===========================================================
+ANYTHING ELSE
+===========================================================
+
+Anything that surprised you, annoyed you, or that you think I have
+misunderstood about the problem. Also worth noting: did the test
+program itself work well with JAWS, or was anything awkward to read?
+
+NOTES:
+
+
+
+
+===========================================================
+FOR REFERENCE - WHY THESE THREE TESTS
+===========================================================
+
+Test 1 checks the assumption the whole design rests on.
+Test 2 decides how the auto-release timer knows you are still active.
+Test 3 picks the keep-alive signal, and interacts with Test 2 - a
+louder signal makes the detection in Test 2 harder.
+
+If Test 3 concludes we need "sine", then Test 2's simple approach
+will not work and we need a more complex one. That is fine, it just
+needs to be known before building.

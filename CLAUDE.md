@@ -69,3 +69,13 @@ If the working tree is dirty, sort that out before starting new work.
 Much of this project can only be validated on real hardware — whether the headset stays awake,
 whether it releases to the phone, how long reconnect takes. Automated tests can't cover that. When a
 change touches keep-alive or release behaviour, say explicitly what needs a manual hardware check.
+
+**Manual tests go in `test.txt`, never in chat.** Write the steps to the file with explicit
+`ANSWER:` lines for the user to fill in, then read the file back. The user is blind and works with
+JAWS; a file can be navigated and annotated at their own pace, whereas multi-step instructions in
+terminal scrollback have to be re-read while performing them. Keep it plain text — no Markdown
+tables or box drawing — put each instruction immediately before its answer field, and include an
+"ANYTHING ODD:" catch-all per section.
+
+Keep completed `test.txt` results in the repo. They're a record of hardware behaviour that can't be
+reproduced from code, and the findings should be folded into `PLAN.md` once read.
