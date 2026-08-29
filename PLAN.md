@@ -94,6 +94,8 @@ This is simpler than enumerating individual audio sessions, and it works because
 
 **To verify:** that JAWS speech actually registers on the device peak meter. JAWS may use an audio path that behaves differently. Tested in Milestone 1.
 
+**Known interaction, found while building the spike:** device-level metering only works if our own keep-alive signal stays below the detection threshold. Fluctuate (~0.00003) and zeros are fine against a 0.0005 threshold. **Sine at 1% (0.01) is not** — we would see our own signal as "real audio" and never release. So if Q3 concludes the AeroClip needs sine, idle detection *must* move to the per-session fallback. The two choices are coupled.
+
 ### 4.3 Settings
 
 - Target device: default output, or a specific device (remembered by name, surviving re-plugging)
@@ -146,9 +148,13 @@ Ordered by how much damage a wrong answer does.
 
 ## 7. Plan
 
-**Milestone 0 — toolchain.** Install rustup and Visual Studio Build Tools (2–4 GB). Confirm a hello world builds and links.
+**Milestone 0 — toolchain. DONE (2026-08-29).** rustup + Rust 1.98.0, Visual Studio Build Tools 17.14.39 with the VC++ workload. Verified end to end: a real binary compiles, links and runs.
 
-**Milestone 1 — spike. Do this before writing any real code.** A throwaway binary that opens a WASAPI stream, emits a keep-alive signal, and stops on keypress. Use it to answer open questions 1, 2 and 3 by hand. If soft release doesn't free the headset, the design changes — better to know now than after building a settings dialog.
+**Milestone 1 — spike. BUILT, awaiting hardware test.** `spike/` is a throwaway console tool that opens a WASAPI stream, emits a selectable keep-alive signal, and fully releases the device on command. Line-based commands and transition-only output, so it is usable with a screen reader.
+
+Run with `cargo run` from `spike/`. Commands: `on`, `off`, `zeros`, `fluct`, `sine`, `watch`, `status`, `quit`.
+
+Connect the AeroClip and make it the default output device first — the spike targets the default endpoint and reports which one it picked at startup.
 
 **Milestone 2 — core engine.** Keep-alive strategies, device selection and hot-plug handling, the state machine, device peak-meter idle detection, clean stream teardown.
 
