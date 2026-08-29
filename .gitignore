@@ -1,0 +1,24 @@
+# Rust
+/target/
+**/*.rs.bk
+*.pdb
+
+# Build artefacts
+*.exe
+*.dll
+*.res
+
+# Local config produced by the app at runtime
+stablesound.toml
+stablesound.json
+
+# Editor / OS
+.vs/
+.vscode/
+*.user
+Thumbs.db
+desktop.ini
+
+# Scratch
+/scratch/
+/tmp/
