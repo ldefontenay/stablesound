@@ -9,9 +9,9 @@ target/
 *.dll
 *.res
 
-# Local config produced by the app at runtime
-stablesound.toml
-stablesound.json
+# Local config and logs produced by the app at runtime
+stablesound.conf
+stablesound.log
 
 # Editor / OS
 .vs/

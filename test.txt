@@ -2,7 +2,7 @@ STABLESOUND - MILESTONE 1 HARDWARE TESTS
 ========================================
 
 Created: 2026-08-30
-Status:  COMPLETE (2026-08-30) - findings folded into PLAN.md
+Status:  Milestone 1 COMPLETE. Milestone 2 tests added below, NOT STARTED.
 
 
 HOW TO USE THIS FILE
@@ -211,3 +211,144 @@ louder signal makes the detection in Test 2 harder.
 If Test 3 concludes we need "sine", then Test 2's simple approach
 will not work and we need a more complex one. That is fine, it just
 needs to be known before building.
+
+
+
+===========================================================
+===========================================================
+MILESTONE 2 TESTS - THE REAL ENGINE
+===========================================================
+===========================================================
+
+Added: 2026-08-30
+Status: NOT STARTED
+
+This is the real app now, not the throwaway spike. Three things
+could not be checked without you and the headphones.
+
+To start it:
+    !cargo run
+
+It prints where its settings and log files live. The log is the
+important part - see Test 6.
+
+
+SETUP
+-----
+
+Connect the AeroClips and make them the default output device, as
+before. Keep the JAWS built-in bluetooth setting OFF.
+
+Useful commands inside the program:
+
+    on / off / toggle     control keep-alive
+    idle <seconds>        release after N seconds with no audio
+    fixed <seconds>       release N seconds after switching on
+    signal zeros          the default
+    device <name>         target a device by name
+    device default        follow the Windows default
+    status                show settings
+    save                  write settings to the config file
+    quit                  exit
+
+
+===========================================================
+TEST 4 - DOES JAWS SPEECH POSTPONE THE RELEASE?
+===========================================================
+
+Automated testing proved it releases when nothing is playing. What
+it could NOT prove is the opposite: that speech keeps it alive. That
+is the whole point of idle mode, so it needs checking by hand.
+
+Steps:
+
+1. Type: idle 15
+2. Type: on
+3. Now keep using JAWS continuously - read a document, arrow around,
+   anything, for about a minute. Do not go quiet for more than ~10
+   seconds at a time.
+
+ANSWER - did keep-alive stay ON for that whole minute? It should NOT
+have released while you were still using JAWS.
+
+
+4. Now stop touching the laptop and stay quiet for 20 seconds.
+
+ANSWER - did it release after about 15 seconds of quiet?
+
+
+ANYTHING ODD:
+
+
+===========================================================
+TEST 5 - DOES IT FOLLOW WHEN THE DEFAULT DEVICE CHANGES?
+===========================================================
+
+If you unplug or disconnect the headphones, the app should notice
+and move to whatever Windows switches to.
+
+Steps:
+
+1. Type: device default
+2. Type: fixed 300      (so it will not release during the test)
+3. Type: on
+4. Now disconnect the AeroClips - put them in the case, or turn
+   Bluetooth off.
+
+ANSWER - did the program report moving to another device? It should
+print a line starting with "MOVED".
+
+
+5. Reconnect the AeroClips and make them default again.
+
+ANSWER - did it move back?
+
+
+ANSWER - did anything crash, hang, or produce an error message?
+
+
+ANYTHING ODD:
+
+
+===========================================================
+TEST 6 - IS THE LOG FILE USEFUL?
+===========================================================
+
+The log exists because we found you cannot watch idle behaviour
+live - reading the screen makes JAWS talk, which is the very sound
+being measured. So the log is how we check what really happened.
+
+Steps:
+
+1. After doing tests 4 and 5, quit the program.
+2. Open the log file. Its location is printed when the program
+   starts - it will be stablesound.log next to the program.
+
+ANSWER - does the log make sense when you read it? Can you tell
+when keep-alive turned on and off, and why it turned off?
+
+
+ANSWER - is anything missing that you would want recorded?
+
+
+ANYTHING ODD:
+
+
+===========================================================
+TEST 7 - GENERAL USE
+===========================================================
+
+Type "idle 60" then "on", then just use the laptop normally for a
+while. This is the closest thing to how you would actually use it.
+
+ANSWER - did speech clipping stay away?
+
+
+ANSWER - did the 60 second timeout feel about right? Too short, too
+long? This is the main number we still need to tune.
+
+
+ANSWER - anything about the app that felt wrong or awkward?
+
+
+ANYTHING ODD:

@@ -88,9 +88,17 @@ So soft release is sufficient. Closing the WASAPI client frees the headset for t
 ### 4.1 States
 
 ```
-RELEASED       --hotkey / audio detected-------->  KEEPING_ALIVE
-KEEPING_ALIVE  --hotkey / idle timeout expires-->  RELEASED
+RELEASED       --hotkey only------------------->  KEEPING_ALIVE
+KEEPING_ALIVE  --hotkey / timeout expires------>  RELEASED
 ```
+
+**Corrected during Milestone 2.** The original diagram had "audio detected" as a
+second way into KEEPING_ALIVE. That was wrong, and would have defeated the app's
+main purpose: after releasing the headset so the iPhone can take over, the next
+word JAWS spoke would have grabbed it straight back, roughly a second later.
+
+**Starting is always explicit. Only stopping is automatic.** Audio detection is
+used solely to postpone release, never to trigger a start.
 
 - **KEEPING_ALIVE** — WASAPI render stream open on the target device, emitting the configured keep-alive signal.
 - **RELEASED** — stream fully closed (`IAudioClient` released, not merely paused — a paused stream may still hold the endpoint). Optionally, Bluetooth audio profile disconnected.
@@ -185,7 +193,24 @@ Run with `cargo run` from `spike/`. Commands: `on`, `off`, `zeros`, `fluct`, `si
 
 Connect the AeroClip and make it the default output device first — the spike targets the default endpoint and reports which one it picked at startup.
 
-**Milestone 2 - core engine. IN PROGRESS.** Keep-alive strategies (zeros default), device selection and hot-plug handling, the state machine, device peak-meter idle detection, clean stream teardown, and **file-based transition logging** so idle behaviour can be verified without a screen reader polluting the measurement.
+**Milestone 2 - core engine. DONE (2026-08-30), pending a hardware round.**
+
+Built: the three keep-alive signals, device selection by name with fallback to default, the state machine, device peak-meter idle detection, clean stream teardown, file-based transition logging, and a plain-text config file.
+
+Verified automatically:
+- Fixed-timer release fires at the right moment and logs it.
+- Idle release fires after the timeout with no audio present.
+- Device selection by name works; the AeroClip is visible as "Headphones (soundcore AeroClip)".
+- 5 unit tests over config parsing and the validation guards.
+- `cargo clippy -- -D warnings` clean.
+- Release binary is **246 KB**, comfortably inside the ~1 MB budget.
+
+Not yet verified on hardware, and needing a test round:
+- That real JAWS speech postpones idle release (only the no-audio case was proven).
+- That following a default-device change actually works when headphones connect or disconnect.
+- Behaviour over a long session rather than a few seconds.
+
+The console harness in `main.rs` is scaffolding for testing the engine. Milestones 3 and 4 replace it with the hotkey and the settings dialog; the engine underneath is the real thing.
 
 **Milestone 3 — control surface.** Global hotkey registration, earcons for on/off, tray icon for sighted users and for a visible quit.
 

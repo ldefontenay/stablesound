@@ -1,0 +1,32 @@
+[workspace]
+# spike/ is the Milestone 1 diagnostic tool. Kept for reference but built
+# independently, so it doesn't drag the real app's lockfile around.
+exclude = ["spike"]
+
+[package]
+name = "stablesound"
+version = "0.1.0"
+edition = "2021"
+description = "Keeps Bluetooth headphones awake for screen reader speech, with a hotkey toggle and auto-release"
+license = "MIT"
+
+[dependencies]
+windows = { version = "0.62", features = [
+    "Win32_Foundation",
+    "Win32_Media_Audio",
+    "Win32_Media_Audio_Endpoints",
+    "Win32_System_Com",
+    "Win32_System_Com_StructuredStorage",
+    "Win32_System_Variant",
+    "Win32_System_SystemInformation",
+    "Win32_Devices_FunctionDiscovery",
+    "Win32_UI_Shell_PropertiesSystem",
+] }
+
+# Size matters: the point of Rust here is a ~1 MB portable exe. See CLAUDE.md.
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
