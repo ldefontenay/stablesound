@@ -2,7 +2,7 @@ STABLESOUND - MILESTONE 1 HARDWARE TESTS
 ========================================
 
 Created: 2026-08-30
-Status:  NOT STARTED
+Status:  COMPLETE (2026-08-30) - findings folded into PLAN.md
 
 
 HOW TO USE THIS FILE
@@ -45,10 +45,10 @@ SETUP - DO THIS FIRST
    the AeroClips and not Realtek.
 
 ANSWER - what device name did it print?
-
+Aeroclips
 
 ANSWER - was the JAWS bluetooth setting successfully turned off?
-
+Yes.
 
 COMMANDS YOU CAN TYPE IN THE PROGRAM
 ------------------------------------
@@ -83,26 +83,26 @@ Steps:
 
 ANSWER - did the iPhone audio come through the AeroClips, or did the
 laptop keep control?
-
+The laptop kept control.
 
 3. Now type: off
 
 4. Try the iPhone again.
 
 ANSWER - did the iPhone take over this time?
-
+Yes, the iPhone took over.
 
 ANSWER - roughly how long did the handover take? A rough count in
 seconds is fine.
-
+Very fast, about 3 seconds.
 
 5. Repeat steps 1-4 once more, to check it was not a fluke.
 
 ANSWER - did it behave the same the second time?
-
+Yes.
 
 ANYTHING ODD:
-
+No, worked as expected.
 
 ===========================================================
 TEST 2 - DOES JAWS SPEECH SHOW UP ON THE AUDIO METER?
@@ -126,26 +126,26 @@ The program should print lines like:
        AUDIO STOPPED after 2.3 s (highest peak 0.06180)
 
 ANSWER - did it report audio detected when JAWS spoke? Yes or no.
-
+Yes.
 
 ANSWER - if yes, roughly what peak numbers did you see?
-
+0.56111
 
 4. Now stay quiet for about 10 seconds and let JAWS say nothing.
 
 ANSWER - did it report audio stopped? Did the timing seem about
 right?
-
+Hard to test propperly, as typing and reading triggers the audiometer. I turned off screen highlight eacho, and it felt about right.
 
 5. Now type: on
    Then let JAWS speak again, with keep-alive running.
 
 ANSWER - did it still correctly report JAWS speech starting and
 stopping, or did it get confused by our own signal?
-
+Hard to test, as reading the screen influences the results. We may need to just wait and see how this pans out but no obvious problems arose.
 
 ANYTHING ODD:
-
+No. Just screenreading interfering with testing.
 
 ===========================================================
 TEST 3 - WHICH SIGNAL ACTUALLY KEEPS THE AEROCLIPS AWAKE?
@@ -168,23 +168,23 @@ we want.
 
 MODE 1 - type: fluct     then: on
 ANSWER - was speech clipped?
-
+No.
 
 MODE 2 - type: zeros     then: on
 ANSWER - was speech clipped?
-
+No
 
 MODE 3 - type: sine      then: on
 ANSWER - was speech clipped?
-
+No.
 
 ANSWER - for comparison, type "off" and use the laptop for a few
 minutes with no keep-alive at all. How bad is the clipping normally?
 This gives us a baseline.
-
+Speech clips after 2-3 seconds, very annoying.
 
 ANYTHING ODD:
-
+Possible slight artifact with the sine option, but only happened once and could have been random.
 
 ===========================================================
 ANYTHING ELSE
@@ -195,7 +195,7 @@ misunderstood about the problem. Also worth noting: did the test
 program itself work well with JAWS, or was anything awkward to read?
 
 NOTES:
-
+Spike programme worked well and makes me feel very hopeful about the project. Programme nicely accessible.
 
 
 

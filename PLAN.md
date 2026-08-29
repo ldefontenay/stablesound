@@ -48,11 +48,24 @@ It works, but it is all-or-nothing: on means always on. There is no hotkey and n
 
 Design consequence: make the keep-alive signal a **configurable strategy** (fluctuate / inaudible sine / pure zeros) rather than hardcoding one. Different headsets respond differently and we may need to experiment on the AeroClip specifically.
 
+**RESOLVED ON HARDWARE (2026-08-30).** All three modes prevented clipping on the AeroClip, including **pure zeros**. The test discriminated properly - with keep-alive off, speech clipped after 2-3 seconds, so the modes were genuinely doing the work.
+
+This contradicts the received wisdom above, and it is good news. On this hardware and Windows build, what keeps the link alive appears to be the render stream being *open and running*, not the content of the samples. So **zeros becomes the default**: it is the quietest signal possible, which gives idle detection unlimited headroom (see 4.2).
+
+Fluctuate and sine stay implemented as fallbacks for other headsets that may need them - the research says some do - but the AeroClip does not. Sine is demoted furthest: the tester noted a possible faint artifact with it once, and 20 kHz sits close to Nyquist at a 48 kHz sample rate, so aliasing is plausible. Not a good default.
+
 ### 2.4 Multipoint behaviour
 
 Soundcore confirms dual connection (multipoint) is **on by default** on AeroClip and can be managed in the Soundcore app. Confirmed: two devices connected at once, switching without re-pairing.
 
-**Not verified, and this is the critical unknown:** what exactly the AeroClip needs from the laptop before it will let the phone take over. Specifically, whether merely stopping our audio stream is enough, or whether Windows keeps the A2DP link "in use" such that the phone stays locked out. This is the single assumption the whole design rests on, so it gets tested first — see Milestone 1.
+**RESOLVED ON HARDWARE (2026-08-30). The core assumption holds.** Tested twice, same result both times:
+
+- With keep-alive running, the iPhone **could not** take over. The laptop kept control.
+- After releasing the stream, the iPhone took over in **about 3 seconds**.
+
+So soft release is sufficient. Closing the WASAPI client frees the headset for the phone, with a handover fast enough to feel immediate. This was the single biggest risk in the design and it is now retired.
+
+**Consequence: hard release is probably unnecessary.** Milestone 5 drops from "planned" to "only if a real need appears" - for instance if another headset behaves differently, or if the 3-second handover proves annoying in practice. Not worth building on spec.
 
 ---
 
@@ -61,7 +74,8 @@ Soundcore confirms dual connection (multipoint) is **on by default** on AeroClip
 | Decision | Choice | Why |
 |---|---|---|
 | Release trigger | **Idle-based**, with a fixed-timer mode as an option | Keep-alive should follow actual use. Any real audio resets the countdown, so it stays alive while you work and releases once you genuinely stop. Fixed timer available for a hard cutoff. |
-| Release depth | **Soft release** default, **hard release** optional | Soft = close the audio stream, let Windows go idle. Hard = disconnect the headset's audio profile from Windows outright. Hard is more certain but costs a reconnect delay, so it's opt-in. |
+| Release depth | **Soft release only** (revised 2026-08-30) | Hardware testing confirmed soft release frees the headset in ~3 s. Hard release was going to be the fallback if it didn't; it isn't needed. Deferred indefinitely rather than built on spec. |
+| Keep-alive signal | **Zeros** by default (decided 2026-08-30) | Pure silence proved sufficient on the AeroClip. Quietest possible signal, so it cannot interfere with idle detection. Fluctuate and sine remain available for other hardware. |
 | Language | **Rust** | ~1 MB single portable exe, no runtime, no installer. Easy to hand to other people. Direct WASAPI access, which suits an app that is fundamentally about audio stream lifetime. |
 | GUI | **Real Win32 controls via `winsafe`** | Non-negotiable for a screen reader tool: real `HWND` controls are accessible to JAWS for free. Drawn-UI toolkits (egui, iced, Slint) reconstruct an accessibility tree via AccessKit — works, but consistently worse under JAWS. **Note:** `native-windows-gui`, the crate most tutorials recommend, is no longer maintained. `winsafe` (v0.0.28, July 2026) is the live alternative. |
 | Toolchain | rustup + MSVC (Visual Studio Build Tools) | The GNU toolchain avoids the download but adds COM/linking friction. Not worth it. |
@@ -92,9 +106,13 @@ This is simpler than enumerating individual audio sessions, and it works because
 
 **Fallback if that proves unreliable:** enumerate sessions via `IAudioSessionManager2`, skip our own process ID, and check each session's state and peak. More code, more precise. Only go here if needed.
 
-**To verify:** that JAWS speech actually registers on the device peak meter. JAWS may use an audio path that behaves differently. Tested in Milestone 1.
+**RESOLVED ON HARDWARE (2026-08-30).** JAWS speech registers clearly, peaking around **0.56** - over half full scale, and roughly 1000x the 0.0005 threshold. Enormous margin. Device-level metering works, and the per-session fallback is not needed.
 
-**Known interaction, found while building the spike:** device-level metering only works if our own keep-alive signal stays below the detection threshold. Fluctuate (~0.00003) and zeros are fine against a 0.0005 threshold. **Sine at 1% (0.01) is not** — we would see our own signal as "real audio" and never release. So if Q3 concludes the AeroClip needs sine, idle detection *must* move to the per-session fallback. The two choices are coupled.
+**Observability problem found during testing, worth designing around.** The tester could not cleanly observe the "audio stopped" transition, because reading the program's own output with JAWS generates speech, which trips the meter. Screen reader output and audio measurement interfere with each other by nature.
+
+Consequence for Milestone 2: **the engine must log state transitions to a file, not just the console.** A log that can be read after the fact, when the headset is quiet, is the only way to verify idle behaviour without the act of observing changing the result. This will matter again when tuning the idle timeout.
+
+**The signal/metering conflict is now moot.** It was real: sine at 1% (0.01) would have tripped our own detector and prevented release. But zeros won 2.3, and zeros has a literal peak of 0.0, so there is no self-detection risk at all on the default path. The coupling only returns if someone switches to sine for other hardware - at which point the app should either force the per-session method or refuse to combine sine with idle-based release. **Guard against that combination in code rather than leaving it as a trap.**
 
 ### 4.3 Settings
 
@@ -136,13 +154,22 @@ Target: single self-contained `.exe`, roughly 300 KB – 1 MB, no installer.
 
 ## 6. Open questions
 
-Ordered by how much damage a wrong answer does.
+### Resolved by Milestone 1 hardware testing (2026-08-30)
 
-1. **Does soft release actually free the headset for the iPhone?** The core assumption. If Windows holds the A2DP link "in use" regardless, hard release stops being optional and becomes the default. Test before building anything else.
-2. **Does JAWS speech show on the device peak meter?** If not, idle detection needs the per-session fallback.
-3. **Which keep-alive signal does the AeroClip actually need?** Fluctuate, inaudible sine, or is pure zeros enough? Empirical, per device.
-4. **What idle timeout feels right?** Too short and speech cuts out mid-task; too long and the phone stays locked out. Needs real-world use to tune. Start at 60s.
-5. **How long does the AeroClip take to reconnect after a hard release?** Determines whether hard release is usable day-to-day or a last resort.
+Raw results are in `test.txt`.
+
+1. ~~Does soft release free the headset for the iPhone?~~ **Yes.** ~3 s handover, reproducible. See 2.4.
+2. ~~Does JAWS speech show on the device peak meter?~~ **Yes,** peak ~0.56. See 4.2.
+3. ~~Which keep-alive signal does the AeroClip need?~~ **Zeros is enough.** See 2.3.
+4. ~~How long does the AeroClip take to reconnect after a hard release?~~ **Moot** - hard release is no longer being built.
+
+### Still open
+
+5. **What idle timeout feels right?** Unchanged, and not answerable in a lab - it needs daily use. Too short and speech clips mid-task; too long and the phone stays locked out. Start at 60 s and tune. The file-based logging from 4.2 exists partly to make this measurable.
+
+6. **Does zeros still work after a much longer idle gap?** Testing used 20-30 second gaps. Real use involves far longer ones - an hour away from the desk, or a laptop that has slept. If clipping reappears after a long gap, fluctuate is the next thing to try. **Residual risk, watch for it in daily use.**
+
+7. **Does the AeroClip behave the same on battery, or after a Windows sleep/resume cycle?** Sound Keeper carries explicit handling for modern-standby suspend/resume events, which suggests this bites in practice. Not yet tested.
 
 ---
 
@@ -150,23 +177,25 @@ Ordered by how much damage a wrong answer does.
 
 **Milestone 0 — toolchain. DONE (2026-08-29).** rustup + Rust 1.98.0, Visual Studio Build Tools 17.14.39 with the VC++ workload. Verified end to end: a real binary compiles, links and runs.
 
-**Milestone 1 — spike. BUILT, awaiting hardware test.** `spike/` is a throwaway console tool that opens a WASAPI stream, emits a selectable keep-alive signal, and fully releases the device on command. Line-based commands and transition-only output, so it is usable with a screen reader.
+**Milestone 1 - spike. DONE (2026-08-30).** All three questions answered; see section 6 and `test.txt`. The tester reported the spike itself was comfortable to use with JAWS, so the line-based, transition-only output pattern is worth reusing for future diagnostic tools.
+
+**Milestone 1, original description.** `spike/` is a throwaway console tool that opens a WASAPI stream, emits a selectable keep-alive signal, and fully releases the device on command. Line-based commands and transition-only output, so it is usable with a screen reader.
 
 Run with `cargo run` from `spike/`. Commands: `on`, `off`, `zeros`, `fluct`, `sine`, `watch`, `status`, `quit`.
 
 Connect the AeroClip and make it the default output device first — the spike targets the default endpoint and reports which one it picked at startup.
 
-**Milestone 2 — core engine.** Keep-alive strategies, device selection and hot-plug handling, the state machine, device peak-meter idle detection, clean stream teardown.
+**Milestone 2 - core engine. IN PROGRESS.** Keep-alive strategies (zeros default), device selection and hot-plug handling, the state machine, device peak-meter idle detection, clean stream teardown, and **file-based transition logging** so idle behaviour can be verified without a screen reader polluting the measurement.
 
 **Milestone 3 — control surface.** Global hotkey registration, earcons for on/off, tray icon for sighted users and for a visible quit.
 
 **Milestone 4 — settings.** The `winsafe` dialog, config load/save, second hotkey to open settings. Test the whole dialog under JAWS with the screen off.
 
-**Milestone 5 — hard release.** Bluetooth audio profile disconnect/reconnect as an opt-in mode. Reference: `m2jean/ToothTray` does exactly this and is open source.
+**Milestone 5 - hard release. DEFERRED, probably not needed.** Soft release was confirmed sufficient on the AeroClip (see 2.4), so this is no longer planned work. Revisit only if another headset needs it, or if the 3-second handover becomes annoying. Reference if it ever happens: `m2jean/ToothTray`.
 
 **Milestone 6 — ship.** Autostart, size-tuned release build, README, and a plan for the antivirus/SmartScreen problem — a small unsigned binary that opens audio devices and registers global hotkeys fits the profile AV heuristics dislike. Options: submit false-positive reports to the major vendors, or look at code signing.
 
-**First action after this document:** Milestone 0, then the Milestone 1 spike.
+**Current position:** Milestones 0 and 1 complete. Milestone 2 under way.
 
 ---
 
