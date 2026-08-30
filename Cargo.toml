@@ -21,6 +21,7 @@ windows = { version = "0.62", features = [
     "Win32_System_SystemInformation",
     "Win32_Devices_FunctionDiscovery",
     "Win32_UI_Shell_PropertiesSystem",
+    "Win32_UI_Input_KeyboardAndMouse",
 ] }
 
 # Size matters: the point of Rust here is a ~1 MB portable exe. See CLAUDE.md.

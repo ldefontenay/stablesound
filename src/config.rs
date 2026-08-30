@@ -76,6 +76,18 @@ pub struct Config {
     /// idle behaviour cannot be observed live, because reading the output with
     /// a screen reader generates the very audio being measured.
     pub logging: bool,
+    /// Bring keep-alive back automatically when the user touches the keyboard
+    /// or mouse.
+    ///
+    /// Requested after Milestone 2 testing. It fixes a real gap: once idle
+    /// release has fired, the next thing to make a sound is often a
+    /// notification, and that first word gets clipped. Sitting down and
+    /// touching a key is a reliable signal that speech is about to be wanted.
+    ///
+    /// This is *not* the same as waking on detected audio, which was rejected
+    /// in `engine`: audio is a consequence of our own output, so it forms a
+    /// loop. Keyboard input is independent of anything the app does.
+    pub wake_on_input: bool,
 }
 
 impl Default for Config {
@@ -83,13 +95,14 @@ impl Default for Config {
         Config {
             device: DeviceSelector::Default,
             signal: Signal::Zeros,
-            // 60 s is a starting point, not a considered answer. Tuning it
-            // needs daily use - see PLAN.md section 6, question 5.
-            release: Release::Idle { secs: 60 },
+            // 30 s after Milestone 2 testing: 60 s felt too long once waking
+            // on input made re-arming cheap.
+            release: Release::Idle { secs: 30 },
             // JAWS speech measured around 0.56 on the AeroClip, so this has
             // roughly a 1000x margin.
             audio_threshold: 0.0005,
             logging: true,
+            wake_on_input: true,
         }
     }
 }
@@ -136,11 +149,11 @@ impl Config {
         };
         if secs == 0 {
             self.release = match self.release {
-                Release::Idle { .. } => Release::Idle { secs: 60 },
-                Release::Fixed { .. } => Release::Fixed { secs: 60 },
+                Release::Idle { .. } => Release::Idle { secs: 30 },
+                Release::Fixed { .. } => Release::Fixed { secs: 30 },
             };
             out.push(Adjustment {
-                what: "timeout changed from 0 to 60 s".into(),
+                what: "timeout changed from 0 to 30 s".into(),
                 why: "a zero timeout would release immediately, making the app pointless".into(),
             });
         }
@@ -163,7 +176,7 @@ impl Config {
         let mut sine_amp = 0.01f32;
         let mut signal_name = String::from("zeros");
         let mut release_name = String::from("idle");
-        let mut release_secs = 60u32;
+        let mut release_secs = 30u32;
 
         for line in text.lines() {
             let line = line.trim();
@@ -191,6 +204,9 @@ impl Config {
                 "timeout" => release_secs = value.parse().unwrap_or(release_secs),
                 "threshold" => cfg.audio_threshold = value.parse().unwrap_or(cfg.audio_threshold),
                 "logging" => cfg.logging = parse_bool(value).unwrap_or(cfg.logging),
+                "wake_on_input" => {
+                    cfg.wake_on_input = parse_bool(value).unwrap_or(cfg.wake_on_input)
+                }
                 _ => {}
             }
         }
@@ -260,9 +276,16 @@ threshold = {threshold}
 # cannot be watched live, because reading output with a screen reader
 # makes the very sound being measured.
 logging = {logging}
+
+# Bring keep-alive back when you touch the keyboard or mouse, so the
+# first word after a pause is not clipped. Switching keep-alive off by
+# hand disables this until you switch it on again - so releasing the
+# headset for your phone is not undone by the next keypress.
+wake_on_input = {wake_on_input}
 ",
             threshold = self.audio_threshold,
             logging = self.logging,
+            wake_on_input = self.wake_on_input,
         )
     }
 }
@@ -358,7 +381,7 @@ mod tests {
     fn quiet_signals_keep_idle_release() {
         let mut cfg = Config::default();
         assert!(cfg.validate().is_empty());
-        assert_eq!(cfg.release, Release::Idle { secs: 60 });
+        assert_eq!(cfg.release, Release::Idle { secs: 30 });
 
         let mut cfg = Config {
             signal: Signal::Fluctuate,
@@ -374,7 +397,16 @@ mod tests {
             ..Config::default()
         };
         let adjustments = cfg.validate();
-        assert_eq!(cfg.release, Release::Idle { secs: 60 });
+        assert_eq!(cfg.release, Release::Idle { secs: 30 });
         assert_eq!(adjustments.len(), 1);
+    }
+
+    #[test]
+    fn wake_on_input_round_trips() {
+        let cfg = Config {
+            wake_on_input: false,
+            ..Config::default()
+        };
+        assert!(!Config::parse(&cfg.serialise()).wake_on_input);
     }
 }

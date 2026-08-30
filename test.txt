@@ -2,7 +2,7 @@ STABLESOUND - MILESTONE 1 HARDWARE TESTS
 ========================================
 
 Created: 2026-08-30
-Status:  Milestone 1 COMPLETE. Milestone 2 tests added below, NOT STARTED.
+Status:  Milestones 1 and 2 COMPLETE. Milestone 2b tests added below, NOT STARTED.
 
 
 HOW TO USE THIS FILE
@@ -221,7 +221,7 @@ MILESTONE 2 TESTS - THE REAL ENGINE
 ===========================================================
 
 Added: 2026-08-30
-Status: NOT STARTED
+Status: COMPLETE - results below, fixes applied
 
 This is the real app now, not the throwaway spike. Three things
 could not be checked without you and the headphones.
@@ -270,15 +270,15 @@ Steps:
 
 ANSWER - did keep-alive stay ON for that whole minute? It should NOT
 have released while you were still using JAWS.
-
+Yes, it stayed on.
 
 4. Now stop touching the laptop and stay quiet for 20 seconds.
 
 ANSWER - did it release after about 15 seconds of quiet?
-
+Yes.
 
 ANYTHING ODD:
-
+Design issue: Ideally, keep-alive should turn back on when the user starts interacting with the computer, i.e. when a keypress is registered on the keyboard. This would be more intuitive, and would also avoid Jaws grabbing the audio with a random notification. Later on, turning keep-alive on this way could be a setting as per user preference.
 
 ===========================================================
 TEST 5 - DOES IT FOLLOW WHEN THE DEFAULT DEVICE CHANGES?
@@ -297,18 +297,18 @@ Steps:
 
 ANSWER - did the program report moving to another device? It should
 print a line starting with "MOVED".
-
+No.
 
 5. Reconnect the AeroClips and make them default again.
 
 ANSWER - did it move back?
-
+No. I had to type "on" again.
 
 ANSWER - did anything crash, hang, or produce an error message?
-
+No.
 
 ANYTHING ODD:
-
+Nothing odd. Sound just went to the laptop speaker and back to the aeroclips with keep-alive off. No error messages. All worked well again after the on command.
 
 ===========================================================
 TEST 6 - IS THE LOG FILE USEFUL?
@@ -326,13 +326,13 @@ Steps:
 
 ANSWER - does the log make sense when you read it? Can you tell
 when keep-alive turned on and off, and why it turned off?
-
+Yes, clear.
 
 ANSWER - is anything missing that you would want recorded?
-
+No.
 
 ANYTHING ODD:
-
+No.
 
 ===========================================================
 TEST 7 - GENERAL USE
@@ -342,13 +342,140 @@ Type "idle 60" then "on", then just use the laptop normally for a
 while. This is the closest thing to how you would actually use it.
 
 ANSWER - did speech clipping stay away?
-
+Yes.
 
 ANSWER - did the 60 second timeout feel about right? Too short, too
 long? This is the main number we still need to tune.
-
+I'd go with 30 seconds for now, especially if keep-alive can be turned on when keyboard activity is registered.
 
 ANSWER - anything about the app that felt wrong or awkward?
+Design issue/idea discussed above.
+
+ANYTHING ODD:
+No, very pleased with tests.
+
+
+===========================================================
+===========================================================
+MILESTONE 2b - RETESTING THE FIXES
+===========================================================
+===========================================================
+
+Added: 2026-08-30
+Status: NOT STARTED
+
+Three changes came out of your last round. Test 8 is the important
+one - it is a retest of the thing that failed.
+
+Start it the same way:
+    !cargo run
+
+New command since last time:
+    wake on | wake off    bring keep-alive back on keyboard/mouse input
+
+The default settings have changed: idle timeout is now 30 seconds
+instead of 60, and waking on input is ON.
+
+
+===========================================================
+TEST 8 - RETEST: DOES IT RECOVER WHEN THE DEVICE GOES?
+===========================================================
+
+This failed last time. The engine stopped for good when the
+headphones disconnected, and you had to type "on" again.
+
+What should happen now: losing the headphones no longer stops it. It
+should keep trying every 2 seconds and reopen on whatever Windows
+switches to, then move back when the AeroClips return.
+
+Steps:
+
+1. Type: wake off        (so input waking does not confuse the test)
+2. Type: device default
+3. Type: fixed 300       (so it will not release mid-test)
+4. Type: on
+5. Disconnect the AeroClips - case them, or turn Bluetooth off.
+
+ANSWER - did it report moving to another device? Look for a line
+starting with "MOVED" or "INTERRUPTED".
+
+
+6. Wait about 10 seconds, then reconnect the AeroClips and make them
+   the default again.
+
+ANSWER - did it move back to the AeroClips on its own, WITHOUT you
+typing "on"?
+
+
+ANSWER - did it get stuck, spam messages, or behave oddly at any
+point?
+
+
+7. Now quit, and read stablesound.log.
+
+ANSWER - does the log tell a clear story of what happened?
+
+
+ANYTHING ODD:
+
+
+===========================================================
+TEST 9 - DOES WAKING ON INPUT FEEL RIGHT?
+===========================================================
+
+This is the feature you suggested. It is on by default now.
+
+The rule to check: turning keep-alive off BY HAND should stay off
+even if you type. But an automatic release should be undone by the
+next keypress. The idea is that deliberately handing the headset to
+your phone sticks, while merely pausing does not.
+
+Steps:
+
+1. Type: wake on
+2. Type: idle 30
+3. Type: on
+4. Walk away or sit quiet for about 40 seconds, so it releases on
+   its own.
+5. Now press a key or move the mouse.
+
+ANSWER - did keep-alive come back on by itself? Look for "woken by
+input".
+
+
+6. Now type: off      (an explicit, by-hand switch off)
+7. Press some keys, move the mouse.
+
+ANSWER - did it STAY off this time? It should. Typing should not
+undo a deliberate switch-off.
+
+
+8. Check your iPhone can take over at this point.
+
+ANSWER - could the phone take the headphones while keep-alive was
+off by hand?
+
+
+ANYTHING ODD:
+
+
+===========================================================
+TEST 10 - LIVE WITH IT
+===========================================================
+
+Type "on" and just use the laptop for a while - ideally a real work
+session, and ideally including picking up your phone at some point.
+
+ANSWER - did the 30 second timeout feel better than 60?
+
+
+ANSWER - did waking on input ever get in the way? For instance,
+grabbing the headphones back when you wanted your phone to have
+them?
+
+
+ANSWER - anything else that felt wrong, or that you would want
+changed before we add the hotkey?
 
 
 ANYTHING ODD:

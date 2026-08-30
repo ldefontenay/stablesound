@@ -7,6 +7,7 @@
 mod audio;
 mod config;
 mod engine;
+mod input;
 mod log;
 
 use std::io::{self, BufRead, Write};
@@ -145,6 +146,18 @@ fn main() {
                 apply(&mut cfg, &handle);
             }
 
+            "wake" => match rest {
+                "on" | "" => {
+                    cfg.wake_on_input = true;
+                    apply(&mut cfg, &handle);
+                }
+                "off" => {
+                    cfg.wake_on_input = false;
+                    apply(&mut cfg, &handle);
+                }
+                _ => println!("Usage: wake on | wake off"),
+            },
+
             "save" => match cfg.save(&config_path) {
                 Ok(()) => println!("Saved to {}", config_path.display()),
                 Err(e) => println!("Could not save: {e}"),
@@ -205,6 +218,14 @@ fn describe(cfg: &Config) {
     println!("Device:  {device}");
     println!("Signal:  {}", cfg.signal);
     println!("Release: {release}");
+    println!(
+        "Wake:    {}",
+        if cfg.wake_on_input {
+            "on - input brings keep-alive back"
+        } else {
+            "off - only the hotkey starts it"
+        }
+    );
 }
 
 fn drain_events(events: &std::sync::mpsc::Receiver<Event>) {
@@ -212,6 +233,12 @@ fn drain_events(events: &std::sync::mpsc::Receiver<Event>) {
         match event {
             Event::Started { device, signal } => {
                 println!("  KEEP-ALIVE ON - {device}, signal {signal}")
+            }
+            Event::WokenByInput { device } => {
+                println!("  KEEP-ALIVE ON - woken by input, {device}")
+            }
+            Event::Interrupted { message } => {
+                println!("  INTERRUPTED - {message} (retrying)")
             }
             Event::Stopped { reason } => {
                 println!("  KEEP-ALIVE OFF - {reason:?}, device released")
@@ -234,6 +261,7 @@ fn help() {
     println!("  idle <seconds>        release after N seconds with no audio");
     println!("  fixed <seconds>       release N seconds after switching on");
     println!("  device <name>         target a device by name, or 'device default'");
+    println!("  wake on | wake off    bring keep-alive back on keyboard/mouse input");
     println!("  save                  write current settings to the config file");
     println!("  status                show current settings");
     println!("  quit                  exit");

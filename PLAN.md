@@ -1,4 +1,54 @@
-# StableSound — research findings and build plan
+# StableSound - research findings and build plan
+
+## 0. Where we are (updated 2026-08-30)
+
+**Read this first when picking the project up.**
+
+Milestones 0, 1, 2 complete. Milestone 3 is next.
+
+### What exists and works
+
+A working console app. `cargo run` from the repo root. It keeps the headphones
+awake, releases them on a timer, wakes again when you touch the keyboard, and
+logs everything to `stablesound.log` next to the exe.
+
+Release binary is **248 KB**, against a ~1 MB budget.
+
+### What is proven on hardware
+
+- Releasing the audio stream frees the AeroClip for the iPhone in ~3 seconds.
+- Pure digital silence is enough to stop speech clipping. No tone needed.
+- JAWS speech reads ~0.56 on the device peak meter; the threshold is 0.0005.
+- Speech correctly postpones release; quiet correctly triggers it.
+- The log is readable and complete (the user's words: "Yes, clear").
+
+### What is built but NOT yet hardware-tested
+
+- **Device-loss recovery.** Milestone 2's Test 5 failed: disconnecting the
+  headphones stopped the engine permanently. Rewritten since (intent is now
+  separate from stream, so a lost device is retried rather than fatal) but
+  **nobody has confirmed the fix on real hardware.** This is the first thing to
+  test next session - see Test 8 in `test.txt`.
+- **Wake on input** in real daily use. Verified with synthetic input; not lived
+  with yet.
+
+### What is next
+
+**Milestone 3: global hotkey, earcons, tray icon.** That is what turns this from
+a console harness into something usable. `main.rs` is scaffolding and gets
+replaced.
+
+### Things a fresh session should not re-litigate
+
+- Rust with `winsafe` for native Win32 controls. Not a drawn-UI toolkit; JAWS is
+  the whole point. `native-windows-gui` is unmaintained - do not use it.
+- Hard release (disconnecting Bluetooth) is **not** being built. Soft release
+  was proven sufficient.
+- Keep-alive never starts because audio was detected. Only explicit request or
+  user input. Section 4.1 explains why.
+- Zeros is the default signal. Sine is a last resort and forces fixed release.
+
+---
 
 **Date:** 2026-08-29
 **Goal:** Stop JAWS speech cutting out on Bluetooth headphones, without permanently monopolising the headset, so the iPhone can still take over.
@@ -79,6 +129,8 @@ So soft release is sufficient. Closing the WASAPI client frees the headset for t
 | Language | **Rust** | ~1 MB single portable exe, no runtime, no installer. Easy to hand to other people. Direct WASAPI access, which suits an app that is fundamentally about audio stream lifetime. |
 | GUI | **Real Win32 controls via `winsafe`** | Non-negotiable for a screen reader tool: real `HWND` controls are accessible to JAWS for free. Drawn-UI toolkits (egui, iced, Slint) reconstruct an accessibility tree via AccessKit — works, but consistently worse under JAWS. **Note:** `native-windows-gui`, the crate most tutorials recommend, is no longer maintained. `winsafe` (v0.0.28, July 2026) is the live alternative. |
 | Toolchain | rustup + MSVC (Visual Studio Build Tools) | The GNU toolchain avoids the download but adds COM/linking friction. Not worth it. |
+| Wake on input | **On by default** (added 2026-08-30) | Requested after Milestone 2 testing. Once idle release has fired, the next sound is often a notification, and its first word gets clipped. Touching a key is a reliable sign speech is about to be wanted. Switching off by hand disarms it, so releasing for the phone still sticks. |
+| Idle timeout | **30 s** (revised 2026-08-30) | 60 s felt too long in use once waking on input made re-arming cheap. |
 | Feedback | **Earcons** (distinct short tones for on/off) | Played through the target device, so hearing the tone also proves the headset is awake. Optional speech can layer on later. |
 
 ---
@@ -88,17 +140,33 @@ So soft release is sufficient. Closing the WASAPI client frees the headset for t
 ### 4.1 States
 
 ```
-RELEASED       --hotkey only------------------->  KEEPING_ALIVE
-KEEPING_ALIVE  --hotkey / timeout expires------>  RELEASED
+RELEASED       --hotkey--------------------------->  KEEPING_ALIVE
+RELEASED       --user input, if armed------------->  KEEPING_ALIVE
+KEEPING_ALIVE  --hotkey / timeout expires-------->  RELEASED
 ```
+
+"Armed" means user input may start keep-alive. Switching off **by hand** clears
+it; an **automatic** release leaves it set. So deliberately handing the headset
+to the phone is not undone by the next keypress, while merely pausing for a
+while is.
 
 **Corrected during Milestone 2.** The original diagram had "audio detected" as a
 second way into KEEPING_ALIVE. That was wrong, and would have defeated the app's
 main purpose: after releasing the headset so the iPhone can take over, the next
 word JAWS spoke would have grabbed it straight back, roughly a second later.
 
-**Starting is always explicit. Only stopping is automatic.** Audio detection is
-used solely to postpone release, never to trigger a start.
+**Audio never starts keep-alive; it only postpones release.**
+
+**User input is different in kind, and does start it** (added after Milestone 2
+testing, at the tester's suggestion). Keyboard and mouse activity is not caused
+by our own output, so it cannot form the feedback loop that makes audio-waking
+useless. It also closes a real gap: after an automatic release, the next thing
+to make a sound is often a notification, and that first word would be clipped.
+
+Input is detected with `GetLastInputInfo`, deliberately not a `WH_KEYBOARD_LL`
+hook. A small unsigned binary that reads every keystroke is exactly the shape
+antivirus heuristics flag, which this project already expects to fight at
+Milestone 6. `GetLastInputInfo` returns only a timestamp, never key data.
 
 - **KEEPING_ALIVE** — WASAPI render stream open on the target device, emitting the configured keep-alive signal.
 - **RELEASED** — stream fully closed (`IAudioClient` released, not merely paused — a paused stream may still hold the endpoint). Optionally, Bluetooth audio profile disconnected.
@@ -173,7 +241,11 @@ Raw results are in `test.txt`.
 
 ### Still open
 
-5. **What idle timeout feels right?** Unchanged, and not answerable in a lab - it needs daily use. Too short and speech clips mid-task; too long and the phone stays locked out. Start at 60 s and tune. The file-based logging from 4.2 exists partly to make this measurable.
+5. ~~What idle timeout feels right?~~ **Answered: 30 s**, chosen by the tester after Milestone 2, on the reasoning that waking on input makes a shorter timeout safe. Now the default. Revisit after daily use.
+
+8. **Does device-loss recovery actually work?** The Milestone 2 rewrite is unverified on hardware. Highest-priority test next session.
+
+9. **Does waking on input become annoying in practice?** It could hold the headset when you only wanted to glance at the laptop. The disarm-on-manual-off rule is meant to prevent the worst case, but only real use will tell.
 
 6. **Does zeros still work after a much longer idle gap?** Testing used 20-30 second gaps. Real use involves far longer ones - an hour away from the desk, or a laptop that has slept. If clipping reappears after a long gap, fluctuate is the next thing to try. **Residual risk, watch for it in daily use.**
 
@@ -205,10 +277,20 @@ Verified automatically:
 - `cargo clippy -- -D warnings` clean.
 - Release binary is **246 KB**, comfortably inside the ~1 MB budget.
 
-Not yet verified on hardware, and needing a test round:
-- That real JAWS speech postpones idle release (only the no-audio case was proven).
-- That following a default-device change actually works when headphones connect or disconnect.
-- Behaviour over a long session rather than a few seconds.
+**Hardware test results (2026-08-30), raw notes in `test.txt`:**
+- Test 4, speech postpones release: **passed.**
+- Test 5, following a device change: **failed.** Disconnecting the headphones stopped the engine for good; the user had to type `on` again. Fixed - see below.
+- Test 6, log readability: **passed** ("Yes, clear", nothing missing).
+- Test 7, general use: **passed**, no clipping. Timeout preference: 30 s.
+
+**Fixes applied after testing:**
+
+1. **Device loss no longer kills the engine.** The cause of Test 5 was conflating "should keep-alive be running" with "is a stream open". They are now separate: losing a device clears the stream but leaves intent standing, so the engine retries every 2 s and reopens on whatever Windows switched to. Retry failures are logged once, not repeatedly. Bounded naturally by the release timeout, so a headset that never returns does not retry forever.
+2. **Wake on input**, at the tester's suggestion. See section 4.1.
+3. **Default idle timeout 60 s to 30 s**, at the tester's preference.
+4. **Fixed a bug in the wake feature found by its own test.** The check short-circuited on the config flag, so while waking was off the input watcher never refreshed its baseline; switching it on then compared against a stale timestamp and fired a spurious wake immediately. The watcher is now polled unconditionally and the flag consulted afterwards.
+
+Still unverified on hardware: the device-loss fix itself, and how waking on input feels in daily use.
 
 The console harness in `main.rs` is scaffolding for testing the engine. Milestones 3 and 4 replace it with the hotkey and the settings dialog; the engine underneath is the real thing.
 
