@@ -5,7 +5,8 @@
 **Read this first when picking the project up.**
 
 Milestones 0, 1 and 2 are complete, hardware round included. Milestone 3 is
-under way.
+built, has had its first hardware round, and the four things that round found
+have been fixed. It needs a second round to confirm them.
 
 ### What exists and works
 
@@ -28,8 +29,16 @@ Release binary is **248 KB**, against a ~1 MB budget.
 - Waking on input holds up in real use, and a manual switch-off correctly
   stays off, so the iPhone can still take the headset.
 - 30 s beats 60 s as the idle timeout.
+- `Ctrl+Win+F12` works from every program tried - a word processor, Chrome and
+  the desktop - toggles exactly once when held down, and clashes with nothing in
+  the tester's JAWS setup.
+- The off-tone is heard **in full**, every time, before the headset is let go,
+  and the iPhone then claims it immediately. The ordering design in 4.4 is
+  sound; this was the question the whole of Milestone 3 rested on.
+- With no headphones connected at all, the hotkey is harmless - the tones simply
+  play through the laptop speakers.
 
-### What the hardware round asked for
+### What the hardware rounds asked for
 
 Two changes came out of Tests 8-10, both from the tester, both now design:
 
@@ -40,6 +49,20 @@ Two changes came out of Tests 8-10, both from the tester, both now design:
   count as easy. This is a requirement for the Milestone 4 dialog, not a
   nice-to-have.
 
+Four more came out of Tests 11-18, all now fixed and awaiting confirmation:
+
+- **Tones only for what the user does.** A tone on every automatic release and
+  every wake was "annoying". Automatic transitions are now silent, whatever
+  `earcons` is set to. See 4.4.
+- **`mouse off` did not work.** A trackpad sweep still woke keep-alive. Not the
+  sweep - the finger lift at the end of it. See 4.1.
+- **The tray menu could not be opened from the keyboard**, and `Enter` on the
+  icon did nothing. The icon was never registered for version 4 of the shell's
+  notification protocol, which is what carries keyboard events at all. See 4.4.
+- **Tones too loud, slightly too long, and the on-tone clipped at the start.**
+  Volume halved to 0.1, notes shortened a fifth, and the on-tone now leads with
+  silence so the Bluetooth link has time to come up. See 4.4.
+
 ### Known residual risks, still untested
 
 - Whether zeros still works after a much longer idle gap - an hour away from
@@ -48,11 +71,12 @@ Two changes came out of Tests 8-10, both from the tester, both now design:
 
 ### What is next
 
-**Milestone 3 is built and needs a hardware round.** Hotkey, earcons and tray
-all work, and none of them has been near the AeroClip. `test.txt` is the script;
-Tests 11-18. The things most likely to come back wrong are matters of taste
-rather than correctness - earcon volume and length, and whether hearing a tone
-every time keep-alive re-arms itself becomes a nuisance.
+**Milestone 3 needs a second hardware round** to confirm the four fixes above.
+`test.txt` is the script; Tests 19-23. The two worth watching are the tray under
+JAWS, which failed outright last time and has been rebuilt on a different shell
+protocol, and whether 250 ms of lead-in silence is actually enough to stop the
+on-tone being clipped - that number is a guess, and it can only be judged by
+ear.
 
 The console harness is **kept alongside** the tray, on its own stdin thread,
 rather than replaced as originally planned. It is the only diagnostic interface
@@ -61,7 +85,9 @@ GUI is proven on hardware would leave nothing to fall back on. Milestone 6 drops
 it and switches to the windows subsystem.
 
 After the round: **Milestone 4, the settings dialog** - which carries the
-tester's request that the timeout be easy to change.
+tester's request that the timeout be easy to change, and now also their request
+to be able to customise the hotkey ("good to be able to customise it in the
+settings").
 
 ### Things a fresh session should not re-litigate
 
@@ -202,15 +228,30 @@ and the cursor also moved, call it the mouse; if it advanced and the cursor sat
 still, call it the keyboard.
 
 That keeps the privacy and antivirus properties intact - a timestamp and a
-cursor coordinate, still no key data and still no hook. It is a heuristic, and
-worth being honest about where it is wrong:
+cursor coordinate, still no key data and still no hook.
 
-- A mouse **click or wheel** with no movement reads as keyboard, and will wake.
-  Acceptable: unlike a trackpad brush, clicking is deliberate.
+**Corrected 2026-09-05 after Milestone 3 testing.** As first written this did
+not work at all: `mouse off` was the default, and a deliberate trackpad sweep
+still woke keep-alive every time. The sweep itself was classified correctly.
+What was not was the *end* of it. Taking a finger off a precision trackpad is
+itself an input event, and it arrives a few milliseconds after the pointer has
+already stopped - so the poll that saw it found the timestamp advanced and the
+pointer still, which is the exact signature of a keypress.
+
+The fix is that the pointer has to have been still for a **settling window**,
+currently 500 ms, not merely still since the previous poll. That covers the
+finger lift, and it covers a click at the end of a movement for the same reason.
+
+It remains a heuristic, and it is worth being honest about where it is wrong:
+
+- A mouse **click or wheel** more than 500 ms after the last movement reads as
+  keyboard, and will wake. Acceptable: unlike a trackpad brush, clicking is
+  deliberate.
 - A trackpad touch too light to move the cursor reads as keyboard. In practice
   a brush that registers as input almost always moves the pointer.
-- A keypress in the same 100 ms tick as a cursor move is attributed to the
-  mouse and missed. Worst case is that waking waits for the next keypress.
+- A keypress within 500 ms of a cursor move is attributed to the mouse and
+  missed. Worst case is that waking waits for the next keypress - and the user
+  this defaults for does not use a pointing device at all.
 
 Deliberately *not* solved with `GetAsyncKeyState` polled over the key range.
 That would be exact, but sweeping every virtual key code in a loop is a
@@ -269,6 +310,30 @@ failure for the primary interface.
 off, with a few milliseconds of fade at each end - a sine that starts at full
 amplitude clicks, and on headphones the click is more noticeable than the tone.
 
+**Only for what the user does (revised 2026-09-05).** Tones originally marked
+every state change, including automatic ones. The hardware round was blunt about
+it: heard "too often", "annoying", and the tester asked for the automatic
+release and the wake that follows it to be "seamless, either silent or maybe a
+small pop, but silence will likely be my preference". They are now silent,
+unconditionally, whatever `earcons` is set to - it is not a third setting.
+
+The reasoning holds up independently of taste. An automatic release and the wake
+after it happen many times an hour and change nothing the user can act on: only
+which device currently holds the headset. A hotkey press is the opposite - it
+has no other feedback at all, so it must be answered. Implemented as a one-shot
+`announce` flag set only by an explicit request. It survives a *failed* open, so
+a hotkey pressed while the headset is still reconnecting is answered late rather
+than not at all, and it does not survive the open it belongs to, so a later
+reconnect or a move to another device stays quiet.
+
+**Lead-in silence.** The round also found the start of the on-tone missing.
+Writing samples the instant after `IAudioClient::Start` is not the same as those
+samples reaching the ears: a Bluetooth headset needs a moment to bring its link
+up, and what is written during it is lost. There is no event that says "you are
+audible now", so the on-tone simply begins with 250 ms of silence. Only the
+on-tone - putting a quarter of a second in front of a release is the one thing
+this design refuses to do.
+
 The non-obvious part is the ordering. The natural design, "release the device,
 then play a tone", is wrong: opening the device again to play it would take the
 headset straight back off the phone, a moment after handing it over. So the tone
@@ -278,20 +343,53 @@ has drained.
 That forced a second change. The render buffer was being filled as full as it
 would go, which meant up to 500 ms of already-queued silence sitting in front of
 anything new - so a tone would trail the keypress by half a second. `pump` now
-maintains 200 ms of queued audio rather than filling the buffer, leaving 300 ms
-of headroom for a descheduled thread. Measured: a release takes 125 ms without an
-earcon and 340 ms with one, against a 1 s drain ceiling that exists so a device
-which stops consuming cannot wedge the engine.
+maintains 150 ms of queued audio rather than filling the buffer, leaving 350 ms
+of headroom for a descheduled thread, against a 1 s drain ceiling that exists so
+a device which stops consuming cannot wedge the engine.
 
-**Known gap:** an earcon can only play through an open stream, so switching off
-when nothing is open is silent. Believed harmless - if no stream is open the
-headset is not being held - but it is Test 18.
+The tester found the resulting release "noticeable after you pointed it out. Not
+a big deal", and asked for slightly snappier. Two things now give that: the notes
+are a fifth shorter, and the queue target came down from 200 ms to 150 ms.
+Measured on this machine, a manual release settled at 260-350 ms with earcons and
+120-190 ms without. The first cycle after the headset has been sitting idle is
+slower - 700 ms, and once 1.6 s - because a cold Bluetooth stream drains lazily;
+that is the same effect the lead-in silence exists for. An **automatic** release
+now costs nothing at all, since it no longer plays or drains anything.
+
+**Known gap, confirmed harmless.** An earcon can only play through an open
+stream, so switching off when nothing is open is silent. Test 18 found this a
+non-issue in practice: pressing the hotkey twice quickly was "clear from the
+tones", and with the headphones disconnected entirely the tones just came out of
+the laptop speakers "with no ill effects".
 
 **Tray.** A convenience, never the only route to anything. Real Win32 menu, so
 JAWS reads it unaided; state carried in the tooltip as words, with colour only as
 a bonus for sighted users. The icon is drawn in code rather than embedded, which
 costs a few hundred bytes of logic instead of a few kilobytes of resource. The
 `TaskbarCreated` broadcast is handled, so the icon survives an Explorer restart.
+
+**`NIM_SETVERSION` is not optional (fixed 2026-09-05).** The first version of the
+tray was unusable from the keyboard - no menu from the Applications key or
+`Shift+F10`, and `Enter` on the icon did nothing - and the cause was that the
+icon had never asked for version 4 of the shell's notification protocol. Without
+that request the shell speaks the original Windows 95 protocol, in which a tray
+icon hears about mouse buttons and nothing else, so keyboard activation produces
+no message whatsoever. It was not a menu bug at all; the messages were never
+arriving.
+
+Version 4 adds `NIN_SELECT`, `NIN_KEYSELECT` and `WM_CONTEXTMENU`, and it puts
+the icon's own screen position in `wParam`, so a keyboard-opened menu now appears
+beside the icon rather than beside the mouse pointer. It also needs `NIF_SHOWTIP`
+to keep the ordinary tooltip, and it reverses the `wParam`/`lParam` layout of the
+callback. One guard came with it: the shell has a long-standing habit of sending
+`NIN_KEYSELECT` twice for a single `Enter`, and two toggles in a row cancel out -
+which would look exactly like the bug being fixed - so a second activation within
+250 ms is treated as an echo.
+
+The tooltip was also cut down. It is the icon's accessible name, read out in full
+every time the user arrows onto it, and the first attempt was judged "too
+verbose": "StableSound: released, the headphones are free" is now "StableSound:
+headphones free".
 
 **One hidden window, one message loop.** The window exists only to have a message
 queue; the hotkey and the tray both post to it. Every message is handled in the
@@ -327,7 +425,7 @@ Target: single self-contained `.exe`, roughly 300 KB – 1 MB, no installer.
 
 ### Resolved by Milestone 1 hardware testing (2026-08-30)
 
-Raw results are in `test.txt`.
+Raw results are in `test-milestones-1-2.txt`.
 
 1. ~~Does soft release free the headset for the iPhone?~~ **Yes.** ~3 s handover, reproducible. See 2.4.
 2. ~~Does JAWS speech show on the device peak meter?~~ **Yes,** peak ~0.56. See 4.2.
@@ -336,7 +434,7 @@ Raw results are in `test.txt`.
 
 ### Resolved by Milestone 2 hardware testing (2026-09-05)
 
-Raw results are in `test.txt`, Tests 8-10.
+Raw results are in `test-milestones-1-2.txt`, Tests 8-10.
 
 5. ~~What idle timeout feels right?~~ **30 s**, confirmed in use ("did the 30 second timeout feel better than 60? Yes"). The tester added that changing it should be easy - a requirement for the Milestone 4 dialog, not just a default.
 
@@ -350,15 +448,29 @@ Raw results are in `test.txt`, Tests 8-10.
 
 7. **Does the AeroClip behave the same on battery, or after a Windows sleep/resume cycle?** Sound Keeper carries explicit handling for modern-standby suspend/resume events, which suggests this bites in practice. Not yet tested.
 
-### Opened by Milestone 3, for the next hardware round
+### Resolved by Milestone 3 hardware testing (2026-09-05)
 
-10. **Do the earcons sound right?** Volume, length and shape are all guesses. 20 % amplitude, two notes, under 200 ms. Test 12.
+Raw results are in `test-milestone-3.txt`, Tests 11-18.
 
-11. **Do the automatic earcons become a nuisance?** This is the one to watch. Every time keep-alive re-arms on a keypress you now hear a rising tone, and every automatic release 30 s later gives you a falling one. Over a working hour that could be a handful of tones, or it could be maddening. If it is, the fix is small - an option to sound only on changes the user asked for - but it should not be built on spec. Test 17.
+10. ~~Do the earcons sound right?~~ **Nearly.** The shape was right first time - "can you tell the on-tone from the off-tone without thinking about it? Yes", no clicks or distortion, nothing to change about how they sound. The numbers were not: volume wanted halving to 0.1, and the notes wanted shortening by about a fifth. Both done.
 
-12. **Is the off-tone heard in full before the headset lets go?** The whole ordering design rests on it. Test 13.
+11. ~~Do the automatic earcons become a nuisance?~~ **Yes.** Heard "too often", "annoying", and the tester asked for the automatic release and re-wake to be silent. Done, and unconditionally rather than as a setting - see 4.4.
 
-13. **Does `Ctrl+Win+F12` clash with anything in JAWS?** Chosen because Windows and the Game Bar leave it alone, but the tester's JAWS setup is the thing that matters and has not been checked. Test 14.
+12. ~~Is the off-tone heard in full before the headset lets go?~~ **Yes,** every time, and the iPhone then took the headphones "pretty much immediately". The ordering design in 4.4 is confirmed. This was the question the milestone rested on.
+
+13. ~~Does `Ctrl+Win+F12` clash with anything in JAWS?~~ **No.** Nothing stopped working, nothing broke that quitting fixed, and the tester is happy with the combination - while asking to be able to change it in the settings dialog.
+
+### Opened by Milestone 3, for the second hardware round
+
+14. **Is 250 ms of lead-in silence enough to stop the on-tone being clipped?** The cause is understood - a Bluetooth link takes a moment to come up and swallows whatever is written during it - but the length is a guess, and it can only be judged by ear. Longer is safe but makes the hotkey feel laggier. Test 20.
+
+15. **Does the tray now work from the keyboard?** It failed outright last time, and has been rebuilt on a different shell protocol rather than patched. Everything about it is unverified again: the menu from the Applications key, `Enter` on the icon, whether the shorter tooltip reads cleanly, and whether the `NIN_KEYSELECT` echo guard is needed or is itself swallowing presses. Test 21.
+
+16. **Does `mouse on` actually work?** The last round could not tell: the step that would have shown it followed a manual `off`, which correctly disarms waking altogether, so nothing could have woken it. The option has therefore never been seen to do anything. Test 22.
+
+### Noted, not a defect
+
+**JAWS announces the hotkey.** Pressing `Ctrl+Win+F12` makes JAWS say "control win f12" before the tone - "slightly annoying". This is JAWS echoing a command key, not anything StableSound does or can intercept; a global hotkey is delivered to us *after* the screen reader has already seen the keystroke. The only lever is JAWS' own "speak command keys" setting, which is global and probably not worth losing elsewhere. Worth re-checking against any hotkey the settings dialog offers, in case some combinations are echoed and others are not.
 
 ---
 
@@ -366,7 +478,7 @@ Raw results are in `test.txt`, Tests 8-10.
 
 **Milestone 0 — toolchain. DONE (2026-08-29).** rustup + Rust 1.98.0, Visual Studio Build Tools 17.14.39 with the VC++ workload. Verified end to end: a real binary compiles, links and runs.
 
-**Milestone 1 - spike. DONE (2026-08-30).** All three questions answered; see section 6 and `test.txt`. The tester reported the spike itself was comfortable to use with JAWS, so the line-based, transition-only output pattern is worth reusing for future diagnostic tools.
+**Milestone 1 - spike. DONE (2026-08-30).** All three questions answered; see section 6 and `test-milestones-1-2.txt`. The tester reported the spike itself was comfortable to use with JAWS, so the line-based, transition-only output pattern is worth reusing for future diagnostic tools.
 
 **Milestone 1, original description.** `spike/` is a throwaway console tool that opens a WASAPI stream, emits a selectable keep-alive signal, and fully releases the device on command. Line-based commands and transition-only output, so it is usable with a screen reader.
 
@@ -386,7 +498,7 @@ Verified automatically:
 - `cargo clippy -- -D warnings` clean.
 - Release binary is **246 KB**, comfortably inside the ~1 MB budget.
 
-**Hardware test results (2026-08-30), raw notes in `test.txt`:**
+**Hardware test results (2026-08-30), raw notes in `test-milestones-1-2.txt`:**
 - Test 4, speech postpones release: **passed.**
 - Test 5, following a device change: **failed.** Disconnecting the headphones stopped the engine for good; the user had to type `on` again. Fixed - see below.
 - Test 6, log readability: **passed** ("Yes, clear", nothing missing).
@@ -399,7 +511,7 @@ Verified automatically:
 3. **Default idle timeout 60 s to 30 s**, at the tester's preference.
 4. **Fixed a bug in the wake feature found by its own test.** The check short-circuited on the config flag, so while waking was off the input watcher never refreshed its baseline; switching it on then compared against a stale timestamp and fired a spurious wake immediately. The watcher is now polled unconditionally and the flag consulted afterwards.
 
-**Second hardware round (2026-09-05), raw notes in `test.txt`:**
+**Second hardware round (2026-09-05), raw notes in `test-milestones-1-2.txt`:**
 - Test 8, device-loss recovery: **passed.** Disconnect, wait, reconnect - it came back on its own. The Test 5 fix holds.
 - Test 9, waking on input: **passed**, including the part that matters most - after a manual `off`, typing did not take the headset back and the iPhone could claim it.
 - Test 10, living with it: **passed.** No clipping, 30 s better than 60 s, waking never got in the way.
@@ -412,7 +524,7 @@ Not worth fixing in the harness - Milestone 3 makes state changes audible throug
 
 The console harness in `main.rs` was scaffolding for testing the engine. Milestone 3 adds the tray and hotkey **alongside** it rather than replacing it, so there is still a diagnostic interface while the GUI is unproven; Milestone 6 removes it.
 
-**Milestone 3 - control surface. BUILT (2026-09-05), pending a hardware round.**
+**Milestone 3 - control surface. BUILT (2026-09-05), first hardware round done, fixes applied, second round pending.**
 
 Built: the global hotkey with its own parser and a refusal to register a bare key; earcons rendered into the keep-alive stream, with an anti-click envelope; the tray icon, its real Win32 menu and an icon drawn in code; the hidden window and message loop; and the keyboard-only wake change carried over from Milestone 2's round. Design detail in 4.4.
 
@@ -424,12 +536,33 @@ Verified automatically:
 - 24 unit tests. `cargo clippy --all-targets -- -D warnings` clean.
 - Release binary **266 KB**, up from 248 KB, against the ~1 MB budget.
 
-**Not tested on hardware. None of it.** Whether the tones are audible and pleasant, whether the off-tone is heard in full before the headset lets go, whether the hotkey clashes with JAWS, whether the tray menu reads properly, and whether automatic earcons become a nuisance. `test.txt`, Tests 11-18.
-
 Two design points settled while building:
 
 - **Earcons play on the existing keep-alive stream, before it is torn down**, and the queued-audio target dropped from 500 ms to 200 ms so the tone does not trail the keypress. See 4.4.
 - **The console harness stays**, on its own stdin thread feeding the same command channel as the hotkey and tray.
+
+**First hardware round (2026-09-05), raw notes in `test-milestone-3.txt`:**
+
+- Test 11, does the hotkey work: **passed.** Worked from a word processor, Chrome and the desktop, and toggled exactly once when held - `MOD_NOREPEAT` doing its job.
+- Test 12, are the tones right: **passed on shape, failed on numbers.** Direction obvious without thinking, no clicks or distortion. Too loud, about a fifth too long, and the start of the on-tone was missing.
+- Test 13, off-tone before release: **passed,** and this was the one that mattered. Whole tone, both notes, every time, and the phone took the headphones straight afterwards.
+- Test 14, JAWS clash: **passed.** Nothing broke. JAWS does announce the hotkey itself, which we cannot intercept - see section 6.
+- Test 15, the tray under JAWS: **failed.** No menu from the Applications key or `Shift+F10`, and `Enter` on the icon did nothing. The tooltip was also "too verbose", and read stale.
+- Test 16, mouse no longer wakes it: **failed.** A trackpad sweep still woke keep-alive with `mouse off` set.
+- Test 17, living with it: **passed on the product, failed on the tones.** No clipping. The automatic tones were "annoying" and heard "too often".
+- Test 18, the known silent-off gap: **passed,** confirmed harmless, including with no headphones connected at all.
+
+**Fixes applied after the round:**
+
+1. **Tones only for what the user does.** Automatic releases and the wake that follows are silent, unconditionally. Also makes an automatic release instant, since nothing has to drain. See 4.4.
+2. **The trackpad fix that was not a trackpad fix.** `mouse off` failed because the finger *lift* at the end of a sweep is an input event arriving after the pointer has already stopped, which reads exactly like a keypress. The pointer now has to have been still for a 500 ms settling window. See 4.1. Covered by a unit test that replays the failing sequence.
+3. **The tray rebuilt on `NIM_SETVERSION` / version 4.** The menu was never broken; the keyboard's messages were never being delivered, because the icon had not asked for the protocol that carries them. See 4.4.
+4. **Tone numbers to the tester's figures.** Volume 0.2 to 0.1, notes shortened a fifth, 250 ms of lead-in silence in front of the on-tone, and the queued-audio target 200 ms to 150 ms for a snappier release.
+5. **Tooltip cut down**, since it is the icon's accessible name and is read in full each time.
+
+**Verified after the fixes:** 30 unit tests, `cargo clippy --all-targets -- -D warnings` clean, and a scripted silent on/off cycle at zero volume - manual release 260-350 ms with earcons, 120-190 ms without, no interruptions or retries over six cycles.
+
+**Not verified, and cannot be from here:** everything audible, and the whole tray. Second round is `test.txt`, Tests 19-23.
 
 **Milestone 4 — settings.** The `winsafe` dialog, config load/save, second hotkey to open settings. Test the whole dialog under JAWS with the screen off.
 
@@ -437,7 +570,7 @@ Two design points settled while building:
 
 **Milestone 6 — ship.** Autostart, size-tuned release build, README, and a plan for the antivirus/SmartScreen problem — a small unsigned binary that opens audio devices and registers global hotkeys fits the profile AV heuristics dislike. Options: submit false-positive reports to the major vendors, or look at code signing.
 
-**Current position (2026-09-05):** Milestones 0, 1 and 2 complete and hardware-tested. Milestone 3 built and awaiting its hardware round.
+**Current position (2026-09-05):** Milestones 0, 1 and 2 complete and hardware-tested. Milestone 3 built, tested once, fixed, and awaiting a second round.
 
 ---
 

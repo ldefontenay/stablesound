@@ -34,6 +34,14 @@
 //! release path blocks briefly while the stream drains. Playing it after the
 //! release instead would mean reopening the device, taking the headset back
 //! off the phone a moment after handing it over.
+//!
+//! Tones mark what the *user* did, never what the engine did on its own. That
+//! is the Milestone 3 hardware verdict, and it was unambiguous: an idle release
+//! and the wake that follows it happen many times an hour, and a tone on each
+//! was "annoying". They are also the transitions the user has no reason to
+//! hear: nothing has changed about what they can do, only about which device
+//! currently holds the headset. A hotkey press is the opposite - it has no
+//! other feedback at all, so it must be answered. See `Source`.
 
 use std::sync::mpsc::{Receiver, Sender, TryRecvError};
 use std::thread::{self, JoinHandle};
@@ -62,12 +70,25 @@ const RETRY_DELAY: Duration = Duration::from_secs(2);
 
 /// Ceiling on how long a release waits for the off-tone to be heard.
 ///
-/// The tone itself is under 200 ms, plus up to another 200 ms of already
-/// queued audio ahead of it, so this is roughly twice what it should ever
-/// need. It exists because draining blocks this thread: a device that has
+/// The tone itself is under 150 ms, plus up to another 150 ms of already
+/// queued audio ahead of it, so this is roughly three times what it should
+/// ever need. It exists because draining blocks this thread: a device that has
 /// stopped consuming must not be able to wedge the engine, and a release that
 /// is late is far worse than an earcon that is cut short.
 const EARCON_TIMEOUT: Duration = Duration::from_secs(1);
+
+/// Who asked for keep-alive to come on.
+///
+/// The only thing this changes is whether the on-tone plays. It is a
+/// distinction the user can hear, so it is worth a type rather than a bare
+/// bool at the call sites.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Source {
+    /// The hotkey, the tray, or a console command.
+    User,
+    /// The user touched the keyboard and keep-alive re-armed itself.
+    Input,
+}
 
 pub enum Command {
     Toggle,
@@ -154,6 +175,14 @@ struct Runtime {
     /// Set when intent came from user input rather than an explicit request,
     /// so the next successful open can say so.
     started_by_input: bool,
+    /// Whether the next successful open should announce itself.
+    ///
+    /// One-shot, and set only by an explicit request. It survives a failed
+    /// open, so a hotkey pressed while the headset is still reconnecting is
+    /// answered late rather than not at all - but it does not survive the open
+    /// it belongs to, so a reconnect or a move to another device later on
+    /// stays silent.
+    announce: bool,
     last_device_name: Option<String>,
     last_device_check: Instant,
 }
@@ -196,6 +225,7 @@ fn run(mut config: Config, log: Log, commands: Receiver<Command>, events: Sender
         next_retry: now,
         retry_reported: false,
         started_by_input: false,
+        announce: false,
         last_device_name: None,
         last_device_check: now,
     };
@@ -212,10 +242,10 @@ fn run(mut config: Config, log: Log, commands: Receiver<Command>, events: Sender
                 if rt.intent {
                     set_intent_off(&mut rt, &config, StopReason::Requested, &log, &events);
                 } else {
-                    set_intent_on(&mut rt);
+                    set_intent_on(&mut rt, Source::User);
                 }
             }
-            Ok(Command::On) => set_intent_on(&mut rt),
+            Ok(Command::On) => set_intent_on(&mut rt, Source::User),
             Ok(Command::Off) => {
                 set_intent_off(&mut rt, &config, StopReason::Requested, &log, &events)
             }
@@ -250,8 +280,7 @@ fn run(mut config: Config, log: Log, commands: Receiver<Command>, events: Sender
                 } else {
                     "woken by keyboard input"
                 });
-                set_intent_on(&mut rt);
-                rt.started_by_input = true;
+                set_intent_on(&mut rt, Source::Input);
             }
         }
 
@@ -329,7 +358,7 @@ fn run(mut config: Config, log: Log, commands: Receiver<Command>, events: Sender
     log.write("engine stopped");
 }
 
-fn set_intent_on(rt: &mut Runtime) {
+fn set_intent_on(rt: &mut Runtime, source: Source) {
     if rt.intent {
         return;
     }
@@ -340,7 +369,8 @@ fn set_intent_on(rt: &mut Runtime) {
     rt.last_audio = now;
     rt.next_retry = now;
     rt.retry_reported = false;
-    rt.started_by_input = false;
+    rt.started_by_input = source == Source::Input;
+    rt.announce = source == Source::User;
 }
 
 fn set_intent_off(
@@ -362,9 +392,17 @@ fn set_intent_off(
 
     let held = rt.since_intent.elapsed().as_secs();
 
+    // A stale announcement must not outlive the intent that set it.
+    rt.announce = false;
+
     // Say goodbye while the stream is still open. Once it is dropped the
     // device is gone and anything we played would have to seize it back.
-    if config.earcons {
+    //
+    // Only for a release the user asked for. An idle timeout is silent: it
+    // happens several times an hour, and draining the tone is also the only
+    // thing that makes a release slow, so staying quiet makes the automatic
+    // path both quieter and quicker.
+    if config.earcons && reason == StopReason::Requested {
         if let Some(active) = rt.stream.as_mut() {
             active.keepalive.play(earcon::OFF, config.earcon_volume);
             active.keepalive.drain(EARCON_TIMEOUT);
@@ -443,11 +481,13 @@ fn try_open(rt: &mut Runtime, config: &Config, log: &Log, events: &Sender<Event>
         }
     };
 
-    // Played on every open, including a reopen after the headset came back or
-    // the default output moved. Hearing it through the device is the point: it
-    // says both "keep-alive is on" and "this is where it is on".
-    if config.earcons {
+    // Only for an open the user asked for - never a wake on input, and never
+    // a reopen after the headset came back or the default output moved.
+    // Hearing it through the device is still the point: it says both
+    // "keep-alive is on" and "this is where it is on".
+    if config.earcons && rt.announce {
         keepalive.play(earcon::ON, config.earcon_volume);
+        rt.announce = false;
     }
 
     let moved = matches!(&rt.last_device_name, Some(previous) if *previous != open.name);

@@ -24,23 +24,47 @@
 //! interface sound, so it needs no learning, and the direction is audible even
 //! when the tone is short or the headset is still waking up. Two notes rather
 //! than one, because a single beep is easy to mistake for a system sound.
+//!
+//! Lengths and volume are the tester's, from the Milestone 3 hardware round:
+//! the first guess was a fifth too long and twice as loud as wanted.
 
 /// One note: a frequency in Hz and a length in milliseconds.
+///
+/// A frequency of zero is silence - `sin(0)` is zero for every frame - which is
+/// how `ON` gets its lead-in below.
 #[derive(Clone, Copy, Debug)]
 pub struct Note {
     pub freq: f32,
     pub ms: u32,
 }
 
+/// Silence in front of the on-tone, so the tone is not clipped.
+///
+/// Milestone 3 testing: "when the keep-alive stream is being switched on, the
+/// complete tone is not heard". Writing samples the instant after
+/// `IAudioClient::Start` is not the same as those samples reaching the ears - a
+/// Bluetooth headset needs a moment to bring its link up, and whatever is
+/// written during it is lost. There is no event that says "now you are actually
+/// audible", so this is simply a wait long enough to cover it.
+///
+/// Only the on-tone needs it. The off-tone plays through a stream that has been
+/// running for a while, and delaying a release is the one thing the whole
+/// design refuses to do.
+const LEAD_IN_MS: u32 = 250;
+
 /// Rising - keep-alive is on and the headset is being held awake.
 pub const ON: &[Note] = &[
     Note {
+        freq: 0.0,
+        ms: LEAD_IN_MS,
+    },
+    Note {
         freq: 660.0,
-        ms: 70,
+        ms: 56,
     },
     Note {
         freq: 990.0,
-        ms: 110,
+        ms: 88,
     },
 ];
 
@@ -48,11 +72,11 @@ pub const ON: &[Note] = &[
 pub const OFF: &[Note] = &[
     Note {
         freq: 990.0,
-        ms: 70,
+        ms: 56,
     },
     Note {
         freq: 660.0,
-        ms: 110,
+        ms: 88,
     },
 ];
 
@@ -146,7 +170,7 @@ mod tests {
     fn starts_and_ends_near_silence() {
         // The anti-click envelope: a tone that begins at full amplitude
         // produces a pop, which on headphones is worse than the tone.
-        let mut player = Player::new(ON, RATE, 1.0);
+        let mut player = Player::new(OFF, RATE, 1.0);
         let first = player.next_sample().unwrap();
         assert!(first.abs() < 0.05, "first sample {first} was not faded in");
 
@@ -160,7 +184,26 @@ mod tests {
 
     #[test]
     fn on_rises_and_off_falls() {
-        assert!(ON[1].freq > ON[0].freq);
+        let audible: Vec<&Note> = ON.iter().filter(|n| n.freq > 0.0).collect();
+        assert_eq!(audible.len(), 2);
+        assert!(audible[1].freq > audible[0].freq);
         assert!(OFF[1].freq < OFF[0].freq);
+    }
+
+    #[test]
+    fn the_on_tone_leads_with_silence_but_the_off_tone_does_not() {
+        // A release that waited a quarter of a second before even starting the
+        // tone would add that to every release, which is the opposite of what
+        // the design is for.
+        assert_eq!(ON[0].freq, 0.0);
+        assert!(ON[0].ms > 0);
+        assert!(OFF.iter().all(|n| n.freq > 0.0));
+
+        let mut player = Player::new(ON, RATE, 1.0);
+        let lead = (RATE * f64::from(ON[0].ms) / 1000.0) as usize;
+        for i in 0..lead {
+            let s = player.next_sample().unwrap();
+            assert_eq!(s, 0.0, "sample {i} of the lead-in was not silent");
+        }
     }
 }

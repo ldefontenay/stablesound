@@ -22,17 +22,18 @@ mod log;
 mod tray;
 
 use windows::core::PCWSTR;
+use windows::Win32::Foundation::POINT;
 use windows::Win32::System::Com::{CoInitializeEx, COINIT_APARTMENTTHREADED};
 use windows::Win32::UI::Shell::ShellExecuteW;
 use windows::Win32::UI::WindowsAndMessaging::{
     DispatchMessageW, GetMessageW, KillTimer, SetTimer, TranslateMessage, MSG, SW_SHOWNORMAL,
-    WM_CONTEXTMENU, WM_HOTKEY, WM_LBUTTONUP, WM_RBUTTONUP, WM_TIMER,
+    WM_HOTKEY, WM_TIMER,
 };
 
 use crate::config::Config;
 use crate::engine::{Command, Event, StopReason};
 use crate::log::Log;
-use crate::tray::Tray;
+use crate::tray::{Tray, TrayEvent};
 
 /// Timer that pulls engine events off the channel. The engine cannot post to
 /// this queue itself - it has no window - so the queue asks it instead. A tenth
@@ -140,26 +141,20 @@ fn pump(tray: &mut Tray, handle: &engine::Handle, log_path: &std::path::Path) {
                 let _ = handle.commands.send(Command::Toggle);
             }
 
-            tray::WM_TRAY => {
-                // The mouse message is in the low word of lParam. A left click
-                // toggles - the common case, and what pressing Enter on the
-                // icon from Win+B sends. Right click and the Applications key
-                // both open the menu.
-                match (message.lParam.0 as u32) & 0xFFFF {
-                    WM_LBUTTONUP => {
-                        let _ = handle.commands.send(Command::Toggle);
-                    }
-                    WM_RBUTTONUP | WM_CONTEXTMENU => {
-                        // Blocks while the menu is open, which is fine: the
-                        // engine keeps pumping audio on its own thread.
-                        let chose_quit = menu(tray, handle, log_path);
-                        if chose_quit {
-                            break;
-                        }
-                    }
-                    _ => {}
+            tray::WM_TRAY => match tray.decode(message.wParam, message.lParam) {
+                Some(TrayEvent::Toggle) => {
+                    let _ = handle.commands.send(Command::Toggle);
                 }
-            }
+                Some(TrayEvent::Menu { x, y }) => {
+                    // Blocks while the menu is open, which is fine: the engine
+                    // keeps pumping audio on its own thread.
+                    let chose_quit = menu(tray, handle, log_path, POINT { x, y });
+                    if chose_quit {
+                        break;
+                    }
+                }
+                None => {}
+            },
 
             console::WM_CONSOLE_QUIT => break,
 
@@ -178,8 +173,8 @@ fn pump(tray: &mut Tray, handle: &engine::Handle, log_path: &std::path::Path) {
 }
 
 /// Show the tray menu and act on the choice. Returns true if we should quit.
-fn menu(tray: &Tray, handle: &engine::Handle, log_path: &std::path::Path) -> bool {
-    match tray.show_menu() {
+fn menu(tray: &Tray, handle: &engine::Handle, log_path: &std::path::Path, at: POINT) -> bool {
+    match tray.show_menu(at) {
         Some(tray::CMD_TOGGLE) => {
             let _ = handle.commands.send(Command::Toggle);
             false

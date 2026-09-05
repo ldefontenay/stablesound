@@ -14,26 +14,72 @@
 //! the queue rather than in a window procedure - which keeps every decision in
 //! one readable loop instead of in a callback that would need global state to
 //! reach the engine.
+//!
+//! # Version 4, and why it is not optional
+//!
+//! `NIM_SETVERSION` is the whole reason the keyboard works. Without it the
+//! shell speaks the original Windows 95 protocol, in which a tray icon is told
+//! about mouse buttons and nothing else - so an icon reached with `Win+B` and
+//! then activated with `Enter`, or asked for its menu with the Applications
+//! key, produces no message whatsoever. Milestone 3 testing found exactly that:
+//! "No context menu appeared when pressing the applications key or f10. [...]
+//! Pressing enter also did nothing."
+//!
+//! Version 4 adds `NIN_SELECT`, `NIN_KEYSELECT` and `WM_CONTEXTMENU`, which are
+//! the keyboard's route in, and it puts the icon's own screen position in
+//! `wParam` so the menu can be anchored to the icon rather than to wherever the
+//! mouse pointer happens to be sitting. For an app whose primary user never
+//! touches a mouse, both matter.
 
 use std::mem::size_of;
+use std::time::{Duration, Instant};
 
 use windows::core::{Result as WinResult, PCWSTR};
 use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, POINT, WPARAM};
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::Shell::{
-    Shell_NotifyIconW, NIF_ICON, NIF_MESSAGE, NIF_TIP, NIM_ADD, NIM_DELETE, NIM_MODIFY,
-    NOTIFYICONDATAW,
+    Shell_NotifyIconW, NIF_ICON, NIF_MESSAGE, NIF_SHOWTIP, NIF_TIP, NIM_ADD, NIM_DELETE,
+    NIM_MODIFY, NIM_SETVERSION, NINF_KEY, NIN_SELECT, NOTIFYICONDATAW, NOTIFYICON_VERSION_4,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     AppendMenuW, CreateIcon, CreatePopupMenu, CreateWindowExW, DefWindowProcW, DestroyIcon,
-    DestroyMenu, DestroyWindow, GetCursorPos, PostMessageW, RegisterClassW, RegisterWindowMessageW,
+    DestroyMenu, DestroyWindow, PostMessageW, RegisterClassW, RegisterWindowMessageW,
     SetForegroundWindow, TrackPopupMenu, HICON, MF_SEPARATOR, MF_STRING, TPM_RETURNCMD,
-    TPM_RIGHTBUTTON, WINDOW_EX_STYLE, WM_APP, WM_NULL, WNDCLASSW, WS_OVERLAPPED,
+    TPM_RIGHTBUTTON, WINDOW_EX_STYLE, WM_APP, WM_CONTEXTMENU, WM_NULL, WNDCLASSW, WS_OVERLAPPED,
 };
+
+/// Sent when the icon is activated with `Enter`. Defined by shellapi.h as
+/// `NIN_SELECT | NINF_KEY`; the windows crate exposes both halves but not the
+/// combination.
+const NIN_KEYSELECT: u32 = NIN_SELECT | NINF_KEY;
+
+/// Our one icon.
+const ICON_ID: u32 = 1;
+
+/// How close together two activations have to be before the second is taken
+/// for an echo rather than a second press.
+///
+/// The shell has a long-standing habit of sending `NIN_KEYSELECT` twice for a
+/// single `Enter`. Two toggles in a row cancel out, which would look exactly
+/// like the bug this version-4 work is fixing - the icon doing nothing - so it
+/// is worth guarding rather than discovering on the next hardware round.
+/// Comfortably longer than any echo, comfortably shorter than a deliberate
+/// second press.
+const ECHO: Duration = Duration::from_millis(250);
 
 /// Message the tray icon posts to our window. Anything from `WM_APP` up is
 /// ours to define.
 pub const WM_TRAY: u32 = WM_APP + 1;
+
+/// What the user asked the icon for.
+pub enum TrayEvent {
+    /// Activated: a left click, or `Enter` or `Space` on a focused icon.
+    Toggle,
+    /// Wants the menu, anchored at this point in screen coordinates. The shell
+    /// supplies the icon's own position, which is what makes a keyboard-opened
+    /// menu appear next to the icon instead of next to the mouse.
+    Menu { x: i32, y: i32 },
+}
 
 /// Menu command ids. Also the values `TrackPopupMenu` hands back.
 pub const CMD_TOGGLE: i32 = 1;
@@ -54,6 +100,9 @@ pub struct Tray {
     /// first time Explorer crashes.
     taskbar_created: u32,
     active: bool,
+    /// When the icon was last activated, so a repeated `NIN_KEYSELECT` is not
+    /// taken for a second press. See `ECHO`.
+    last_select: Option<Instant>,
 }
 
 impl Tray {
@@ -100,6 +149,7 @@ impl Tray {
                 RegisterWindowMessageW(PCWSTR(wide("TaskbarCreated").as_ptr()))
             },
             active: false,
+            last_select: None,
         };
         tray.add()?;
         Ok(tray)
@@ -131,15 +181,29 @@ impl Tray {
     }
 
     fn add(&self) -> WinResult<()> {
-        self.notify(NIM_ADD)
+        self.notify(NIM_ADD)?;
+
+        // Must follow the add, and must happen before any keyboard use. See
+        // the module note: without it the icon is deaf to everything but the
+        // mouse.
+        let mut data = NOTIFYICONDATAW {
+            cbSize: size_of::<NOTIFYICONDATAW>() as u32,
+            hWnd: self.hwnd,
+            uID: ICON_ID,
+            ..Default::default()
+        };
+        data.Anonymous.uVersion = NOTIFYICON_VERSION_4;
+        unsafe { Shell_NotifyIconW(NIM_SETVERSION, &data).ok() }
     }
 
     fn notify(&self, action: windows::Win32::UI::Shell::NOTIFY_ICON_MESSAGE) -> WinResult<()> {
         let mut data = NOTIFYICONDATAW {
             cbSize: size_of::<NOTIFYICONDATAW>() as u32,
             hWnd: self.hwnd,
-            uID: 1,
-            uFlags: NIF_ICON | NIF_MESSAGE | NIF_TIP,
+            uID: ICON_ID,
+            // NIF_SHOWTIP is needed under version 4 to keep the ordinary
+            // tooltip; without it the shell assumes the app draws its own.
+            uFlags: NIF_ICON | NIF_MESSAGE | NIF_TIP | NIF_SHOWTIP,
             uCallbackMessage: WM_TRAY,
             hIcon: if self.active {
                 self.on_icon
@@ -149,10 +213,13 @@ impl Tray {
             ..Default::default()
         };
 
+        // Short on purpose. This string is the icon's accessible name, so it is
+        // read out in full every time the user arrows onto the icon - the
+        // Milestone 3 verdict on the first attempt was simply "too verbose".
         let tip = if self.active {
-            "StableSound: keeping the headphones awake"
+            "StableSound: headphones awake"
         } else {
-            "StableSound: released, the headphones are free"
+            "StableSound: headphones free"
         };
         for (slot, ch) in data.szTip.iter_mut().zip(tip.encode_utf16()) {
             *slot = ch;
@@ -161,12 +228,38 @@ impl Tray {
         unsafe { Shell_NotifyIconW(action, &data).ok() }
     }
 
-    /// Show the context menu and return the command the user picked.
+    /// Turn a callback message into what the user meant by it.
+    ///
+    /// Version 4 layout: `wParam` holds the anchor point, `lParam` holds the
+    /// event in its low word and the icon id in its high word. Note that this
+    /// is the reverse of the version 3 layout, where `wParam` was the id.
+    pub fn decode(&mut self, wparam: WPARAM, lparam: LPARAM) -> Option<TrayEvent> {
+        match (lparam.0 as u32) & 0xFFFF {
+            NIN_SELECT | NIN_KEYSELECT => {
+                let now = Instant::now();
+                if self.last_select.is_some_and(|at| now - at < ECHO) {
+                    return None;
+                }
+                self.last_select = Some(now);
+                Some(TrayEvent::Toggle)
+            }
+            // Both the right mouse button and the Applications key arrive here
+            // under version 4; WM_RBUTTONUP is deliberately not handled as
+            // well, or a right click would open two menus in a row.
+            WM_CONTEXTMENU => Some(TrayEvent::Menu {
+                x: loword(wparam.0 as u32),
+                y: hiword(wparam.0 as u32),
+            }),
+            _ => None,
+        }
+    }
+
+    /// Show the context menu at a point and return the command the user picked.
     ///
     /// Blocks until the menu closes. `TPM_RETURNCMD` hands the id straight
     /// back, which avoids routing `WM_COMMAND` through a window procedure that
     /// would then need a way to reach the engine.
-    pub fn show_menu(&self) -> Option<i32> {
+    pub fn show_menu(&self, at: POINT) -> Option<i32> {
         unsafe {
             let menu = CreatePopupMenu().ok()?;
             let toggle = if self.active {
@@ -194,9 +287,6 @@ impl Tray {
                 PCWSTR(wide("E&xit StableSound").as_ptr()),
             );
 
-            let mut point = POINT { x: 0, y: 0 };
-            let _ = GetCursorPos(&mut point);
-
             // Both of these are long-standing tray menu requirements. Without
             // the first the menu cannot take focus; without the second it
             // refuses to close when the user clicks elsewhere.
@@ -204,8 +294,8 @@ impl Tray {
             let choice = TrackPopupMenu(
                 menu,
                 TPM_RETURNCMD | TPM_RIGHTBUTTON,
-                point.x,
-                point.y,
+                at.x,
+                at.y,
                 None,
                 self.hwnd,
                 None,
@@ -227,7 +317,7 @@ impl Drop for Tray {
             let data = NOTIFYICONDATAW {
                 cbSize: size_of::<NOTIFYICONDATAW>() as u32,
                 hWnd: self.hwnd,
-                uID: 1,
+                uID: ICON_ID,
                 ..Default::default()
             };
             // Without this the icon stays in the notification area as a ghost
@@ -299,6 +389,17 @@ unsafe extern "system" fn wndproc(
     lparam: LPARAM,
 ) -> LRESULT {
     DefWindowProcW(hwnd, message, wparam, lparam)
+}
+
+/// Screen coordinates arrive packed into one word each, and can be negative on
+/// a multi-monitor desktop, so they have to go through `i16` rather than being
+/// masked straight into an `i32`.
+fn loword(packed: u32) -> i32 {
+    i32::from(packed as u16 as i16)
+}
+
+fn hiword(packed: u32) -> i32 {
+    i32::from((packed >> 16) as u16 as i16)
 }
 
 fn wide(text: &str) -> Vec<u16> {

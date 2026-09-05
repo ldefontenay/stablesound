@@ -32,10 +32,14 @@ const BUFFER_MS: i64 = 500;
 ///
 /// Deliberately far less than the buffer. Anything already queued has to play
 /// out before a newly queued earcon is heard, so filling all 500 ms would put
-/// up to half a second between pressing the hotkey and hearing the answer. At
-/// 200 ms the feedback is prompt, while 300 ms of unused buffer remains as
-/// headroom if the engine thread is ever descheduled.
-const TARGET_QUEUE_MS: f64 = 200.0;
+/// up to half a second between pressing the hotkey and hearing the answer, and
+/// the same again onto every release, which waits for the tone.
+///
+/// 150 ms after the Milestone 3 round, where switching off was "noticeable"
+/// though not objectionable. The engine tops this up every 100 ms, so the queue
+/// swings between 50 and 150 ms and there is always at least a tick in hand;
+/// 350 ms of the buffer stays unused as headroom for a descheduled thread.
+const TARGET_QUEUE_MS: f64 = 150.0;
 
 const WAVE_FORMAT_IEEE_FLOAT: u16 = 0x0003;
 const WAVE_FORMAT_EXTENSIBLE: u16 = 0xFFFE;

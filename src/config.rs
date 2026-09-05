@@ -99,9 +99,14 @@ pub struct Config {
     pub wake_on_mouse: bool,
     /// The global toggle combination. The primary interface, not a shortcut.
     pub hotkey: Hotkey,
-    /// Play a tone on every state change. On by default: CLAUDE.md requires
-    /// state changes to be audible, and for a hotkey pressed with no window in
-    /// front of you the tone is the only feedback there is.
+    /// Play a tone when *you* switch keep-alive on or off. On by default:
+    /// CLAUDE.md requires state changes to be audible, and for a hotkey pressed
+    /// with no window in front of you the tone is the only feedback there is.
+    ///
+    /// Automatic transitions - an idle release, and the wake that follows the
+    /// next keypress - are always silent, whatever this is set to. They were
+    /// not, and the Milestone 3 round found them a nuisance: they happen many
+    /// times an hour and tell the user nothing they need to act on.
     pub earcons: bool,
     /// Earcon amplitude, 0.0 to 1.0.
     pub earcon_volume: f32,
@@ -123,9 +128,10 @@ impl Default for Config {
             wake_on_mouse: false,
             hotkey: Hotkey::default(),
             earcons: true,
-            // Loud enough to hear over a headset that is still waking, quiet
-            // enough not to startle. Wants checking on hardware.
-            earcon_volume: 0.2,
+            // The tester's figure from the Milestone 3 round, having compared
+            // 0.1, 0.2 and 0.35 on the AeroClip. The first guess of 0.2 was
+            // twice as loud as wanted.
+            earcon_volume: 0.1,
         }
     }
 }
@@ -347,9 +353,11 @@ wake_on_mouse = {wake_on_mouse}
 # runs, so obscure is good.
 hotkey = {hotkey}
 
-# Play a short tone on every state change: rising for on, falling for
-# off. It plays through the headphones being kept awake, so hearing it
-# also proves the headset is up.
+# Play a short tone when you switch keep-alive on or off: rising for on,
+# falling for off. It plays through the headphones being kept awake, so
+# hearing it also proves the headset is up.
+# Automatic releases, and waking again when you next type, are always
+# silent - they happen often and there is nothing to act on.
 earcons = {earcons}
 
 # Earcon loudness, 0.0 to 1.0.

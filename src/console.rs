@@ -238,7 +238,10 @@ pub fn describe(cfg: &Config) {
     println!(
         "Earcons: {}",
         if cfg.earcons {
-            format!("on at {:.0}%", cfg.earcon_volume * 100.0)
+            format!(
+                "on at {:.0}% - when you switch it on or off; automatic                  releases are silent",
+                cfg.earcon_volume * 100.0
+            )
         } else {
             "off".to_string()
         }
@@ -256,7 +259,7 @@ pub fn help() {
     println!("  device <name>         target a device by name, or 'device default'");
     println!("  wake on | wake off    bring keep-alive back on keyboard input");
     println!("  mouse on | mouse off  let the mouse wake it too (off by default)");
-    println!("  earcons on | off      the tones that mark each state change");
+    println!("  earcons on | off      the tones for switching on and off by hand");
     println!("  volume <0.0-1.0>      how loud those tones are");
     println!("  hotkey <combination>  for example: hotkey ctrl+win+f12");
     println!("  save                  write current settings to the config file");
