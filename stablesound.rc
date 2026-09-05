@@ -15,24 +15,35 @@
 //   2. Every mnemonic is unique within the dialog. A mnemonic on a static
 //      label moves focus to the next control that can take it, which is what
 //      makes Alt+O reach the device list.
-//   3. The first control inside each GROUPBOX carries WS_GROUP, which is what
-//      marks the group boundary for the accessibility layer. The Milestone 4
-//      round found JAWS reading every control correctly but never naming the
-//      group it was in; nothing here declared where one group ended and the
-//      next began, so there was nothing to name.
+//   3. Every control reads correctly on its own, without its group name. A
+//      screen reader user hears one control at a time: the Milestone 4 round
+//      reported "let go of them" as meaningless heard in isolation, because
+//      "them" lived in a group heading three controls earlier. No label here
+//      depends on another to make sense.
 //
-// Every control also reads correctly on its own, without its group name, and
-// that is the rule that survives if rule 3 turns out not to be enough. A
-// screen reader user hears one control at a time: the Milestone 4 round
-// reported "let go of them" as meaningless heard in isolation, because "them"
-// lived in a group heading three controls earlier. No label here depends on
-// another to make sense.
+// Rule 3 is the one that carries the weight, because **there is no way from
+// in here to make JAWS announce the group headings.** The same round asked
+// for that, and the obvious lever turned out to be already pulled: WS_GROUP
+// on the first control of each group, which rc.exe adds to every LTEXT by
+// default, so it was present all along and announced nothing. What JAWS
+// actually uses is geometry - the GROUPBOX rectangle enclosing the focused
+// control - and that has always been true here too (checked by reading the
+// live control rectangles out of the running dialog). Whether it speaks them
+// is JAWS' own verbosity setting, not ours. So the headings are kept for the
+// sighted reader and for structure, and nothing is allowed to depend on them.
 //
 // Mnemonics in use: O S L A K P V H U T W D I. OK and Cancel deliberately
 // have none - they are the default and cancel buttons, reached with Enter and
 // Escape.
 
 #include <windows.h>
+
+// The application manifest. It is here rather than in a crate of its own
+// because rc.exe is already running over this file, so it costs no dependency
+// against the size budget - and what it buys is the version 6 common
+// controls, which is an accessibility matter rather than a cosmetic one. See
+// stablesound.manifest.
+1 RT_MANIFEST "stablesound.manifest"
 
 #define IDD_SETTINGS      100
 

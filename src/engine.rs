@@ -172,6 +172,11 @@ struct Runtime {
     next_retry: Instant,
     /// So a device that stays away does not fill the log with retry failures.
     retry_reported: bool,
+    /// Whether the peak meter was above the threshold on the previous tick.
+    ///
+    /// Only so detailed logging can record the two *transitions* rather than
+    /// ten lines a second. See the note on `Config::diagnostics`.
+    audio_present: bool,
     /// Set when intent came from user input rather than an explicit request,
     /// so the next successful open can say so.
     started_by_input: bool,
@@ -224,6 +229,7 @@ fn run(mut config: Config, log: Log, commands: Receiver<Command>, events: Sender
         last_audio: now,
         next_retry: now,
         retry_reported: false,
+        audio_present: false,
         started_by_input: false,
         announce: false,
         last_device_name: None,
@@ -305,9 +311,29 @@ fn run(mut config: Config, log: Log, commands: Receiver<Command>, events: Sender
             // --- has anything real been playing? ---------------------------
             if matches!(config.release, Release::Idle { .. }) {
                 if let Some(active) = rt.stream.as_ref() {
-                    if active.meter.peak() > config.audio_threshold {
+                    let peak = active.meter.peak();
+                    let present = peak > config.audio_threshold;
+                    if present {
                         rt.last_audio = now;
                     }
+                    // The two transitions, not the ten readings a second in
+                    // between. This is what idle release actually rests on,
+                    // and it is invisible from outside the app - watching it
+                    // live is impossible, because reading the output with a
+                    // screen reader makes the very sound being measured.
+                    if config.diagnostics && present != rt.audio_present {
+                        log.write(&if present {
+                            format!("audio detected, peak {peak:.4}")
+                        } else {
+                            format!(
+                                "audio stopped, peak {peak:.4}; letting go in {}s unless something plays",
+                                match config.release {
+                                    Release::Idle { secs } | Release::Fixed { secs } => secs,
+                                }
+                            )
+                        });
+                    }
+                    rt.audio_present = present;
                 }
             }
 
@@ -409,6 +435,7 @@ fn set_intent_off(
     // Dropping releases the IAudioClient, which is what frees the headset.
     let had_stream = rt.stream.take().is_some();
     rt.last_device_name = None;
+    rt.audio_present = false;
 
     log.write(&format!(
         "keep-alive OFF ({}) after {}s{}",
@@ -420,6 +447,7 @@ fn set_intent_off(
 }
 
 fn try_open(rt: &mut Runtime, config: &Config, log: &Log, events: &Sender<Event>, now: Instant) {
+    let began = Instant::now();
     let (open, substituted) = match device::open(&config.device) {
         Ok(v) => v,
         Err(e) => {
@@ -494,6 +522,19 @@ fn try_open(rt: &mut Runtime, config: &Config, log: &Log, events: &Sender<Event>
         config.signal,
         describe_release(config.release)
     ));
+    // How long the device took to hand itself over. A Bluetooth headset that
+    // has to reconnect is the slow case, and two of the questions still open
+    // in PLAN.md - a long idle gap, and a sleep or resume - would show up here
+    // first as an open that suddenly takes much longer than usual.
+    if config.diagnostics {
+        log.write(&format!(
+            "device opened in {} ms",
+            began.elapsed().as_millis()
+        ));
+    }
+    // A fresh stream has heard nothing yet, so the next thing that plays is a
+    // transition worth recording.
+    rt.audio_present = false;
     let _ = events.send(if moved {
         Event::Moved {
             device: open.name.clone(),

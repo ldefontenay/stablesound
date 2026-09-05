@@ -74,9 +74,16 @@ pub struct Config {
     pub release: Release,
     /// Peak level above which we call it real audio rather than our own signal.
     pub audio_threshold: f32,
-    /// Append state transitions to a log file. On by default: testing showed
-    /// idle behaviour cannot be observed live, because reading the output with
-    /// a screen reader generates the very audio being measured.
+    /// Append state transitions to a log file.
+    ///
+    /// On by default, and worth defending because the tester asked: "I don't
+    /// foresee myself or other users wanting to keep a log." What it costs is
+    /// a line per state change - a few hundred bytes a day - and what it buys
+    /// is the only evidence that exists when something goes wrong, in an app
+    /// whose behaviour cannot be watched as it happens. Every hardware round
+    /// so far that produced a fix rather than a guess produced it from this
+    /// file. See [`Config::diagnostics`] for the detailed variety, which is
+    /// the part that does get switched on only when needed.
     pub logging: bool,
     /// Bring keep-alive back automatically when the user touches the machine.
     ///
@@ -126,14 +133,25 @@ pub struct Config {
     pub earcons: bool,
     /// Earcon amplitude, 0.0 to 1.0.
     pub earcon_volume: f32,
-    /// Write the reasoning behind each decision to the log, not just the
-    /// decision.
+    /// Log the measurements behind each decision, not just the decision.
     ///
-    /// Off by default; it makes the log much longer. It exists because telling
-    /// the keyboard from the mouse has now been got wrong twice on hardware,
-    /// each time because the numbers the decision rested on were invisible from
-    /// outside. Turning this on makes them readable after the fact, which is
-    /// the only way to observe input behaviour without generating input.
+    /// Off by default; it makes the log several times longer. The tester asked
+    /// after the Milestone 4 round whether a log is worth keeping at all, and
+    /// the answer this settles on is: an ordinary log yes, a detailed one only
+    /// while something is being looked into.
+    ///
+    /// The reason for the split is that this project's behaviour cannot be
+    /// watched live. Reading the app's own output with a screen reader makes
+    /// the very sound the idle detector is measuring, so anything about audio
+    /// or timing has to be read back afterwards. Two rounds were lost guessing
+    /// at input handling from the outside before a detailed log settled it in
+    /// three lines.
+    ///
+    /// What it adds now that input handling has gone: the peak meter crossing
+    /// the audio threshold in each direction, and how long a device took to
+    /// open. Those are the two measurements behind the questions still open in
+    /// PLAN.md - whether digital silence still works after a long gap, and
+    /// what a sleep or resume does to the headset.
     pub diagnostics: bool,
 }
 
@@ -228,7 +246,7 @@ impl Config {
                     "settings hotkey changed to {}, because it was the same as the toggle",
                     self.settings_hotkey
                 ),
-                why: "a combination can only be registered once, so the second of two                       identical hotkeys would never fire and that function would have no                       key at all"
+                why: "a combination can only be registered once, so the second of two identical hotkeys would never fire and that function would have no key at all"
                     .into(),
             });
         }
@@ -238,7 +256,7 @@ impl Config {
             self.earcon_volume = self.earcon_volume.clamp(0.0, 1.0);
             out.push(Adjustment {
                 what: format!("earcon volume clamped from {was} to {}", self.earcon_volume),
-                why: "amplitude runs from 0.0 to 1.0; anything above 1.0 clips, and the                       earcon would come out as a rasp rather than a tone"
+                why: "amplitude runs from 0.0 to 1.0; anything above 1.0 clips, and the earcon would come out as a rasp rather than a tone"
                     .into(),
             });
         }
@@ -259,6 +277,12 @@ impl Config {
     /// failing the load, but says so - a mistyped hotkey that silently did
     /// nothing would be maddening to diagnose without sight of the file.
     fn parse(text: &str) -> (Config, Vec<Adjustment>) {
+        // A byte order mark, if an editor left one. This file is documented as
+        // safe to edit by hand, and several Windows editors offer "UTF-8 with
+        // BOM"; without this the mark glues itself to the first key, so that
+        // one setting is silently ignored and every other one works. That is
+        // about the most confusing way a config file can fail.
+        let text = text.strip_prefix('\u{feff}').unwrap_or(text);
         let mut cfg = Config::default();
         let mut adjustments = Vec::new();
         let mut sine_freq = 20_000.0f32;
@@ -307,7 +331,7 @@ impl Config {
                             "settings_hotkey '{value}' ignored, keeping {}",
                             cfg.settings_hotkey
                         ),
-                        why: "it should read like 'ctrl+win+f11' - at least one of ctrl,                               alt, shift or win, then one key"
+                        why: "it should read like 'ctrl+win+f11' - at least one of ctrl, alt, shift or win, then one key"
                             .into(),
                     }),
                 },
@@ -315,7 +339,7 @@ impl Config {
                     Some(key) => cfg.hotkey = key,
                     None => adjustments.push(Adjustment {
                         what: format!("hotkey '{value}' ignored, keeping {}", cfg.hotkey),
-                        why: "it should read like 'ctrl+win+f12' - at least one of ctrl,                               alt, shift or win, then one key. A key with no modifier is                               refused because registering it would take that key away from                               every other program"
+                        why: "it should read like 'ctrl+win+f12' - at least one of ctrl, alt, shift or win, then one key. A key with no modifier is refused because registering it would take that key away from every other program"
                             .into(),
                     }),
                 },
@@ -431,10 +455,10 @@ earcons = {earcons}
 # Earcon loudness, 0.0 to 1.0.
 earcon_volume = {earcon_volume}
 
-# Log why each decision was made, not just what was decided. Off by
-# default - it makes the log much longer. Turn it on if keep-alive wakes
-# when it should not, or fails to when it should: it records what the
-# app thought the input was, and the timings it thought it on.
+# Detailed logging, for troubleshooting. Off by default - it makes the
+# log several times longer. Turn it on while looking into a problem: it
+# adds the moments when audio starts and stops, with the level measured,
+# and how long each device took to open.
 diagnostics = {diagnostics}
 ",
             threshold = self.audio_threshold,
@@ -513,6 +537,17 @@ mod tests {
         let (parsed, adjustments) = Config::parse(&cfg.serialise());
         assert!(adjustments.is_empty());
         assert_eq!(parsed, cfg);
+    }
+
+    #[test]
+    fn a_byte_order_mark_does_not_eat_the_first_setting() {
+        // Found by writing a test config with PowerShell's -Encoding utf8,
+        // which adds one: the first line was ignored and every other line
+        // worked, which looked exactly like a parser bug in one key.
+        let (cfg, adjustments) = Config::parse("\u{feff}timeout = 45\nearcons = off\n");
+        assert_eq!(cfg.release, Release::Idle { secs: 45 });
+        assert!(!cfg.earcons);
+        assert!(adjustments.is_empty());
     }
 
     #[test]

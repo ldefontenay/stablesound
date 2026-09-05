@@ -172,8 +172,9 @@ fn run(shared: &Mutex<Config>, commands: &Sender<Command>, hwnd_bits: isize) {
             "diag" | "diagnostics" => match rest {
                 "on" | "" => {
                     cfg.diagnostics = true;
-                    println!("Diagnostics on. The log will now record why each");
-                    println!("input was called the keyboard or the mouse.");
+                    println!("Detailed logging on. The log will now record when audio");
+                    println!("starts and stops, at what level, and how long each device");
+                    println!("took to open.");
                     apply(cfg, commands);
                 }
                 "off" => {
@@ -253,11 +254,14 @@ pub fn describe(cfg: &Config) {
     println!("Release: {release}");
     println!("Hotkey:  {} toggles keep-alive", cfg.hotkey);
     println!(
-        "Settings: {}",
+        "Dialog:  {}",
         if cfg.settings_hotkey_enabled {
-            format!("{} opens them, or the tray menu", cfg.settings_hotkey)
+            format!(
+                "{} opens the settings, as does the tray",
+                cfg.settings_hotkey
+            )
         } else {
-            "tray menu (Win+B) or type 'settings' - no hotkey".to_string()
+            "tray menu (Win+B), or type 'settings' - no hotkey".to_string()
         }
     );
     println!(
@@ -272,16 +276,21 @@ pub fn describe(cfg: &Config) {
         "Earcons: {}",
         if cfg.earcons {
             format!(
-                "on at {:.0}% - when you switch it on or off; automatic                  releases are silent",
+                "on at {:.0}% - when you switch it on or off; automatic releases are silent",
                 cfg.earcon_volume * 100.0
             )
         } else {
             "off".to_string()
         }
     );
-    if cfg.diagnostics {
-        println!("Diag:    on - the log records the reason behind each decision");
-    }
+    println!(
+        "Logging: {}",
+        match (cfg.logging, cfg.diagnostics) {
+            (false, _) => "off",
+            (true, false) => "on - state changes",
+            (true, true) => "on - state changes, plus detailed troubleshooting lines",
+        }
+    );
 }
 
 pub fn help() {
@@ -298,7 +307,7 @@ pub fn help() {
     println!("  volume <0.0-1.0>      how loud those tones are");
     println!("  hotkey <combination>  for example: hotkey ctrl+win+f12");
     println!("  settings              open the settings dialog");
-    println!("  diag on | diag off    log why input was called keyboard or mouse");
+    println!("  diag on | diag off    detailed logging, for troubleshooting");
     println!("  save                  write current settings to the config file");
     println!("  status                show current settings");
     println!("  quit                  exit");

@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
+  <assemblyIdentity type="win32" name="StableSound" version="1.0.0.0"/>
+  <!--
+    The app had no manifest at all until now, which PLAN.md's stack section
+    had assumed it did. Without one a process gets the version 5 common
+    controls, so the dialog was the only one on the machine not built from the
+    same controls as every other - and "the same dialog a screen reader meets
+    everywhere else" is the entire argument for using a template rather than a
+    toolkit.
+
+    Being straight about what this does not do: it was tried as a fix for the
+    Milestone 4 round's finding that JAWS never named the groups, and it made
+    no difference to the accessibility tree at all. See stablesound.rc.
+  -->
+  <dependency>
+    <dependentAssembly>
+      <assemblyIdentity type="win32" name="Microsoft.Windows.Common-Controls"
+                        version="6.0.0.0" processorArchitecture="*"
+                        publicKeyToken="6595b64144ccf1df" language="*"/>
+    </dependentAssembly>
+  </dependency>
+  <trustInfo xmlns="urn:schemas-microsoft-com:asm.v3">
+    <security>
+      <requestedPrivileges>
+        <!-- Nothing here needs elevation, and asking for it would be one more
+             thing for SmartScreen to dislike (PLAN.md, Milestone 6). -->
+        <requestedExecutionLevel level="asInvoker" uiAccess="false"/>
+      </requestedPrivileges>
+    </security>
+  </trustInfo>
+  <compatibility xmlns="urn:schemas-microsoft-com:compatibility.v1">
+    <application>
+      <!-- Windows 8.1 and 10/11. Without these Windows applies compatibility
+           shims and lies about its own version. -->
+      <supportedOS Id="{1f676c76-80e1-4239-95bb-83d0f6d0da78}"/>
+      <supportedOS Id="{8e0f7a12-bfb3-4fe8-b9a5-48fd50a15a9a}"/>
+    </application>
+  </compatibility>
+</assembly>
