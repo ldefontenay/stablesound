@@ -124,6 +124,11 @@ pub const CMD_SETTINGS: i32 = 4;
 /// where the display needs something larger.
 const SIZE: i32 = 16;
 
+/// The label the icon is registered under, and the first half of what a screen
+/// reader reads off it. See `add` for why it is registered separately from the
+/// state.
+const NAME: &str = "StableSound";
+
 pub struct Tray {
     hwnd: HWND,
     /// Icons for the two states, so a sighted user can tell at a glance.
@@ -230,7 +235,22 @@ impl Tray {
     }
 
     fn add(&mut self) -> WinResult<()> {
-        self.notify(NIM_ADD)?;
+        // Added under the app's name rather than its state, which matters more
+        // than it looks. Windows 11 keeps whatever `szTip` said at `NIM_ADD` as
+        // the icon's label, and a screen reader is then given "<label>
+        // <tooltip>" for the rest of the session. Adding it as "StableSound:
+        // headphones free" therefore made switching keep-alive on read as
+        // "StableSound: headphones free StableSound: headphones awake", which
+        // is what the Milestone 5 round reported. Registering the name once and
+        // leaving the state to the tooltip gives "StableSound Headphones
+        // awake" - the shape every built-in icon already uses, as in "Volume
+        // Headphones (soundcore AeroClip): 44%".
+        //
+        // Measured on Windows 11 build 26200. Microsoft's own Windows Security
+        // icon reads "Windows Security - No actions needed. Windows Security -
+        // Actions recommended." on the same machine, so this is the shell's
+        // rule and not something we can switch off.
+        self.notify_with_tip(NIM_ADD, NAME)?;
 
         // Must follow the add, and must happen before any keyboard use. See
         // the module note: without it the icon is deaf to everything but the
@@ -244,6 +264,10 @@ impl Tray {
         };
         data.Anonymous.uVersion = NOTIFYICON_VERSION_4;
         self.version4 = unsafe { Shell_NotifyIconW(NIM_SETVERSION, &data) }.as_bool();
+
+        // Only now say what the state is. The label is cached by this point, so
+        // this and every later change move the second half of the name alone.
+        self.notify(NIM_MODIFY)?;
         Ok(())
     }
 
@@ -254,6 +278,24 @@ impl Tray {
     }
 
     fn notify(&self, action: windows::Win32::UI::Shell::NOTIFY_ICON_MESSAGE) -> WinResult<()> {
+        // Short on purpose. The Milestone 3 verdict on the first attempt was
+        // simply "too verbose". The name of the app is deliberately absent -
+        // the shell puts it in front of this; see `NAME`.
+        let tip = if self.active {
+            "Headphones awake"
+        } else {
+            "Headphones free"
+        };
+        self.notify_with_tip(action, tip)
+    }
+
+    /// The one place `Shell_NotifyIconW` is called, so the flags and the icon
+    /// are decided once.
+    fn notify_with_tip(
+        &self,
+        action: windows::Win32::UI::Shell::NOTIFY_ICON_MESSAGE,
+        tip: &str,
+    ) -> WinResult<()> {
         let mut data = NOTIFYICONDATAW {
             cbSize: size_of::<NOTIFYICONDATAW>() as u32,
             hWnd: self.hwnd,
@@ -268,15 +310,6 @@ impl Tray {
                 self.off_icon
             },
             ..Default::default()
-        };
-
-        // Short on purpose. This string is the icon's accessible name, so it is
-        // read out in full every time the user arrows onto the icon - the
-        // Milestone 3 verdict on the first attempt was simply "too verbose".
-        let tip = if self.active {
-            "StableSound: headphones awake"
-        } else {
-            "StableSound: headphones free"
         };
         for (slot, ch) in data.szTip.iter_mut().zip(tip.encode_utf16()) {
             *slot = ch;
