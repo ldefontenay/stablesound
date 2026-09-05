@@ -123,10 +123,10 @@ fn main() {
         "toggles keep-alive",
         &log,
     );
-    // Off by default, at the tester's request after the Milestone 4 round.
-    // The tray menu and the console both open the settings, so nothing is
-    // out of reach; this is one combination handed back to the rest of the
-    // machine.
+    // On by default, at the tester's request after the Milestone 5 round, and
+    // switchable off in the dialog once the settings are settled - which is
+    // what the help file will recommend. The tray menu and the console open
+    // the settings too, so nothing is out of reach either way.
     let settings_key = cfg
         .settings_hotkey_enabled
         .then(|| {

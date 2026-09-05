@@ -18,10 +18,10 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
 };
 
 /// The ids we register under. At most two combinations are claimed: one to
-/// toggle keep-alive, and one to open the settings if the user has asked for
-/// it - it is off by default, because the settings are opened rarely and every
-/// global hotkey is taken away from every other program on the machine. There
-/// is no third, and both defaults are deliberately obscure.
+/// toggle keep-alive, and one to open the settings, which can be switched off
+/// once the settings are the way you want them - every global hotkey is taken
+/// away from every other program on the machine. There is no third, and both
+/// defaults are deliberately obscure.
 pub const TOGGLE_ID: i32 = 1;
 pub const SETTINGS_ID: i32 = 2;
 

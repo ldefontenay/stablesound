@@ -76,14 +76,19 @@ pub struct Config {
     pub audio_threshold: f32,
     /// Append state transitions to a log file.
     ///
-    /// On by default, and worth defending because the tester asked: "I don't
-    /// foresee myself or other users wanting to keep a log." What it costs is
-    /// a line per state change - a few hundred bytes a day - and what it buys
-    /// is the only evidence that exists when something goes wrong, in an app
-    /// whose behaviour cannot be watched as it happens. Every hardware round
-    /// so far that produced a fix rather than a guess produced it from this
-    /// file. See [`Config::diagnostics`] for the detailed variety, which is
-    /// the part that does get switched on only when needed.
+    /// Off by default, which is the tester's decision and not the one argued
+    /// for here. The case put to them was that a line per state change costs a
+    /// few hundred bytes a day and is the only evidence that exists when
+    /// something goes wrong, in an app whose behaviour cannot be watched as it
+    /// happens. Having seen both, they chose: "Please have logging off by
+    /// default and it can then be turned on when needed for development or
+    /// trouble-shooting." It is one checkbox in the dialog and one command in
+    /// the console.
+    ///
+    /// The cost is real and worth stating: a hardware round run without
+    /// turning it on first leaves nothing behind to read. Every test script
+    /// from here on has to say so. See [`Config::diagnostics`] for the
+    /// detailed variety, which sits behind the same switch again.
     pub logging: bool,
     /// Bring keep-alive back automatically when the user touches the machine.
     ///
@@ -103,18 +108,19 @@ pub struct Config {
     pub hotkey: Hotkey,
     /// Whether to claim [`Config::settings_hotkey`] at all.
     ///
-    /// Off by default, and that is the tester's own call after the Milestone 4
-    /// round: "It won't be used often enough to warrant a hotkey, so having it
-    /// in the tray only is my current preference." Every global hotkey is a
-    /// combination taken away from every other program on the machine for as
-    /// long as StableSound runs, and the settings are opened a handful of
-    /// times in a lifetime.
+    /// On by default. The Milestone 4 round asked for it off - "it won't be
+    /// used often enough to warrant a hotkey" - and the Milestone 5 round,
+    /// having lived with it off, changed its mind: "Actually, ship with the
+    /// settings hotkey on. In the documentation later, we can recommend that
+    /// the hotkey can be disabled once the user has completed tweaking the
+    /// application settings to their satisfaction."
     ///
-    /// It stays *available*, one checkbox away, because CLAUDE.md requires
-    /// every function to be reachable without the tray menu. The tray is
-    /// keyboard-reachable with `Win+B` and was signed off in the third
-    /// Milestone 3 round, so leaving this off is a preference rather than a
-    /// door being closed.
+    /// So the reasoning survives, only inverted. A global hotkey is a
+    /// combination taken away from every other program on the machine for as
+    /// long as StableSound runs, and it is worth handing back - but the moment
+    /// that is worth doing is after the settings have been set the way you
+    /// want them, not before you have ever opened them. The help file owes
+    /// this a paragraph; see the Milestone 6 notes in PLAN.md.
     pub settings_hotkey_enabled: bool,
     /// The global combination that opens the settings dialog, when
     /// [`Config::settings_hotkey_enabled`] is on.
@@ -166,10 +172,10 @@ impl Default for Config {
             // JAWS speech measured around 0.56 on the AeroClip, so this has
             // roughly a 1000x margin.
             audio_threshold: 0.0005,
-            logging: true,
+            logging: false,
             wake_on_input: true,
             hotkey: Hotkey::default(),
-            settings_hotkey_enabled: false,
+            settings_hotkey_enabled: true,
             settings_hotkey: Hotkey::settings_default(),
             earcons: true,
             // The tester's figure from the Milestone 3 round, having compared
@@ -415,9 +421,10 @@ timeout = {secs}
 # Peak level counted as real audio. JAWS speech measures around 0.56.
 threshold = {threshold}
 
-# Log state changes to stablesound.log. Recommended: idle behaviour
-# cannot be watched live, because reading output with a screen reader
-# makes the very sound being measured.
+# Log state changes to stablesound.log. Off by default; turn it on
+# before doing anything you might want to ask about afterwards. Idle
+# behaviour cannot be watched live - reading output with a screen reader
+# makes the very sound being measured - so the file is the only record.
 logging = {logging}
 
 # Bring keep-alive back when you touch the machine, so the first word
@@ -428,16 +435,19 @@ logging = {logging}
 wake_on_input = {wake_on_input}
 
 # Global toggle. At least one of ctrl, alt, shift, win - then one key
-# (a letter, a digit, f1 to f24, or space, pause, insert, delete, home,
-# end, pageup, pagedown, up, down, left, right).
+# (a letter, a digit, f1 to f24, a punctuation key such as ; , . / - =,
+# or space, pause, insert, delete, home, end, pageup, pagedown, up,
+# down, left, right).
 # This combination is taken from every other program while StableSound
 # runs, so obscure is good.
 hotkey = {hotkey}
 
 # A second global hotkey that opens the settings dialog from anywhere.
-# Off by default: the settings are opened rarely, and every global hotkey
-# is a combination taken away from every other program while StableSound
-# runs. The tray menu opens them too, with Win+B.
+# On by default, so the settings can be found before you know where the
+# tray is. Every global hotkey is a combination taken away from every
+# other program while StableSound runs, so once the settings are the way
+# you want them this is worth switching off: the tray menu opens them
+# too, with Win+B.
 settings_hotkey_enabled = {settings_hotkey_enabled}
 
 # Which combination that would be. Same rules as the toggle above. Kept
@@ -685,19 +695,38 @@ mod tests {
     }
 
     #[test]
-    fn the_settings_hotkey_is_off_by_default_but_still_offered() {
-        // The tester asked for the tray to be the only route, while keeping
-        // the combination one checkbox away - so the field must not be empty.
+    fn the_settings_hotkey_is_on_by_default_and_can_be_handed_back() {
+        // Shipped on, at the tester's request after the Milestone 5 round, and
+        // switchable off once the settings are settled - so both directions
+        // have to survive a round trip through the file.
         let cfg = Config::default();
-        assert!(!cfg.settings_hotkey_enabled);
+        assert!(cfg.settings_hotkey_enabled);
         assert_eq!(cfg.settings_hotkey, Hotkey::settings_default());
         assert!(
-            Config::parse(
-                "settings_hotkey_enabled = yes
+            !Config::parse(
+                "settings_hotkey_enabled = no
 "
             )
             .0
             .settings_hotkey_enabled
+        );
+    }
+
+    #[test]
+    fn logging_is_off_by_default_and_can_be_turned_on() {
+        // The tester's call after seeing both: "Please have logging off by
+        // default and it can then be turned on when needed for development or
+        // trouble-shooting."
+        let cfg = Config::default();
+        assert!(!cfg.logging);
+        assert!(!cfg.diagnostics);
+        assert!(
+            Config::parse(
+                "logging = yes
+"
+            )
+            .0
+            .logging
         );
     }
 
