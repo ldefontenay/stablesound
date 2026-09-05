@@ -13,8 +13,8 @@ use std::fmt;
 
 use windows::Win32::Foundation::HWND;
 use windows::Win32::UI::Input::KeyboardAndMouse::{
-    RegisterHotKey, UnregisterHotKey, HOT_KEY_MODIFIERS, MOD_ALT, MOD_CONTROL, MOD_NOREPEAT,
-    MOD_SHIFT, MOD_WIN,
+    MapVirtualKeyW, RegisterHotKey, UnregisterHotKey, VkKeyScanW, HOT_KEY_MODIFIERS,
+    MAPVK_VK_TO_CHAR, MOD_ALT, MOD_CONTROL, MOD_NOREPEAT, MOD_SHIFT, MOD_WIN,
 };
 
 /// The ids we register under. At most two combinations are claimed: one to
@@ -124,8 +124,10 @@ At least one modifier is needed, and you can use several. The order does not \
 matter, and neither does capitalisation or spacing: ctrl+win+f12, WIN+CTRL+F12 \
 and Control + Windows + F12 are all the same combination.
 
-The key can be a letter, a digit, f1 to f24, or one of: space, pause, break, \
-insert, delete, home, end, pageup, pagedown, up, down, left, right.
+The key can be a letter, a digit, f1 to f24, a punctuation key such as \
+; , . / ' [ ] - or =, or one of: space, pause, break, insert, delete, home, end, \
+pageup, pagedown, up, down, left, right. The plus key is written as the word \
+plus, because a plus sign is what joins the parts together.
 
 For example: ctrl+win+f12, ctrl+alt+shift+s, win+shift+pageup";
 
@@ -156,7 +158,13 @@ impl Hotkey {
                     if vk.is_some() {
                         return Err(ParseError::TwoKeys);
                     }
-                    vk = Some(key_code(key).ok_or_else(|| ParseError::Unknown(key.to_string()))?);
+                    let (code, implied) =
+                        key_code(key).ok_or_else(|| ParseError::Unknown(key.to_string()))?;
+                    // A punctuation key can imply a modifier of its own: on
+                    // this keyboard ':' is Shift and the ';' key, so asking for
+                    // Ctrl+Win+: is asking for Ctrl+Win+Shift+;.
+                    modifiers |= implied;
+                    vk = Some(code);
                 }
             }
         }
@@ -248,30 +256,66 @@ const NAMED: &[(&str, u32)] = &[
     ("right", 0x27),
 ];
 
-fn key_code(key: &str) -> Option<u32> {
+/// The virtual key a name stands for, and any modifier that name implies.
+fn key_code(key: &str) -> Option<(u32, u32)> {
     if let Some((_, code)) = NAMED.iter().find(|(name, _)| *name == key) {
-        return Some(*code);
+        return Some((*code, 0));
+    }
+    // Spelt out, because a plus sign is what joins the parts together and so
+    // cannot also be one of them.
+    if key == "plus" {
+        return key_that_types('+');
     }
 
-    let bytes = key.as_bytes();
-    // Single letter or digit: the virtual key code is the ASCII value.
-    if bytes.len() == 1 {
-        let c = bytes[0].to_ascii_uppercase();
-        if c.is_ascii_uppercase() || c.is_ascii_digit() {
-            return Some(u32::from(c));
+    let mut chars = key.chars();
+    if let (Some(c), None) = (chars.next(), chars.next()) {
+        // Single letter or digit: the virtual key code is the ASCII value.
+        let upper = c.to_ascii_uppercase();
+        if upper.is_ascii_uppercase() || upper.is_ascii_digit() {
+            return Some((u32::from(upper as u8), 0));
         }
-        return None;
+        // Anything else of one character is punctuation, and which key that is
+        // depends on the layout.
+        return key_that_types(c);
     }
 
     // F1 to F24.
     if let Some(number) = key.strip_prefix('f') {
         if let Ok(n) = number.parse::<u32>() {
             if (1..=24).contains(&n) {
-                return Some(0x70 + n - 1);
+                return Some((0x70 + n - 1, 0));
             }
         }
     }
     None
+}
+
+/// Ask the keyboard layout which key types this character, and what has to be
+/// held down to get it.
+///
+/// Punctuation has no fixed virtual key code the way letters and digits do -
+/// the key that types ';' is not in the same place on every layout - so the
+/// answer has to come from Windows rather than from a table of ours. The
+/// Milestone 5 round asked for this: "I tried using ctrl+win+; but ; was not
+/// available as an option."
+///
+/// Where the character needs Shift, Shift is folded into the combination,
+/// because that is literally what the fingers do. AltGr characters are refused:
+/// they need Ctrl and Alt held down as well, which would fight the modifiers
+/// rather than sit alongside them.
+fn key_that_types(c: char) -> Option<(u32, u32)> {
+    let scan = unsafe { VkKeyScanW(c as u16) };
+    if scan == -1 {
+        return None;
+    }
+    let vk = u32::from((scan & 0xFF) as u8);
+    let held = (scan >> 8) & 0xFF;
+    // Bit 0 is Shift; bits 1 and 2 are Ctrl and Alt, which together mean AltGr.
+    if held & !1 != 0 {
+        return None;
+    }
+    let implied = if held & 1 != 0 { MOD_SHIFT.0 } else { 0 };
+    Some((vk, implied))
 }
 
 fn key_name(vk: u32) -> String {
@@ -284,6 +328,16 @@ fn key_name(vk: u32) -> String {
     if let Some(c) = char::from_u32(vk) {
         if c.is_ascii_uppercase() || c.is_ascii_digit() {
             return c.to_string();
+        }
+    }
+    // Punctuation, the other way round from `key_that_types`. The top bit
+    // marks a dead key, which is not something to print.
+    let typed = unsafe { MapVirtualKeyW(vk, MAPVK_VK_TO_CHAR) };
+    if typed & 0x8000_0000 == 0 {
+        if let Some(c) = char::from_u32(typed) {
+            if !c.is_control() && c != ' ' {
+                return c.to_string();
+            }
         }
     }
     format!("key {vk}")
@@ -384,6 +438,18 @@ mod tests {
                 named.0
             );
         }
+        // The punctuation it now offers has to work too, or the advice would
+        // be sending people at keys that are refused.
+        for key in [";", ",", ".", "/", "'", "[", "]", "-", "=", "plus"] {
+            assert!(
+                HOW_TO_WRITE.contains(key),
+                "{key} is accepted but never mentioned"
+            );
+            assert!(
+                Hotkey::parse(&format!("ctrl+{key}")).is_some(),
+                "{key} is offered but refused"
+            );
+        }
         // And it says the thing the tester specifically asked about.
         assert!(HOW_TO_WRITE.contains("order does not"));
     }
@@ -398,6 +464,47 @@ mod tests {
         ] {
             assert_eq!(Hotkey::parse(text), Some(wanted), "{text}");
         }
+    }
+
+    #[test]
+    fn punctuation_keys_are_allowed() {
+        // The Milestone 5 round: "I tried using ctrl+win+; but ; was not
+        // available as an option."
+        assert_eq!(
+            Hotkey::parse("ctrl+win+;").expect("semicolon").to_string(),
+            "Ctrl+Win+;"
+        );
+        for text in [
+            "ctrl+win+;",
+            "ctrl+alt+,",
+            "ctrl+alt+.",
+            "ctrl+alt+/",
+            "win+alt+plus",
+        ] {
+            let key = Hotkey::parse(text).unwrap_or_else(|| panic!("{text} was refused"));
+            // Whatever it prints has to come back in as the same combination,
+            // or the config file and the dialog would disagree.
+            assert_eq!(Hotkey::parse(&key.to_string()), Some(key), "{text}");
+        }
+    }
+
+    #[test]
+    fn a_shifted_character_brings_its_shift_with_it() {
+        // Which characters need Shift is the layout's business, so ask it
+        // rather than assume: if ':' is Shift and the ';' key here, then
+        // Ctrl+Win+: has to *be* Ctrl+Win+Shift+;.
+        let Some((vk, implied)) = key_that_types(':') else {
+            return;
+        };
+        if implied != MOD_SHIFT.0 {
+            return;
+        }
+        let typed = Hotkey::parse("ctrl+win+:").expect("colon");
+        assert_eq!(typed.vk, vk);
+        assert_eq!(
+            typed,
+            Hotkey::parse("ctrl+win+shift+;").expect("shift and semicolon")
+        );
     }
 
     #[test]
