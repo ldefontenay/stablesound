@@ -171,6 +171,20 @@ fn run(mut cfg: Config, commands: &Sender<Command>) {
                 }
             },
 
+            "diag" | "diagnostics" => match rest {
+                "on" | "" => {
+                    cfg.diagnostics = true;
+                    println!("Diagnostics on. The log will now record why each");
+                    println!("input was called the keyboard or the mouse.");
+                    apply(&mut cfg, commands);
+                }
+                "off" => {
+                    cfg.diagnostics = false;
+                    apply(&mut cfg, commands);
+                }
+                _ => println!("Usage: diag on | diag off"),
+            },
+
             "save" => match cfg.save(&config_path) {
                 Ok(()) => println!("Saved to {}", config_path.display()),
                 Err(e) => println!("Could not save: {e}"),
@@ -246,6 +260,9 @@ pub fn describe(cfg: &Config) {
             "off".to_string()
         }
     );
+    if cfg.diagnostics {
+        println!("Diag:    on - the log records the reason behind each decision");
+    }
 }
 
 pub fn help() {
@@ -262,6 +279,7 @@ pub fn help() {
     println!("  earcons on | off      the tones for switching on and off by hand");
     println!("  volume <0.0-1.0>      how loud those tones are");
     println!("  hotkey <combination>  for example: hotkey ctrl+win+f12");
+    println!("  diag on | diag off    log why input was called keyboard or mouse");
     println!("  save                  write current settings to the config file");
     println!("  status                show current settings");
     println!("  quit                  exit");

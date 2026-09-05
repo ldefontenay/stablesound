@@ -9,11 +9,27 @@
 //! the keyboard with `Win+B`. The menu is a real Win32 menu, so JAWS reads it
 //! without any help from us.
 //!
-//! The window exists only to have a message queue. It is never shown. Both the
-//! hotkey and the tray callback post to it, and `main` reads them straight off
-//! the queue rather than in a window procedure - which keeps every decision in
-//! one readable loop instead of in a callback that would need global state to
-//! reach the engine.
+//! The window exists only to have a message queue. It is never shown. The
+//! hotkey, the tray and the raw mouse stream all arrive here, and `main` reads
+//! them off the queue rather than in a window procedure - which keeps every
+//! decision in one readable loop instead of in a callback that would need
+//! global state to reach the engine.
+//!
+//! # Why there is a window procedure after all
+//!
+//! Reading everything off the queue was the second reason the tray did not
+//! work, and the harder one to see. `GetMessage` returns **posted** messages.
+//! Messages that are *sent* it dispatches straight to the window procedure
+//! while it waits, and never returns to the caller at all. The hotkey and the
+//! timer are posted, so they arrived and the loop looked healthy; the shell
+//! sends the tray callback, so it went to a procedure that did nothing but call
+//! `DefWindowProcW` and was thrown away. Every click, every `Enter`, every
+//! Applications key, silently discarded.
+//!
+//! `wndproc` therefore re-posts the callback to the queue as `WM_TRAY_QUEUED`,
+//! which puts the decision back in the loop where it belongs and works whether
+//! the shell sends the message or posts it. It is also the right thing to do
+//! regardless: opening a modal menu inside a sent message blocks the sender.
 //!
 //! # Version 4, and why it is not optional
 //!
@@ -30,12 +46,20 @@
 //! `wParam` so the menu can be anchored to the icon rather than to wherever the
 //! mouse pointer happens to be sitting. For an app whose primary user never
 //! touches a mouse, both matter.
+//!
+//! The version 3 mouse messages are still accepted, and a failed
+//! `NIM_SETVERSION` is no longer fatal. Handling both costs a few lines and
+//! removes a whole class of question from the next hardware round: it no longer
+//! matters which protocol is actually in force.
 
+use std::ffi::c_void;
 use std::mem::size_of;
+use std::sync::atomic::{AtomicIsize, Ordering};
 use std::time::{Duration, Instant};
 
-use windows::core::{Result as WinResult, PCWSTR};
+use windows::core::{Result as WinResult, BOOL, PCWSTR};
 use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, POINT, WPARAM};
+use windows::Win32::System::Console::SetConsoleCtrlHandler;
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::Shell::{
     Shell_NotifyIconW, NIF_ICON, NIF_MESSAGE, NIF_SHOWTIP, NIF_TIP, NIM_ADD, NIM_DELETE,
@@ -43,9 +67,10 @@ use windows::Win32::UI::Shell::{
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     AppendMenuW, CreateIcon, CreatePopupMenu, CreateWindowExW, DefWindowProcW, DestroyIcon,
-    DestroyMenu, DestroyWindow, PostMessageW, RegisterClassW, RegisterWindowMessageW,
+    DestroyMenu, DestroyWindow, GetCursorPos, PostMessageW, RegisterClassW, RegisterWindowMessageW,
     SetForegroundWindow, TrackPopupMenu, HICON, MF_SEPARATOR, MF_STRING, TPM_RETURNCMD,
-    TPM_RIGHTBUTTON, WINDOW_EX_STYLE, WM_APP, WM_CONTEXTMENU, WM_NULL, WNDCLASSW, WS_OVERLAPPED,
+    TPM_RIGHTBUTTON, WINDOW_EX_STYLE, WM_APP, WM_CONTEXTMENU, WM_INPUT, WM_LBUTTONUP, WM_NULL,
+    WM_RBUTTONUP, WNDCLASSW, WS_OVERLAPPED,
 };
 
 /// Sent when the icon is activated with `Enter`. Defined by shellapi.h as
@@ -67,9 +92,17 @@ const ICON_ID: u32 = 1;
 /// second press.
 const ECHO: Duration = Duration::from_millis(250);
 
-/// Message the tray icon posts to our window. Anything from `WM_APP` up is
+/// Message the shell uses for the tray callback. Anything from `WM_APP` up is
 /// ours to define.
 pub const WM_TRAY: u32 = WM_APP + 1;
+
+/// The same callback, re-posted by `wndproc` so the message loop can see it.
+/// See the module note on sent versus posted messages.
+pub const WM_TRAY_QUEUED: u32 = WM_APP + 3;
+
+/// The window owning the tray icon, for the console control handler, which runs
+/// on a thread of the system's choosing and can reach nothing else.
+static ICON_OWNER: AtomicIsize = AtomicIsize::new(0);
 
 /// What the user asked the icon for.
 pub enum TrayEvent {
@@ -100,9 +133,14 @@ pub struct Tray {
     /// first time Explorer crashes.
     taskbar_created: u32,
     active: bool,
-    /// When the icon was last activated, so a repeated `NIN_KEYSELECT` is not
-    /// taken for a second press. See `ECHO`.
+    /// Whether `NIM_SETVERSION` was accepted. Decides only where the menu's
+    /// anchor point comes from; both protocols are handled either way.
+    version4: bool,
+    /// When the icon was last activated, and when the menu was last asked for,
+    /// so that one press producing two messages is not read as two presses.
+    /// See `ECHO`.
     last_select: Option<Instant>,
+    last_menu: Option<Instant>,
 }
 
 impl Tray {
@@ -140,7 +178,7 @@ impl Tray {
             )?
         };
 
-        let tray = Tray {
+        let mut tray = Tray {
             hwnd,
             // Green while holding the device awake, grey once released.
             on_icon: make_icon(0x2E, 0xB8, 0x4C)?,
@@ -149,9 +187,19 @@ impl Tray {
                 RegisterWindowMessageW(PCWSTR(wide("TaskbarCreated").as_ptr()))
             },
             active: false,
+            version4: false,
             last_select: None,
+            last_menu: None,
         };
         tray.add()?;
+
+        // Closing the console window or pressing Ctrl+C does not run `Drop`.
+        // See `on_console_close`.
+        ICON_OWNER.store(hwnd.0 as isize, Ordering::Relaxed);
+        unsafe {
+            let _ = SetConsoleCtrlHandler(Some(on_console_close), true);
+        }
+
         Ok(tray)
     }
 
@@ -180,12 +228,13 @@ impl Tray {
         let _ = self.notify(NIM_MODIFY);
     }
 
-    fn add(&self) -> WinResult<()> {
+    fn add(&mut self) -> WinResult<()> {
         self.notify(NIM_ADD)?;
 
         // Must follow the add, and must happen before any keyboard use. See
         // the module note: without it the icon is deaf to everything but the
-        // mouse.
+        // mouse. Not fatal if it is refused - the version 3 messages are
+        // handled too - but worth knowing about, so `create` reports it.
         let mut data = NOTIFYICONDATAW {
             cbSize: size_of::<NOTIFYICONDATAW>() as u32,
             hWnd: self.hwnd,
@@ -193,7 +242,14 @@ impl Tray {
             ..Default::default()
         };
         data.Anonymous.uVersion = NOTIFYICON_VERSION_4;
-        unsafe { Shell_NotifyIconW(NIM_SETVERSION, &data).ok() }
+        self.version4 = unsafe { Shell_NotifyIconW(NIM_SETVERSION, &data) }.as_bool();
+        Ok(())
+    }
+
+    /// Whether the shell accepted version 4. Reported at startup: if the tray
+    /// misbehaves again, this is the first thing worth knowing.
+    pub fn is_version4(&self) -> bool {
+        self.version4
     }
 
     fn notify(&self, action: windows::Win32::UI::Shell::NOTIFY_ICON_MESSAGE) -> WinResult<()> {
@@ -232,26 +288,49 @@ impl Tray {
     ///
     /// Version 4 layout: `wParam` holds the anchor point, `lParam` holds the
     /// event in its low word and the icon id in its high word. Note that this
-    /// is the reverse of the version 3 layout, where `wParam` was the id.
+    /// is the reverse of the version 3 layout, where `wParam` was the id - so
+    /// the anchor is only trustworthy when version 4 was accepted.
+    ///
+    /// Both protocols are accepted. The version 3 mouse messages should not
+    /// arrive once version 4 is in force, and the echo guard makes it harmless
+    /// if they do.
     pub fn decode(&mut self, wparam: WPARAM, lparam: LPARAM) -> Option<TrayEvent> {
-        match (lparam.0 as u32) & 0xFFFF {
-            NIN_SELECT | NIN_KEYSELECT => {
-                let now = Instant::now();
-                if self.last_select.is_some_and(|at| now - at < ECHO) {
-                    return None;
+        let now = Instant::now();
+        match callback_event(lparam) {
+            NIN_SELECT | NIN_KEYSELECT | WM_LBUTTONUP => {
+                if fresh(&mut self.last_select, now) {
+                    Some(TrayEvent::Toggle)
+                } else {
+                    None
                 }
-                self.last_select = Some(now);
-                Some(TrayEvent::Toggle)
             }
-            // Both the right mouse button and the Applications key arrive here
-            // under version 4; WM_RBUTTONUP is deliberately not handled as
-            // well, or a right click would open two menus in a row.
-            WM_CONTEXTMENU => Some(TrayEvent::Menu {
-                x: loword(wparam.0 as u32),
-                y: hiword(wparam.0 as u32),
-            }),
+            WM_CONTEXTMENU | WM_RBUTTONUP => {
+                if fresh(&mut self.last_menu, now) {
+                    let at = self.anchor(wparam);
+                    Some(TrayEvent::Menu { x: at.x, y: at.y })
+                } else {
+                    None
+                }
+            }
             _ => None,
         }
+    }
+
+    /// Where to put the menu. Under version 4 the shell hands us the icon's own
+    /// position, which is what makes a keyboard-opened menu appear beside the
+    /// icon; without it there is nothing to go on but the pointer.
+    fn anchor(&self, wparam: WPARAM) -> POINT {
+        if self.version4 {
+            return POINT {
+                x: loword(wparam.0 as u32),
+                y: hiword(wparam.0 as u32),
+            };
+        }
+        let mut point = POINT { x: 0, y: 0 };
+        unsafe {
+            let _ = GetCursorPos(&mut point);
+        }
+        point
     }
 
     /// Show the context menu at a point and return the command the user picked.
@@ -313,21 +392,67 @@ impl Tray {
 
 impl Drop for Tray {
     fn drop(&mut self) {
+        ICON_OWNER.store(0, Ordering::Relaxed);
+        remove_icon(self.hwnd);
         unsafe {
-            let data = NOTIFYICONDATAW {
-                cbSize: size_of::<NOTIFYICONDATAW>() as u32,
-                hWnd: self.hwnd,
-                uID: ICON_ID,
-                ..Default::default()
-            };
-            // Without this the icon stays in the notification area as a ghost
-            // until something makes Windows notice the process is gone.
-            let _ = Shell_NotifyIconW(NIM_DELETE, &data);
             let _ = DestroyIcon(self.on_icon);
             let _ = DestroyIcon(self.off_icon);
             let _ = DestroyWindow(self.hwnd);
         }
     }
+}
+
+/// Take the icon out of the notification area.
+///
+/// Without this the icon stays there as a ghost pointing at a dead window: it
+/// does nothing when activated, and a screen reader still reads it out, so the
+/// next run is easy to mistake for the corpse of the last one.
+fn remove_icon(hwnd: HWND) {
+    let data = NOTIFYICONDATAW {
+        cbSize: size_of::<NOTIFYICONDATAW>() as u32,
+        hWnd: hwnd,
+        uID: ICON_ID,
+        ..Default::default()
+    };
+    unsafe {
+        let _ = Shell_NotifyIconW(NIM_DELETE, &data);
+    }
+}
+
+/// Clean up when the process is being killed rather than quitting.
+///
+/// Closing the console window, or Ctrl+C, does not unwind and does not run
+/// `Drop`. While the console harness exists that is an easy way to leave a
+/// ghost behind, and ghosts are worse than untidy here: they are indexed and
+/// read out exactly like the live icon.
+unsafe extern "system" fn on_console_close(_event: u32) -> BOOL {
+    let hwnd = ICON_OWNER.swap(0, Ordering::Relaxed);
+    if hwnd != 0 {
+        remove_icon(HWND(hwnd as *mut c_void));
+    }
+    // False: cleaning up was all we wanted. Let the default handler end the
+    // process the way it normally would.
+    BOOL(0)
+}
+
+/// The notification event, in the low word of `lParam` under both protocols.
+/// Public so the caller can log what actually arrived.
+pub fn callback_event(lparam: LPARAM) -> u32 {
+    (lparam.0 as u32) & 0xFFFF
+}
+
+/// True if this is a real press rather than a second message for the same one.
+///
+/// The shell has a long-standing habit of sending `NIN_KEYSELECT` twice for a
+/// single `Enter`, and accepting both version 3 and version 4 gives a second
+/// way for one press to arrive twice. Two toggles in a row cancel out, which
+/// looks exactly like an icon that does nothing - the very symptom being fixed.
+fn fresh(last: &mut Option<Instant>, now: Instant) -> bool {
+    if last.is_some_and(|at| now - at < ECHO) {
+        return false;
+    }
+    *last = Some(now);
+    true
 }
 
 /// A filled circle in the given colour.
@@ -379,16 +504,40 @@ fn make_icon(r: u8, g: u8, b: u8) -> WinResult<HICON> {
     }
 }
 
-/// Nothing interesting happens here. Every message this app cares about is
-/// read directly off the queue in `main`, so the window procedure only has to
-/// satisfy Windows.
+/// The two messages that cannot be handled in the loop, and nothing else.
+///
+/// Both are here for the same reason: `GetMessage` hands sent messages straight
+/// to this procedure and never returns them to the caller, so anything the
+/// system sends rather than posts is invisible to a loop-only design. See the
+/// module note.
 unsafe extern "system" fn wndproc(
     hwnd: HWND,
     message: u32,
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> LRESULT {
-    DefWindowProcW(hwnd, message, wparam, lparam)
+    match message {
+        // Put it back on the queue, where the loop can make the decision with
+        // the engine in reach. Also the correct order of events for the menu:
+        // showing a modal popup inside a sent message blocks whoever sent it.
+        WM_TRAY => {
+            unsafe {
+                let _ = PostMessageW(Some(hwnd), WM_TRAY_QUEUED, wparam, lparam);
+            }
+            LRESULT(0)
+        }
+        // Raw mouse input, which is how the app tells the mouse from the
+        // keyboard. Handled here rather than in the loop so it keeps working
+        // while a menu is open and the loop is not running. The payload is
+        // never read - see `input`.
+        WM_INPUT => {
+            crate::input::note_pointer_event();
+            // Still hand it on: the system reclaims the raw input buffer in
+            // its default handling.
+            unsafe { DefWindowProcW(hwnd, message, wparam, lparam) }
+        }
+        _ => unsafe { DefWindowProcW(hwnd, message, wparam, lparam) },
+    }
 }
 
 /// Screen coordinates arrive packed into one word each, and can be negative on

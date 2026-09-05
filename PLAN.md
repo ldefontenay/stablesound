@@ -5,8 +5,10 @@
 **Read this first when picking the project up.**
 
 Milestones 0, 1 and 2 are complete, hardware round included. Milestone 3 is
-built, has had its first hardware round, and the four things that round found
-have been fixed. It needs a second round to confirm them.
+built and has had **two** hardware rounds. The sound side is finished and
+signed off. Two things failed twice - the tray, and the mouse still waking
+keep-alive - and both have now been rebuilt on different mechanisms rather than
+patched again. A third round is needed.
 
 ### What exists and works
 
@@ -37,6 +39,12 @@ Release binary is **248 KB**, against a ~1 MB budget.
   sound; this was the question the whole of Milestone 3 rested on.
 - With no headphones connected at all, the hotkey is harmless - the tones simply
   play through the laptop speakers.
+- The earcons are right: volume, length, shape, no clicks, and the whole
+  on-tone audible from its start. Signed off in the second round.
+- Automatic transitions are silent and stay silent. "I heard no tones, which
+  was perfect."
+- `mouse on` does work - confirmed for the first time in the second round,
+  once the test stopped confounding it with a manual `off`.
 
 ### What the hardware rounds asked for
 
@@ -49,19 +57,22 @@ Two changes came out of Tests 8-10, both from the tester, both now design:
   count as easy. This is a requirement for the Milestone 4 dialog, not a
   nice-to-have.
 
-Four more came out of Tests 11-18, all now fixed and awaiting confirmation:
+Four came out of Tests 11-18. Two are confirmed fixed:
 
-- **Tones only for what the user does.** A tone on every automatic release and
-  every wake was "annoying". Automatic transitions are now silent, whatever
-  `earcons` is set to. See 4.4.
-- **`mouse off` did not work.** A trackpad sweep still woke keep-alive. Not the
-  sweep - the finger lift at the end of it. See 4.1.
-- **The tray menu could not be opened from the keyboard**, and `Enter` on the
-  icon did nothing. The icon was never registered for version 4 of the shell's
-  notification protocol, which is what carries keyboard events at all. See 4.4.
-- **Tones too loud, slightly too long, and the on-tone clipped at the start.**
-  Volume halved to 0.1, notes shortened a fifth, and the on-tone now leads with
-  silence so the Bluetooth link has time to come up. See 4.4.
+- **Tones only for what the user does.** Done, and confirmed.
+- **Tone volume, length and the clipped on-tone.** Done, and confirmed. The
+  lead-in silence is now 125 ms, halved again in the second round.
+
+The other two failed a second time, and both diagnoses were wrong:
+
+- **The tray still did nothing at all.** Version 4 was accepted - the log now
+  proves it - so that was never the whole story. The real fault was that the
+  shell **sends** the callback, and a sent message is dispatched straight to the
+  window procedure and never returned by `GetMessage`, which is the only place
+  the app was looking. See 4.4.
+- **The trackpad still woke keep-alive.** Inferring the source from the cursor
+  position was the wrong tool twice over. The mouse now reports itself, through
+  raw mouse input. See 4.1.
 
 ### Known residual risks, still untested
 
@@ -71,12 +82,16 @@ Four more came out of Tests 11-18, all now fixed and awaiting confirmation:
 
 ### What is next
 
-**Milestone 3 needs a second hardware round** to confirm the four fixes above.
-`test.txt` is the script; Tests 19-23. The two worth watching are the tray under
-JAWS, which failed outright last time and has been rebuilt on a different shell
-protocol, and whether 250 ms of lead-in silence is actually enough to stop the
-on-tone being clipped - that number is a guess, and it can only be judged by
-ear.
+**Milestone 3 needs a third hardware round**, and only for the two things that
+have now failed twice. `test.txt` is the script; Tests 24-26.
+
+Unlike the previous two rounds, both fixes have been **demonstrated on this
+machine** rather than reasoned about - see Milestone 3 in section 7 for what
+was measured and how. What cannot be checked from here is whether the icon the
+tester reaches with `Win+B` is actually ours, which is why every tray callback
+is now written to the log: if `Enter` produces no line, the icon being pressed
+belongs to a dead process, and that is a different problem with a different
+fix.
 
 The console harness is **kept alongside** the tray, on its own stdin thread,
 rather than replaced as originally planned. It is the only diagnostic interface
@@ -227,31 +242,53 @@ source is inferred by pairing it with `GetCursorPos`: if the timestamp advanced
 and the cursor also moved, call it the mouse; if it advanced and the cursor sat
 still, call it the keyboard.
 
-That keeps the privacy and antivirus properties intact - a timestamp and a
-cursor coordinate, still no key data and still no hook.
+**That approach failed twice on hardware and has been abandoned.** Round one:
+the *end* of a trackpad sweep defeats it, because taking a finger off the pad
+is itself an input event arriving after the pointer has already stopped, which
+is the exact signature of a keypress. Round two added a settling window
+requiring the pointer to have been still for 500 ms, and the trackpad still woke
+keep-alive every time, short flicks included. A pointing device evidently
+produces input that the cursor position does not account for, and no amount of
+tightening the inference was going to find it.
 
-**Corrected 2026-09-05 after Milestone 3 testing.** As first written this did
-not work at all: `mouse off` was the default, and a deliberate trackpad sweep
-still woke keep-alive every time. The sweep itself was classified correctly.
-What was not was the *end* of it. Taking a finger off a precision trackpad is
-itself an input event, and it arrives a few milliseconds after the pointer has
-already stopped - so the poll that saw it found the timestamp advanced and the
-pointer still, which is the exact signature of a keypress.
+**The mouse now reports itself (2026-09-05).** `input::watch_pointer` registers
+for **raw mouse input** - usage page 1, usage 2 - with `RIDEV_INPUTSINK`, so
+every event from a mouse or trackpad reaches the hidden window even though it is
+never in the foreground. Each one records a timestamp. Input whose timestamp
+coincides with recent pointing-device activity is the mouse; anything else is
+the keyboard.
 
-The fix is that the pointer has to have been still for a **settling window**,
-currently 500 ms, not merely still since the previous poll. That covers the
-finger lift, and it covers a click at the end of a movement for the same reason.
+This is exact where the cursor was not: it sees buttons, wheels, and contacts
+that move the pointer nowhere.
 
-It remains a heuristic, and it is worth being honest about where it is wrong:
+**It keeps the property the whole design rests on.** Only the mouse usage page
+is registered, and the payload is never read - `GetRawInputData` is not called,
+and nothing else that could report what happened is either. That a pointing
+device did something is the entire content. A keystroke never enters the process
+in any form, so the objection that ruled out a keyboard hook does not apply.
+Registering for raw *keyboard* input would carry exactly that objection, which
+is why it is not done.
 
-- A mouse **click or wheel** more than 500 ms after the last movement reads as
-  keyboard, and will wake. Acceptable: unlike a trackpad brush, clicking is
-  deliberate.
-- A trackpad touch too light to move the cursor reads as keyboard. In practice
-  a brush that registers as input almost always moves the pointer.
-- A keypress within 500 ms of a cursor move is attributed to the mouse and
-  missed. Worst case is that waking waits for the next keypress - and the user
-  this defaults for does not use a pointing device at all.
+A settling window survives, now anchored to real mouse events rather than to
+cursor coordinates, and widened to a second. It covers the trailing events a
+pointing device produces around an interaction - a contact ending, a click
+landing after a movement, a gesture the system turns into something else. It
+costs a keyboard-only user nothing, because they produce no mouse events for it
+to hang off.
+
+Where this is still wrong: a keypress within a second of mouse activity is
+attributed to the mouse and missed, so waking waits for the next keypress. That
+only affects someone who uses both, and someone who uses both would turn
+`wake_on_mouse` on, where the distinction stops mattering.
+
+**What it costs.** A `WM_INPUT` for every pointer movement, system-wide.
+Measured at about 75 microseconds each, which at a precision trackpad's 125 Hz
+is roughly 1 % of one core *while the pointer is actually moving* and nothing at
+all when it stops. Idle cost is unchanged at 0.3 %. Acceptable; if it ever is
+not, the registration is only needed when `wake_on_input` is on and
+`wake_on_mouse` is off, and could be dropped the rest of the time.
+
+Deliberately *not* solved with `GetAsyncKeyState` polled over the key range.
 
 Deliberately *not* solved with `GetAsyncKeyState` polled over the key range.
 That would be exact, but sweeping every virtual key code in a loop is a
@@ -330,9 +367,15 @@ reconnect or a move to another device stays quiet.
 Writing samples the instant after `IAudioClient::Start` is not the same as those
 samples reaching the ears: a Bluetooth headset needs a moment to bring its link
 up, and what is written during it is lost. There is no event that says "you are
-audible now", so the on-tone simply begins with 250 ms of silence. Only the
-on-tone - putting a quarter of a second in front of a release is the one thing
-this design refuses to do.
+audible now", so the on-tone simply begins with silence. Only the on-tone -
+putting a delay in front of a *release* is the one thing this design refuses to
+do.
+
+250 ms fixed the clipping and the second round confirmed it, but the tone then
+felt slow to arrive, so it is now 125 ms. The tester's reasoning was better than
+a preference: "I can hear JAWS starting to announce the keystroke prior to the
+tone playing, so it should be safe to halve the delay." JAWS beginning to speak
+is itself evidence the link was already up.
 
 The non-obvious part is the ordering. The natural design, "release the device,
 then play a tone", is wrong: opening the device again to play it would take the
@@ -368,23 +411,68 @@ a bonus for sighted users. The icon is drawn in code rather than embedded, which
 costs a few hundred bytes of logic instead of a few kilobytes of resource. The
 `TaskbarCreated` broadcast is handled, so the icon survives an Explorer restart.
 
-**`NIM_SETVERSION` is not optional (fixed 2026-09-05).** The first version of the
-tray was unusable from the keyboard - no menu from the Applications key or
-`Shift+F10`, and `Enter` on the icon did nothing - and the cause was that the
-icon had never asked for version 4 of the shell's notification protocol. Without
-that request the shell speaks the original Windows 95 protocol, in which a tray
-icon hears about mouse buttons and nothing else, so keyboard activation produces
-no message whatsoever. It was not a menu bug at all; the messages were never
-arriving.
+**Two things were wrong, and the first fix only found one of them.** The tray
+was unusable from the keyboard - no menu from the Applications key or
+`Shift+F10`, and `Enter` on the icon did nothing - and it stayed that way
+through a second round.
+
+**`NIM_SETVERSION` is not optional.** The icon had never asked for version 4 of
+the shell's notification protocol. Without that request the shell speaks the
+original Windows 95 protocol, in which a tray icon hears about mouse buttons and
+nothing else, so keyboard activation produces no message whatsoever.
+
+**But sent messages never reach a message loop, and that was the real fault.**
+`GetMessage` returns *posted* messages. Messages that are *sent* it dispatches
+straight to the window procedure while it waits, and never returns to the
+caller. The hotkey and the timer are posted, so they arrived and the loop looked
+healthy. The shell sends the tray callback - so it went to a window procedure
+whose entire body was `DefWindowProcW`, and was discarded. Every click, every
+`Enter`, every Applications key, silently thrown away, in both versions of the
+protocol. Reading the tray off the loop could never have worked.
+
+`wndproc` now re-posts the callback as `WM_TRAY_QUEUED`, which puts the decision
+back in the loop where the rest of the control surface lives, and works whether
+the shell sends the message or posts it. It is the right order of events anyway:
+showing a modal menu inside a sent message blocks the sender.
+
+**Demonstrated, not assumed.** A test sends `WM_TRAY` to the running app's
+window from another process, exactly as the shell does, and confirms that
+`NIN_SELECT` and `NIN_KEYSELECT` toggle keep-alive and that a doubled `Enter`
+toggles once. Version 4 is also confirmed accepted on this machine, which is how
+we know it was never the whole story.
 
 Version 4 adds `NIN_SELECT`, `NIN_KEYSELECT` and `WM_CONTEXTMENU`, and it puts
 the icon's own screen position in `wParam`, so a keyboard-opened menu now appears
 beside the icon rather than beside the mouse pointer. It also needs `NIF_SHOWTIP`
 to keep the ordinary tooltip, and it reverses the `wParam`/`lParam` layout of the
-callback. One guard came with it: the shell has a long-standing habit of sending
-`NIN_KEYSELECT` twice for a single `Enter`, and two toggles in a row cancel out -
-which would look exactly like the bug being fixed - so a second activation within
-250 ms is treated as an echo.
+callback. The version 3 mouse messages are accepted too, and a refused
+`NIM_SETVERSION` is no longer fatal: handling both costs a few lines and removes
+the question of which protocol is in force from the next round entirely.
+
+One guard came with it: the shell has a long-standing habit of sending
+`NIN_KEYSELECT` twice for a single `Enter`, and accepting both protocols gives a
+second way for one press to arrive twice. Two toggles in a row cancel out -
+which looks exactly like an icon that does nothing, the very symptom being fixed
+- so a second activation within 250 ms is treated as an echo.
+
+**Ghost icons, and the doubled name.** Both rounds reported the icon's name read
+twice over, once with the old wording and once with the new. The most likely
+explanation is that there were two icons: closing the console window or pressing
+Ctrl+C does not unwind and does not run `Drop`, so the icon stays in the
+notification area pointing at a dead window. A ghost is worse than untidy here,
+because it is indexed and read out exactly like the live one - and pressing
+`Enter` on a ghost does nothing, which is indistinguishable from the bug above.
+`SetConsoleCtrlHandler` now removes the icon on the way out of a killed process.
+
+That prevents new ghosts; it cannot clear ones already there, which a reboot
+does. Whether it was ever the explanation is still open - see question 15 - and
+every tray callback is now logged so the next round can settle it: if `Enter`
+produces no log line, the icon being pressed is not ours.
+
+`NIF_GUID` would give the icon an identity stable across runs and let a ghost be
+deleted outright at startup, and was rejected: it binds the icon to the
+executable's path, and a single portable exe the user is expected to move is
+exactly the case it breaks.
 
 The tooltip was also cut down. It is the icon's accessible name, read out in full
 every time the user arrows onto it, and the first attempt was judged "too
@@ -460,13 +548,21 @@ Raw results are in `test-milestone-3.txt`, Tests 11-18.
 
 13. ~~Does `Ctrl+Win+F12` clash with anything in JAWS?~~ **No.** Nothing stopped working, nothing broke that quitting fixed, and the tester is happy with the combination - while asking to be able to change it in the settings dialog.
 
-### Opened by Milestone 3, for the second hardware round
+### Resolved by the second Milestone 3 round (2026-09-05)
 
-14. **Is 250 ms of lead-in silence enough to stop the on-tone being clipped?** The cause is understood - a Bluetooth link takes a moment to come up and swallows whatever is written during it - but the length is a guess, and it can only be judged by ear. Longer is safe but makes the hotkey feel laggier. Test 20.
+Raw results are in `test-milestone-3-round-2.txt`, Tests 19-23.
 
-15. **Does the tray now work from the keyboard?** It failed outright last time, and has been rebuilt on a different shell protocol rather than patched. Everything about it is unverified again: the menu from the Applications key, `Enter` on the icon, whether the shorter tooltip reads cleanly, and whether the `NIN_KEYSELECT` echo guard is needed or is itself swallowing presses. Test 21.
+14. ~~Is the lead-in silence enough to stop the on-tone being clipped?~~ **Yes at 250 ms**, and the whole tone was audible. Now halved to 125 ms, because it then felt slow to arrive and the tester could hear JAWS begin to speak before the tone started - which means the link was already up well inside the old figure.
 
-16. **Does `mouse on` actually work?** The last round could not tell: the step that would have shown it followed a manual `off`, which correctly disarms waking altogether, so nothing could have woken it. The option has therefore never been seen to do anything. Test 22.
+16. ~~Does `mouse on` actually work?~~ **Yes.** Confirmed for the first time, once the test stopped confounding it with a manual `off`.
+
+Also settled, and worth recording because they were the whole point of the milestone: the earcons are **right** - volume, length, shape, no clicks - and automatic transitions are **silent**, with "I heard no tones, which was perfect."
+
+### Still open after the second round
+
+15. **Does the tray work from the keyboard?** Failed again, identically: no menu, `Enter` does nothing, and the icon's name still read twice over. The first diagnosis was incomplete - version 4 is accepted, which the log now proves - and the actual fault was that a *sent* message never comes back out of `GetMessage`. That is fixed and demonstrated locally. What cannot be checked from here is whether the icon being pressed is ours at all: if it is a ghost from a killed process, none of this helps. Every callback is now logged, which settles it either way. Test 24.
+
+17. **Does the trackpad still wake keep-alive?** Failed twice. Both fixes tried to infer the source from the cursor position and both were wrong; the mouse now reports itself through raw mouse input. Demonstrated locally on synthesised input, never on a real trackpad. Test 25.
 
 ### Noted, not a defect
 
@@ -524,7 +620,7 @@ Not worth fixing in the harness - Milestone 3 makes state changes audible throug
 
 The console harness in `main.rs` was scaffolding for testing the engine. Milestone 3 adds the tray and hotkey **alongside** it rather than replacing it, so there is still a diagnostic interface while the GUI is unproven; Milestone 6 removes it.
 
-**Milestone 3 - control surface. BUILT (2026-09-05), first hardware round done, fixes applied, second round pending.**
+**Milestone 3 - control surface. BUILT (2026-09-05), two hardware rounds done, sound signed off, tray and mouse rebuilt, third round pending.**
 
 Built: the global hotkey with its own parser and a refusal to register a bare key; earcons rendered into the keep-alive stream, with an anti-click envelope; the tray icon, its real Win32 menu and an icon drawn in code; the hidden window and message loop; and the keyboard-only wake change carried over from Milestone 2's round. Design detail in 4.4.
 
@@ -562,15 +658,49 @@ Two design points settled while building:
 
 **Verified after the fixes:** 30 unit tests, `cargo clippy --all-targets -- -D warnings` clean, and a scripted silent on/off cycle at zero volume - manual release 260-350 ms with earcons, 120-190 ms without, no interruptions or retries over six cycles.
 
-**Not verified, and cannot be from here:** everything audible, and the whole tray. Second round is `test.txt`, Tests 19-23.
+**Not verified, and cannot be from here:** everything audible, and the whole tray. Second round is `test-milestone-3-round-2.txt`, Tests 19-23.
+
+**Second hardware round (2026-09-05), raw notes in `test-milestone-3-round-2.txt`:**
+
+- Test 19, are the automatic tones gone: **passed.** "I heard no tones, which was perfect."
+- Test 20, the tones themselves: **passed.** Volume right, length right, whole on-tone audible, no clicks, switching off quick enough. One refinement: the on-tone felt slow to start.
+- Test 21, the tray from the keyboard: **failed again, identically.** No menu, `Enter` does nothing, name still read twice over.
+- Test 22, mouse off and mouse on: **failed again.** A sweep and even a short flick still woke keep-alive. `mouse on` was confirmed working for the first time.
+- Test 23, living with it: **passed.** No clipping, no unasked-for tones, clean handover to the phone.
+
+**Fixes applied after the second round:**
+
+1. **The tray callback is handled in the window procedure and re-posted.** The shell *sends* it, and `GetMessage` dispatches sent messages straight to the window procedure without ever returning them, so a loop-only design could never have seen a single click or keypress. Version 4 was accepted all along. Version 3 messages are now accepted too, so the protocol in force no longer matters. See 4.4.
+2. **The mouse reports itself.** Raw mouse input replaces two failed attempts at inferring the source from the cursor. Mouse usage page only, payload never read, so the no-key-data property is intact. See 4.1.
+3. **The icon is removed when the process is killed**, not only when it exits cleanly, so closing the console window stops leaving a ghost behind. Ghosts are the leading explanation for the doubled name, and a ghost is also unpressable, which would look exactly like the bug above.
+4. **Every tray callback is logged**, and so is whether version 4 and raw input registered. Three rounds have now been spent inferring this from the outside.
+5. **A `diag` setting** that logs the reasoning behind each keyboard-or-mouse decision, with the timings it rested on.
+6. **Lead-in silence halved to 125 ms**, at the tester's suggestion.
+
+**Verified locally this time, rather than reasoned about.** A test drives the running app from another process:
+- `WM_TRAY` sent the way the shell sends it, carrying `NIN_KEYSELECT` and `NIN_SELECT`, toggles keep-alive. A doubled `Enter` toggles once.
+- Version 4 is accepted, and raw mouse input registers.
+- A synthesised mouse movement is classified as the mouse, not the keyboard.
+- Cost of the raw input stream measured: ~75 us per event, about 1 % of one core at a trackpad's 125 Hz while moving, nothing when still.
+- 30 unit tests, clippy clean, release binary 273 KB.
+
+**Still not verifiable from here:** whether the icon the tester actually reaches with `Win+B` is ours, and whether a real trackpad behaves like synthesised input. Third round is `test.txt`, Tests 24-26.
 
 **Milestone 4 — settings.** The `winsafe` dialog, config load/save, second hotkey to open settings. Test the whole dialog under JAWS with the screen off.
+
+**What the tester wants in it**, asked directly in the second round and worth building to rather than guessing:
+- The idle timeout (carried from Milestone 2 - "editing a config file by hand does not count as easy").
+- The hotkey.
+- The keep-alive signal type, "in case needed for different headsets".
+- Earcon volume.
+- The device to keep awake, "in case the headset isn't set as the default device - some users may have their screen reader on the headset while doing audio work or being on a meeting over the default speakers". Note this is a use case the current design already supports but has never been tested.
+- Start automatically on system start, as a simple toggle. New scope: currently Milestone 6.
 
 **Milestone 5 - hard release. DEFERRED, probably not needed.** Soft release was confirmed sufficient on the AeroClip (see 2.4), so this is no longer planned work. Revisit only if another headset needs it, or if the 3-second handover becomes annoying. Reference if it ever happens: `m2jean/ToothTray`.
 
 **Milestone 6 — ship.** Autostart, size-tuned release build, README, and a plan for the antivirus/SmartScreen problem — a small unsigned binary that opens audio devices and registers global hotkeys fits the profile AV heuristics dislike. Options: submit false-positive reports to the major vendors, or look at code signing.
 
-**Current position (2026-09-05):** Milestones 0, 1 and 2 complete and hardware-tested. Milestone 3 built, tested once, fixed, and awaiting a second round.
+**Current position (2026-09-05):** Milestones 0, 1 and 2 complete and hardware-tested. Milestone 3's audio behaviour is finished and signed off; its tray and its mouse handling have each failed two rounds, have been rebuilt on different mechanisms, and await a third.
 
 ---
 

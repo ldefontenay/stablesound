@@ -27,7 +27,7 @@ use windows::Win32::System::Com::{CoInitializeEx, COINIT_APARTMENTTHREADED};
 use windows::Win32::UI::Shell::ShellExecuteW;
 use windows::Win32::UI::WindowsAndMessaging::{
     DispatchMessageW, GetMessageW, KillTimer, SetTimer, TranslateMessage, MSG, SW_SHOWNORMAL,
-    WM_HOTKEY, WM_TIMER,
+    WM_HOTKEY, WM_MOUSEMOVE, WM_TIMER,
 };
 
 use crate::config::Config;
@@ -62,6 +62,9 @@ fn main() {
         false,
     );
     let log_path = config::log_path();
+    // The engine takes ownership of the log; the message loop keeps a handle
+    // of its own so tray callbacks can be recorded where they arrive.
+    let loop_log = log.clone();
 
     let mut tray = match Tray::create() {
         Ok(t) => t,
@@ -75,6 +78,28 @@ fn main() {
     };
 
     banner(&cfg, &config_path, &log, &adjustments);
+
+    // Both of these have been wrong on hardware before, so both say so rather
+    // than failing quietly.
+    log.write(&format!(
+        "tray icon added, shell notification version 4 {}",
+        if tray.is_version4() {
+            "accepted"
+        } else {
+            "REFUSED, falling back to version 3 messages"
+        }
+    ));
+    match input::watch_pointer(tray.hwnd()) {
+        Ok(()) => log.write("raw mouse input registered"),
+        Err(e) => {
+            // Without it nothing can be attributed to the mouse, so every
+            // input reads as the keyboard and 'mouse off' cannot work.
+            println!("WARNING: could not register for mouse input ({e}).");
+            println!("  Keep-alive will treat trackpad and mouse activity as typing,");
+            println!("  so it may wake when you did not mean it to.");
+            log.write(&format!("raw mouse input NOT registered: {e}"));
+        }
+    }
 
     // Claim the hotkey before anything else can want it, and say plainly if
     // somebody already has it. A hotkey that silently does nothing is the
@@ -105,7 +130,7 @@ fn main() {
     unsafe {
         SetTimer(Some(tray.hwnd()), EVENT_TIMER, EVENT_TIMER_MS, None);
     }
-    pump(&mut tray, &handle, &log_path);
+    pump(&mut tray, &handle, &log_path, &loop_log);
     unsafe {
         let _ = KillTimer(Some(tray.hwnd()), EVENT_TIMER);
     }
@@ -125,7 +150,7 @@ fn main() {
 /// Everything is handled here rather than in a window procedure. A procedure
 /// would need global state to reach the engine, whereas this can simply borrow
 /// it, and it keeps the whole control surface in one place a reader can follow.
-fn pump(tray: &mut Tray, handle: &engine::Handle, log_path: &std::path::Path) {
+fn pump(tray: &mut Tray, handle: &engine::Handle, log_path: &std::path::Path, log: &Log) {
     let mut message = MSG::default();
 
     loop {
@@ -141,21 +166,21 @@ fn pump(tray: &mut Tray, handle: &engine::Handle, log_path: &std::path::Path) {
                 let _ = handle.commands.send(Command::Toggle);
             }
 
-            tray::WM_TRAY => match tray.decode(message.wParam, message.lParam) {
-                Some(TrayEvent::Toggle) => {
-                    let _ = handle.commands.send(Command::Toggle);
+            // Re-posted by the window procedure, because the shell *sends*
+            // the callback and a sent message never comes back out of
+            // GetMessage. See `tray`.
+            tray::WM_TRAY_QUEUED => {
+                // Recorded before it is acted on. Two rounds have now ended
+                // with "the tray does nothing", and that report cannot be told
+                // apart from "the message never arrived" without this line.
+                let event = tray::callback_event(message.lParam);
+                if event != WM_MOUSEMOVE {
+                    log.write(&format!("tray callback 0x{event:04X}"));
                 }
-                Some(TrayEvent::Menu { x, y }) => {
-                    // Blocks while the menu is open, which is fine: the engine
-                    // keeps pumping audio on its own thread.
-                    let chose_quit = menu(tray, handle, log_path, POINT { x, y });
-                    if chose_quit {
-                        break;
-                    }
+                if tray_event(tray, handle, log_path, message.wParam, message.lParam) {
+                    break;
                 }
-                None => {}
-            },
-
+            }
             console::WM_CONSOLE_QUIT => break,
 
             WM_TIMER if message.wParam.0 == EVENT_TIMER => drain(tray, &handle.events),
@@ -169,6 +194,26 @@ fn pump(tray: &mut Tray, handle: &engine::Handle, log_path: &std::path::Path) {
             let _ = TranslateMessage(&message);
             DispatchMessageW(&message);
         }
+    }
+}
+
+/// Act on a tray callback. Returns true if we should quit.
+fn tray_event(
+    tray: &mut Tray,
+    handle: &engine::Handle,
+    log_path: &std::path::Path,
+    wparam: windows::Win32::Foundation::WPARAM,
+    lparam: windows::Win32::Foundation::LPARAM,
+) -> bool {
+    match tray.decode(wparam, lparam) {
+        Some(TrayEvent::Toggle) => {
+            let _ = handle.commands.send(Command::Toggle);
+            false
+        }
+        // Blocks while the menu is open, which is fine: the engine keeps
+        // pumping audio on its own thread.
+        Some(TrayEvent::Menu { x, y }) => menu(tray, handle, log_path, POINT { x, y }),
+        None => false,
     }
 }
 

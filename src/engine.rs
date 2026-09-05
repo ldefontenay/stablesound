@@ -269,6 +269,9 @@ fn run(mut config: Config, log: Log, commands: Receiver<Command>, events: Sender
         // setting on later compares against an ancient timestamp and fires a
         // spurious wake immediately.
         let seen = input.poll();
+        if config.diagnostics && seen.any {
+            log.write(&seen.explain());
+        }
         if seen.wakes(config.wake_on_input, config.wake_on_mouse) {
             if rt.intent {
                 // Somebody is here and typing, so do not release out from

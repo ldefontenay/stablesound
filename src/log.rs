@@ -12,6 +12,9 @@ use std::path::{Path, PathBuf};
 
 use windows::Win32::System::SystemInformation::GetLocalTime;
 
+/// Cheap to clone - a path and a flag - so the message loop can keep its own
+/// handle after the engine has taken one.
+#[derive(Clone)]
 pub struct Log {
     path: Option<PathBuf>,
     /// Mirror to the console too. Off once there is a tray icon instead.

@@ -110,6 +110,15 @@ pub struct Config {
     pub earcons: bool,
     /// Earcon amplitude, 0.0 to 1.0.
     pub earcon_volume: f32,
+    /// Write the reasoning behind each decision to the log, not just the
+    /// decision.
+    ///
+    /// Off by default; it makes the log much longer. It exists because telling
+    /// the keyboard from the mouse has now been got wrong twice on hardware,
+    /// each time because the numbers the decision rested on were invisible from
+    /// outside. Turning this on makes them readable after the fact, which is
+    /// the only way to observe input behaviour without generating input.
+    pub diagnostics: bool,
 }
 
 impl Default for Config {
@@ -132,6 +141,7 @@ impl Default for Config {
             // 0.1, 0.2 and 0.35 on the AeroClip. The first guess of 0.2 was
             // twice as loud as wanted.
             earcon_volume: 0.1,
+            diagnostics: false,
         }
     }
 }
@@ -262,6 +272,9 @@ impl Config {
                     }),
                 },
                 "earcons" => cfg.earcons = parse_bool(value).unwrap_or(cfg.earcons),
+                "diagnostics" => {
+                    cfg.diagnostics = parse_bool(value).unwrap_or(cfg.diagnostics)
+                }
                 "earcon_volume" => {
                     cfg.earcon_volume = value.parse().unwrap_or(cfg.earcon_volume)
                 }
@@ -362,6 +375,12 @@ earcons = {earcons}
 
 # Earcon loudness, 0.0 to 1.0.
 earcon_volume = {earcon_volume}
+
+# Log why each decision was made, not just what was decided. Off by
+# default - it makes the log much longer. Turn it on if keep-alive wakes
+# when it should not, or fails to when it should: it records what the
+# app thought the input was, and the timings it thought it on.
+diagnostics = {diagnostics}
 ",
             threshold = self.audio_threshold,
             logging = self.logging,
@@ -370,6 +389,7 @@ earcon_volume = {earcon_volume}
             hotkey = self.hotkey,
             earcons = self.earcons,
             earcon_volume = self.earcon_volume,
+            diagnostics = self.diagnostics,
         )
     }
 }

@@ -50,7 +50,13 @@ pub struct Note {
 /// Only the on-tone needs it. The off-tone plays through a stream that has been
 /// running for a while, and delaying a release is the one thing the whole
 /// design refuses to do.
-const LEAD_IN_MS: u32 = 250;
+///
+/// Halved from 250 ms after the second round, at the tester's suggestion: the
+/// whole tone was audible but felt slow, and "I can hear JAWS starting to
+/// announce the keystroke prior to the tone playing, so it should be safe to
+/// halve the delay". That is a useful measurement as well as a preference -
+/// JAWS beginning to speak means the link was already up.
+const LEAD_IN_MS: u32 = 125;
 
 /// Rising - keep-alive is on and the headset is being held awake.
 pub const ON: &[Note] = &[

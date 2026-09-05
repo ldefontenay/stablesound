@@ -1,7 +1,7 @@
-//! Detecting that the user is at the machine.
+//! Detecting that the user is at the machine, and whether it was the keyboard.
 //!
-//! Uses `GetLastInputInfo`, which reports when the system last saw keyboard or
-//! mouse input, rather than installing a low-level keyboard hook.
+//! Uses `GetLastInputInfo`, which reports when the system last saw input of any
+//! kind, rather than installing a low-level keyboard hook.
 //!
 //! That choice is deliberate. A `WH_KEYBOARD_LL` hook sees the actual keys, and
 //! a small unsigned binary that reads every keystroke is precisely the shape
@@ -12,72 +12,117 @@
 //!
 //! # Telling the keyboard from the mouse
 //!
-//! Milestone 2's hardware round asked for the mouse to stop waking keep-alive:
-//! the tester does not use one, and brushing the trackpad by accident takes the
-//! headset back off their phone.
+//! Milestone 2's round asked for the mouse to stop waking keep-alive: the
+//! tester does not use one, and brushing the trackpad by accident takes the
+//! headset back off their phone. `GetLastInputInfo` reports one timestamp for
+//! all input and cannot say what caused it, so something has to supply that.
 //!
-//! `GetLastInputInfo` reports one timestamp for all input and cannot say what
-//! caused it. So the source is inferred by pairing it with `GetCursorPos`: if
-//! the timestamp advanced and the pointer also moved, call it the mouse; if it
-//! advanced and the pointer sat still, call it the keyboard. That keeps both
-//! properties that mattered above - a timestamp and a cursor coordinate are
-//! still not key data, and there is still no hook.
+//! **Two attempts at inferring it from the cursor failed on hardware**, and the
+//! second failure is why this module now measures instead of guessing. The idea
+//! was to pair the timestamp with `GetCursorPos`: pointer moved, call it the
+//! mouse; pointer still, call it the keyboard. Round one showed that the *end*
+//! of a trackpad sweep defeats it - lifting a finger is itself an input event
+//! and arrives after the pointer has already stopped, so it reads as a
+//! keypress. Round two added a settling window, requiring the pointer to have
+//! been still for half a second, and a trackpad sweep still woke keep-alive
+//! every time. A pointing device evidently produces input that the cursor
+//! position does not account for.
 //!
-//! Comparing against only the *previous* poll is not enough, and the Milestone
-//! 3 hardware round proved it: `mouse off` did not work, and a deliberate
-//! trackpad sweep still woke keep-alive every time. The sweep itself was
-//! classified correctly - what was not was the moment the finger left the pad.
-//! Lifting off a precision trackpad is itself an input event, it arrives a few
-//! milliseconds after the pointer has already stopped, and so the poll that saw
-//! it found the timestamp advanced and the pointer still: keyboard.
+//! So the mouse now reports itself. `watch_pointer` registers for **raw mouse
+//! input** - usage page 1, usage 2 - with `RIDEV_INPUTSINK`, so every event
+//! from a mouse or trackpad reaches our window even in the background. When one
+//! arrives, `note_pointer_event` records the time and nothing else.
 //!
-//! So the pointer has to be still for a while, not merely still since the last
-//! poll. `SETTLING` below is that window. Anything arriving within it of a
-//! pointer movement is called the mouse.
+//! That is exact where the cursor was not: it sees buttons, wheels and contacts
+//! that move the pointer nowhere. And it keeps the property the whole design
+//! rests on - **only the mouse is registered, and the payload is never read.**
+//! We call neither `GetRawInputData` nor anything else that could say what
+//! happened; that a pointing device did something is the entire content. A
+//! keystroke never enters this process in any form, so the objection that ruled
+//! out a keyboard hook does not apply here.
 //!
-//! It is a heuristic, and it is wrong in three places:
-//!
-//! - A mouse click or wheel more than `SETTLING` after the last movement reads
-//!   as keyboard. Acceptable: unlike a trackpad brush, clicking is deliberate.
-//! - A trackpad touch too light to move the pointer reads as keyboard. In
-//!   practice a brush that registers at all moves it.
-//! - A keypress within `SETTLING` of a pointer move is attributed to the mouse
-//!   and missed. Worst case, waking waits for the next keypress - and the user
-//!   this defaults for does not use a pointing device at all.
-//!
-//! Deliberately *not* solved by polling `GetAsyncKeyState` across the key
-//! range. That would be exact, but sweeping every virtual key code in a loop is
-//! a textbook keylogger signature - worse for Milestone 6 than the hook already
-//! rejected above.
+//! The rule is then simply: input whose timestamp coincides with recent
+//! pointing-device activity is the mouse, and anything else is the keyboard.
 
-use std::time::{Duration, Instant};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::time::Duration;
 
-use windows::Win32::Foundation::POINT;
+use windows::core::Result as WinResult;
+use windows::Win32::Foundation::HWND;
+use windows::Win32::System::SystemInformation::GetTickCount;
 use windows::Win32::UI::Input::KeyboardAndMouse::{GetLastInputInfo, LASTINPUTINFO};
-use windows::Win32::UI::WindowsAndMessaging::GetCursorPos;
+use windows::Win32::UI::Input::{RegisterRawInputDevices, RAWINPUTDEVICE, RIDEV_INPUTSINK};
 
-/// How long after a pointer movement input still counts as the mouse.
+/// How long after a pointing-device event input still counts as the mouse.
 ///
-/// Sized for the trailing events a pointing device emits once the pointer has
-/// stopped - a trackpad finger lift, a click at the end of a movement. Long
-/// enough to cover them, short enough that typing after using the mouse is not
-/// ignored for any noticeable time.
-const SETTLING: Duration = Duration::from_millis(500);
+/// Not a fudge for imprecision any more - the raw stream is exact about when
+/// the mouse moved. It covers the trailing events a pointing device produces
+/// around an interaction: a trackpad contact ending, a click landing after a
+/// movement, a gesture the system turns into something other than mouse input.
+/// A second is generous, and it costs a keyboard-only user nothing at all,
+/// because they produce no pointing-device events for it to hang off.
+const SETTLING: Duration = Duration::from_millis(1000);
+
+/// Tick count of the most recent pointing-device event.
+static POINTER_TICK: AtomicU32 = AtomicU32::new(0);
+/// Whether one has ever arrived. Separate from the tick because zero is a
+/// legitimate reading in the first millisecond after boot, and because it tells
+/// "the mouse has been quiet" apart from "raw input never registered".
+static POINTER_SEEN: AtomicBool = AtomicBool::new(false);
+
+/// Ask Windows to report mouse activity to `hwnd`, in the background as well as
+/// the foreground.
+///
+/// Call once, from the thread that owns the window's message queue. `hwnd` must
+/// be an ordinary window: a message-only window does not receive raw input.
+pub fn watch_pointer(hwnd: HWND) -> WinResult<()> {
+    let devices = [RAWINPUTDEVICE {
+        // Generic desktop page, mouse. Nothing else is registered, which is
+        // the point - see the module note.
+        usUsagePage: 0x01,
+        usUsage: 0x02,
+        // Deliver even when we are not the foreground window. We never are:
+        // our only window is hidden.
+        dwFlags: RIDEV_INPUTSINK,
+        hwndTarget: hwnd,
+    }];
+    unsafe { RegisterRawInputDevices(&devices, size_of::<RAWINPUTDEVICE>() as u32) }
+}
+
+/// Record that a pointing device did something. Called for every `WM_INPUT`.
+///
+/// Deliberately does not touch the message payload. See the module note: the
+/// time is the whole of what we want to know.
+pub fn note_pointer_event() {
+    POINTER_TICK.store(unsafe { GetTickCount() }, Ordering::Relaxed);
+    POINTER_SEEN.store(true, Ordering::Relaxed);
+}
+
+fn pointer_tick() -> Option<u32> {
+    POINTER_SEEN
+        .load(Ordering::Relaxed)
+        .then(|| POINTER_TICK.load(Ordering::Relaxed))
+}
 
 /// What the user did since the last poll.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Input {
     /// Any input at all: keyboard, mouse, touch, pen.
     pub any: bool,
-    /// Input that did not move the pointer, so most likely the keyboard.
-    /// See the module note for where this inference is wrong.
+    /// Input that no pointing device accounts for, so the keyboard.
     pub keyboard: bool,
+    /// How long before this input the mouse was last active, in milliseconds -
+    /// negative if it reported itself just afterwards, `None` if no
+    /// pointing-device event has ever been seen. Carried only so the
+    /// diagnostic log can show the number the decision was made on.
+    pub pointer_age_ms: Option<i32>,
 }
 
 impl Input {
     const NONE: Input = Input {
         any: false,
         keyboard: false,
+        pointer_age_ms: None,
     };
 
     /// Whether this should wake keep-alive, given the user's settings.
@@ -91,6 +136,17 @@ impl Input {
             self.keyboard
         }
     }
+
+    /// One line for the log when `diagnostics` is on. Two rounds of testing
+    /// have now been spent guessing at this decision from the outside; the
+    /// third should be able to read what it actually decided, and on what.
+    pub fn explain(self) -> String {
+        let source = if self.keyboard { "keyboard" } else { "mouse" };
+        match self.pointer_age_ms {
+            Some(age) => format!("input seen, mouse active {age} ms before it -> {source}"),
+            None => format!("input seen, no mouse activity ever recorded -> {source}"),
+        }
+    }
 }
 
 /// Reports whether new input has happened since the last call, and whether it
@@ -98,47 +154,37 @@ impl Input {
 /// reports nothing.
 pub struct InputWatcher {
     last_tick: u32,
-    last_cursor: POINT,
-    /// When the pointer was last seen in a new place. `None` until it moves.
-    last_moved: Option<Instant>,
 }
 
 impl InputWatcher {
     pub fn new() -> Self {
         InputWatcher {
             last_tick: current_tick(),
-            last_cursor: cursor(),
-            last_moved: None,
         }
     }
 
     pub fn poll(&mut self) -> Input {
-        self.observe(Instant::now(), current_tick(), cursor())
-    }
-
-    /// The whole decision, with the three readings passed in so it can be
-    /// tested. `poll` is only this plus the calls that take them.
-    fn observe(&mut self, now: Instant, tick: u32, cursor: POINT) -> Input {
-        if cursor.x != self.last_cursor.x || cursor.y != self.last_cursor.y {
-            self.last_cursor = cursor;
-            self.last_moved = Some(now);
-        }
-
+        let tick = current_tick();
         if tick == self.last_tick {
-            // No input at all. A pointer that moved without the input
-            // timestamp advancing was moved by software, not by the user.
             return Input::NONE;
         }
         self.last_tick = tick;
+        classify(tick, pointer_tick())
+    }
+}
 
-        let settling = self
-            .last_moved
-            .is_some_and(|at| now.duration_since(at) < SETTLING);
-
-        Input {
-            any: true,
-            keyboard: !settling,
-        }
+/// The decision, split out so it can be tested without a mouse.
+fn classify(input_tick: u32, pointer: Option<u32>) -> Input {
+    // Signed on purpose. `WM_INPUT` reaches us a moment after the system
+    // stamped the input clock, so the mouse can legitimately look newer than
+    // the input it caused, and the subtraction has to survive that as well as
+    // the tick counter wrapping.
+    let age = pointer.map(|p| input_tick.wrapping_sub(p) as i32);
+    let from_pointer = age.is_some_and(|age| age <= SETTLING.as_millis() as i32);
+    Input {
+        any: true,
+        keyboard: !from_pointer,
+        pointer_age_ms: age,
     }
 }
 
@@ -156,40 +202,24 @@ fn current_tick() -> u32 {
     }
 }
 
-fn cursor() -> POINT {
-    let mut point = POINT { x: 0, y: 0 };
-    unsafe {
-        let _ = GetCursorPos(&mut point);
-    }
-    point
-}
-
 #[cfg(test)]
 mod tests {
-    use super::{Input, InputWatcher, POINT, SETTLING};
-    use std::time::{Duration, Instant};
-
-    /// A watcher with a known baseline, so tests can drive `observe` directly
-    /// instead of moving a real mouse.
-    fn watcher(at: Instant) -> (InputWatcher, Instant) {
-        (
-            InputWatcher {
-                last_tick: 1_000,
-                last_cursor: POINT { x: 100, y: 100 },
-                last_moved: None,
-            },
-            at,
-        )
-    }
+    use super::{classify, Input, SETTLING};
 
     const KEY: Input = Input {
         any: true,
         keyboard: true,
+        pointer_age_ms: None,
     };
     const MOUSE: Input = Input {
         any: true,
         keyboard: false,
+        pointer_age_ms: None,
     };
+
+    fn settling() -> u32 {
+        SETTLING.as_millis() as u32
+    }
 
     #[test]
     fn keyboard_wakes_but_mouse_does_not_by_default() {
@@ -216,57 +246,47 @@ mod tests {
     }
 
     #[test]
-    fn a_still_pointer_and_a_new_timestamp_is_the_keyboard() {
-        let (mut w, t0) = watcher(Instant::now());
-        let seen = w.observe(t0, 1_001, POINT { x: 100, y: 100 });
-        assert_eq!(seen, KEY);
+    fn input_with_no_mouse_behind_it_is_the_keyboard() {
+        assert!(classify(500_000, None).keyboard);
+        // A mouse last active far longer ago than the settling window has
+        // nothing to do with this input.
+        assert!(classify(500_000, Some(500_000 - settling() - 1)).keyboard);
     }
 
     #[test]
-    fn a_moving_pointer_is_the_mouse() {
-        let (mut w, t0) = watcher(Instant::now());
-        let seen = w.observe(t0, 1_001, POINT { x: 140, y: 100 });
-        assert_eq!(seen, MOUSE);
+    fn input_the_mouse_accounts_for_is_the_mouse() {
+        assert!(!classify(500_000, Some(500_000)).keyboard);
+        assert!(!classify(500_000, Some(500_000 - settling() + 1)).keyboard);
     }
 
     #[test]
-    fn nothing_is_reported_when_the_timestamp_stands_still() {
-        let (mut w, t0) = watcher(Instant::now());
-        // A pointer that moves without the input clock advancing was moved by
-        // software, not by a person.
-        assert_eq!(w.observe(t0, 1_000, POINT { x: 300, y: 300 }), Input::NONE);
-    }
-
-    #[test]
-    fn the_lift_at_the_end_of_a_trackpad_sweep_is_not_the_keyboard() {
-        // The Milestone 3 bug. The sweep is classified correctly; the finger
-        // coming off the pad is a further input event, arriving after the
-        // pointer has already stopped. Judged on the previous poll alone it
-        // looks exactly like a keypress, and it woke keep-alive every time.
-        let (mut w, t0) = watcher(Instant::now());
-
-        assert_eq!(w.observe(t0, 1_001, POINT { x: 140, y: 120 }), MOUSE);
-        let t1 = t0 + Duration::from_millis(100);
-        assert_eq!(w.observe(t1, 1_002, POINT { x: 190, y: 160 }), MOUSE);
-
-        // Pointer now stationary, but the lift lands in the next poll.
-        let t2 = t1 + Duration::from_millis(100);
-        assert_eq!(
-            w.observe(t2, 1_003, POINT { x: 190, y: 160 }),
-            MOUSE,
-            "the finger lift was attributed to the keyboard"
+    fn a_mouse_event_recorded_just_after_the_input_clock_still_counts() {
+        // WM_INPUT arrives a moment after the system stamps the input clock,
+        // so the pointer tick can be the newer of the two. Read unsigned, that
+        // subtraction underflows to a huge positive number and the event comes
+        // out as the keyboard - which is how a trackpad kept waking keep-alive.
+        let seen = classify(500_000, Some(500_020));
+        assert!(
+            !seen.keyboard,
+            "a mouse event 20 ms late was read as typing"
         );
-        assert!(!w
-            .observe(t2, 1_004, POINT { x: 190, y: 160 })
-            .wakes(true, false));
+        assert_eq!(seen.pointer_age_ms, Some(-20));
     }
 
     #[test]
-    fn typing_after_the_pointer_settles_still_counts() {
-        let (mut w, t0) = watcher(Instant::now());
-        assert_eq!(w.observe(t0, 1_001, POINT { x: 140, y: 120 }), MOUSE);
+    fn the_decision_survives_the_tick_counter_wrapping() {
+        // GetTickCount wraps roughly every 49 days, and a machine left running
+        // will cross it.
+        let just_before = u32::MAX - 10;
+        let just_after = 10u32;
+        assert!(!classify(just_after, Some(just_before)).keyboard);
+    }
 
-        let later = t0 + SETTLING + Duration::from_millis(1);
-        assert_eq!(w.observe(later, 1_002, POINT { x: 140, y: 120 }), KEY);
+    #[test]
+    fn the_explanation_names_the_number_it_decided_on() {
+        assert!(classify(500_000, Some(499_900))
+            .explain()
+            .contains("100 ms"));
+        assert!(classify(500_000, None).explain().contains("no mouse"));
     }
 }
