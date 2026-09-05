@@ -1,0 +1,330 @@
+STABLESOUND - MILESTONE 5, WHAT THE LAST ROUND ASKED FOR
+========================================================
+
+Created: 2026-09-05
+Status:  NOT STARTED
+
+This round is smaller than the last four, because Milestone 5 mostly
+takes things away. Six tests, about forty minutes, and most of it is
+using the app normally.
+
+Your previous rounds are kept in test-milestones-1-2.txt,
+test-milestone-3.txt, test-milestone-3-round-2.txt,
+test-milestone-3-round-3.txt and test-milestone-4.txt.
+
+
+WHAT CHANGED, AND WHY
+---------------------
+
+1. The mouse feature is gone. All of it. You said to give up on it and
+   I have: the raw mouse input, the waiting, the setting, the console
+   command and the checkbox in the dialog. Any input now wakes
+   keep-alive and nothing tries to work out what caused it.
+
+   Two things follow from that. Waking is a quarter of a second quicker
+   than it was in your last round, because the wait I added is gone. And
+   brushing the trackpad will take the headset back from your phone -
+   but switching keep-alive off by hand still stops that, exactly as
+   before, so a deliberate handover is not undone by a stray finger.
+
+2. The settings hotkey is off by default. Ctrl+Win+F11 belongs to
+   everyone else again. There is a checkbox in the dialog, "Also use a
+   hotkey to open these settings", with Ctrl+Win+F11 already filled in
+   beside it, so switching it on is one press.
+
+3. When a hotkey is refused, the message now says which mistake you
+   made and then how to write one properly - every spelling of every
+   modifier, every key name it will take, and the fact that the order
+   does not matter. It never did, and now it says so.
+
+4. The wording. "Let go of them" is now "Let go of the headphones", and
+   I went through every other label the same way. Nothing in the dialog
+   should now need you to have heard something earlier to make sense.
+
+5. The group headings. I could not do this one, and I want to be
+   straight about it rather than have you hunt for a change that is not
+   there. I found no way from inside the app to make JAWS announce
+   them. The obvious thing to try turned out to be already switched on,
+   and the other thing I tried made no difference either. Test 35 asks
+   you to look at one JAWS setting, because that is now my best guess.
+
+6. Logging - my steer, which you asked for. I have split it rather than
+   choosing. The ordinary log stays on: it is one line per state change,
+   a few hundred bytes a day, and it is the only evidence either of us
+   has when something goes wrong, because this app's behaviour cannot be
+   watched while it happens. Every round of yours that produced a real
+   fix instead of a guess produced it from that file.
+
+   The detailed log stays off until something is being looked into, and
+   it now records what the app hears - when audio starts and stops, and
+   how loud - which is the thing neither of us can observe any other
+   way. The checkbox is "Detailed logging, for troubleshooting".
+
+7. The app now has a Windows application manifest, which it turns out
+   it never had. Without one, the dialog was built from an older
+   generation of Windows controls than every other dialog on your
+   machine. It should be neutral or slightly better. Test 34 checks it
+   did not disturb anything, since the dialog passed your last round on
+   the old ones.
+
+Not done, on purpose, and both waiting for Milestone 6: the help file
+with a button to open it, and removing the console window.
+
+
+BEFORE YOU START
+----------------
+
+Build and run from the repo root:
+
+    cargo run
+
+Have the AeroClips connected and set as the default output.
+
+ANSWER - did the app start cleanly?
+
+
+===========================================================
+TEST 33 - THE TRACKPAD, NOW THAT NOTHING IS WATCHING IT
+===========================================================
+
+This is no longer a test of whether the trackpad is ignored. It is not.
+This is a check that removing all that machinery did not break waking.
+
+Steps:
+
+1. Type: idle 10
+2. Press Ctrl+Win+F12 to switch keep-alive on.
+3. Sit quietly for about fifteen seconds so it releases on its own.
+4. Press a key.
+
+ANSWER - did keep-alive come back on?
+
+
+5. Compare this with last time, if you can. Waking should now be a
+   quarter of a second quicker than it was in your last round.
+
+ANSWER - does typing after a pause bring the sound back any quicker
+than it did, or does it feel the same?
+
+
+6. Now sweep the trackpad. It is expected to wake keep-alive.
+
+ANSWER - did it? (Expected: yes. If it does not, something is wrong.)
+
+
+7. Press Ctrl+Win+F12 to switch keep-alive OFF by hand. Then sweep the
+   trackpad again, and type a few keys.
+
+ANSWER - did keep-alive stay off? This is the part that matters most
+in the whole round: switching off by hand has to keep the headset free
+for your phone, whatever you touch afterwards.
+
+
+ANYTHING ODD:
+
+
+===========================================================
+TEST 34 - THE DIALOG, ON NEW CONTROLS
+===========================================================
+
+The dialog passed your last round, and then I changed the controls
+underneath it. This test is only asking whether anything got worse.
+
+Steps:
+
+1. Open the settings from the tray: Windows+B, arrow to StableSound,
+   press the Applications key, choose "Settings...".
+
+ANSWER - did it open, and did JAWS announce it the same way it did last
+time?
+
+
+2. Tab all the way through, to the end and round again.
+
+ANSWER - did every control still read with its name and its value? If
+any one reads differently from last time - better or worse - that is
+the thing I need to know.
+
+
+3. Try Alt with an underlined letter again - Alt+O for the device,
+   Alt+K for the keyboard checkbox, Alt+V for tone volume.
+
+ANSWER - do the shortcuts still work?
+
+
+4. Arrow through the two combo boxes near the top without opening them.
+
+ANSWER - do the choices still read sensibly?
+
+
+ANYTHING ODD:
+
+
+===========================================================
+TEST 35 - THE WORDING, AND THE GROUP HEADINGS
+===========================================================
+
+Steps:
+
+1. With the dialog open, Tab slowly through it and listen to each label
+   as a sentence on its own, as if you had not heard the one before it.
+
+ANSWER - is there any control left that only makes sense if you already
+know what it is about? "Let go of the headphones" is the one you named
+last time; I want to know about the ones I missed.
+
+
+2. There is a new checkbox in the Hotkeys group: "Also use a hotkey to
+   open these settings".
+
+ANSWER - reading it and the field after it, is it clear what it does and
+that the field is the combination it would use?
+
+
+3. The group headings. There are six: keeping the headphones awake,
+   waking up again, tones, hotkeys, the log file, and starting up.
+
+ANSWER - does JAWS name any of them as you tab into a group?
+
+
+4. If not - and I expect not - please check one JAWS setting for me.
+   In Settings Center (Insert+6), search for "group". There is an
+   option about announcing groupings or group names in dialogs.
+
+ANSWER - what is that setting called on your machine, and is it on or
+off?
+
+
+5. If it was off, turn it on and tab through the dialog again.
+
+ANSWER - does JAWS name the groups now?
+
+
+ANSWER - if it does, would you rather leave that setting on generally,
+or would you prefer I found another way? This decides whether question
+21 in the plan is closed or still open.
+
+
+ANYTHING ODD:
+
+
+===========================================================
+TEST 36 - THE SETTINGS HOTKEY, NOW OPTIONAL
+===========================================================
+
+Steps:
+
+1. Close the dialog if it is open. Press Ctrl+Win+F11.
+
+ANSWER - did nothing happen? It should now do nothing, because the
+combination belongs to other programs again.
+
+
+2. Open the settings from the tray. Find "Also use a hotkey to open
+   these settings" and tick it. Press OK.
+
+3. Press Ctrl+Win+F11.
+
+ANSWER - did the dialog open, without you having restarted anything?
+
+
+4. Open the settings again, untick the same box, press OK, then press
+   Ctrl+Win+F11 once more.
+
+ANSWER - did it stop working again?
+
+
+ANSWER - which way would you like it shipped, off as it is now, or on?
+
+
+ANYTHING ODD:
+
+
+===========================================================
+TEST 37 - GETTING A HOTKEY WRONG ON PURPOSE
+===========================================================
+
+You asked for the refusal message to tell you how to write one
+properly. Four goes at it, each wrong in a different way.
+
+Steps:
+
+1. Open the settings. In "Hotkey to switch keep-alive on and off",
+   type each of these in turn and press OK. Put right whatever it tells
+   you before moving on to the next.
+
+   a. f12
+   b. ctrl
+   c. ctrl+a+b
+   d. ctrl+banana
+
+ANSWER - for each one, did the message say what was actually wrong with
+that particular attempt, rather than the same general complaint four
+times?
+
+   a. f12:
+   b. ctrl:
+   c. ctrl+a+b:
+   d. ctrl+banana:
+
+
+2. The message is long - the fault, then how to write one.
+
+ANSWER - is it too long to listen to? Would you rather have the fault
+alone, with the explanation somewhere you could ask for it?
+
+
+ANSWER - after hearing it once, would you know how to write a valid
+combination without asking me?
+
+
+3. Now set it to something you would actually like to keep, and press
+   OK.
+
+ANSWER - did the new combination work straight away?
+
+
+ANYTHING ODD:
+
+
+===========================================================
+TEST 38 - LIVING WITH IT
+===========================================================
+
+Half an hour of ordinary work. Then, near the end, five minutes with
+the detailed log on.
+
+ANSWER - did speech ever clip?
+
+
+ANSWER - now that the trackpad wakes keep-alive again, did that get in
+the way? Be honest about this one - it is the trade I asked you to
+accept and it can be revisited.
+
+
+ANSWER - did the headset go to your phone when you wanted it to?
+
+
+4. Open the settings, tick "Detailed logging, for troubleshooting",
+   press OK. Work for five minutes, then open the log from the tray
+   menu: Windows+B, StableSound, Applications key, "Open log file".
+
+ANSWER - the log should now have lines about audio starting and
+stopping, with a level, and how long each device took to open. Are they
+there, and do they read clearly?
+
+
+ANSWER - the ordinary log I have argued should stay on. Having seen
+both, do you agree, or would you rather it were off by default and you
+turned it on when you needed it?
+
+
+ANYTHING ODD:
+
+
+===========================================================
+ANYTHING ELSE
+===========================================================
+
+ANSWER - anything at all, in any of this, that felt wrong or that you
+would want done differently:

@@ -4,22 +4,21 @@
 
 **Read this first when picking the project up.**
 
-Milestones 0, 1, 2 and 3 are complete, hardware rounds included. Milestone 3
-took **three** rounds: the sound side was signed off in the second, the tray in
-the third, and the trackpad was diagnosed in the third from the diagnostic log
-and fixed afterwards.
+Milestones 0, 1, 2, 3 and 4 are complete, hardware rounds included. Milestone 3
+took **three** rounds. Milestone 4 took one and passed: the settings dialog
+reads correctly under JAWS.
 
-**Milestone 4, the settings dialog, is built and needs its hardware round.**
-Two things in the app have never been seen working on real hardware: the
-trackpad fix, and the whole dialog. Both are in the one round.
+**Milestone 5, polish, is built and needs its hardware round.** It is entirely
+made of what the Milestone 4 round asked for.
 
 ### What exists and works
 
 A working console app. `cargo run` from the repo root. It keeps the headphones
-awake, releases them on a timer, wakes again when you touch the keyboard, and
-logs everything to `stablesound.log` next to the exe.
+awake, releases them on a timer, wakes again when you touch the machine, has a
+tray icon, a global hotkey and a real settings dialog, and logs everything to
+`stablesound.log` next to the exe.
 
-Release binary is **248 KB**, against a ~1 MB budget.
+Release binary is **296 KB**, against a ~1 MB budget.
 
 ### What is proven on hardware
 
@@ -46,94 +45,95 @@ Release binary is **248 KB**, against a ~1 MB budget.
   on-tone audible from its start. Signed off in the second round.
 - Automatic transitions are silent and stay silent. "I heard no tones, which
   was perfect."
-- `mouse on` does work - confirmed for the first time in the second round,
-  once the test stopped confounding it with a manual `off`.
+- The tray works from the keyboard. One icon, read once and correctly, `Enter`
+  toggles once per press, the menu opens on the Applications key.
+- **The settings dialog reads correctly under JAWS.** Every control announced
+  with its name and its value, mnemonics working, the choices in the combo
+  boxes sensible, a refused hotkey read aloud with the focus returned to the
+  field that was wrong, and the toggle hotkey still working while the dialog is
+  open. The tester's verdict: "This was perfect. The dialogue behaves like a
+  model accessible app." Signed off in the Milestone 4 round.
 
 ### What the hardware rounds asked for
 
-Two changes came out of Tests 8-10, both from the tester, both now design:
+Every request from Milestones 2 and 3 is now built, and all but one is
+confirmed. The exception is the one that was abandoned instead:
 
-- **Do not wake on the mouse.** The tester works without a mouse and can brush
-  the trackpad by accident, which grabs the headset back. Waking stays on
-  keyboard input; mouse waking becomes an option, off by default. See 4.1.
-- **Make the timeout easy to change.** Editing a config file by hand does not
-  count as easy. This is a requirement for the Milestone 4 dialog, not a
-  nice-to-have.
-
-Four came out of Tests 11-18. Two are confirmed fixed:
-
+- **Do not wake on the mouse. ABANDONED after four rounds**, at the tester's
+  own request: "Please give up on this feature now and remove all code that was
+  there to facilitate it. It was just a nice-to-have anyway and I'm happy to let
+  it go for now." Three mechanisms were built and every one of them failed on
+  the trackpad. See 4.1 for what was tried and why it kept losing.
+- **Make the timeout easy to change.** Done in Milestone 4 and confirmed.
 - **Tones only for what the user does.** Done, and confirmed.
-- **Tone volume, length and the clipped on-tone.** Done, and confirmed. The
-  lead-in silence is now 125 ms, halved again in the second round.
+- **Tone volume, length and the clipped on-tone.** Done, and confirmed.
+- **The tray.** Fixed and signed off in the third Milestone 3 round.
+- **A settings item in the tray menu.** Done in Milestone 4 and confirmed.
 
-The other two failed a second time, and both diagnoses were wrong. Both are now
-settled:
+The Milestone 4 round then asked for five more, all built in Milestone 5:
 
-- **The tray.** Fixed and signed off in the third round. The shell **sends** its
-  callback, and a sent message is dispatched straight to the window procedure
-  and never returned by `GetMessage`, which was the only place the app looked.
-  The duplicated name and the dead `Enter` were ghost icons left by killed
-  processes. See 4.4.
-- **The trackpad.** Raw mouse input was the right mechanism all along and was
-  working. The fault was a **race**: `GetLastInputInfo` is stamped before
-  `WM_INPUT` is dispatched, so the leading event of a sweep found a stale
-  pointer tick and read as a keypress - and the leading event is the one that
-  wakes. An input no pointing device accounts for is now held 250 ms before it
-  is called the keyboard. See 4.2 and question 17.
+- **Drop the mouse feature entirely**, above.
+- **Announce the group headings.** JAWS named every control but never the group
+  it was in. **This one could not be delivered** - see question 21. What was
+  done instead is that no control now depends on its group heading to make
+  sense, which was the underlying complaint: "Remember that a screenreader user
+  hears options in isolation."
+- **Make the settings hotkey optional.** "It won't be used often enough to
+  warrant a hotkey, so having it in the tray only is my current preference.
+  Maybe make the option to have a settings hotkey available in the settings
+  dialogue, offering the current ctrl+win+f11 option by default." Done exactly
+  that way, and off by default.
+- **Say how to write a hotkey when one is refused**, with every modifier
+  spelling, and whether the order matters. Done; it does not.
+- **A steer on logging.** Asked for directly. See 4.6.
 
-A fifth request came out of the third round, and is now done:
+And two things were confirmed for later rather than acted on now:
 
-- **A settings item in the tray menu.** The tester asked for one, unprompted.
-  Built in Milestone 4, along with a second global hotkey that opens the same
-  dialog - CLAUDE.md does not allow the tray to be the only route to anything.
+- **A help file, with a button in the dialog and the tray menu.** Wanted
+  "eventually". Milestone 6, once there is something to open.
+- **The console window can go.** "The dialogue is enough and I would be
+  comfortable with the console window removed." Milestone 6, as planned.
 
 ### Known residual risks, still untested
 
 - Whether zeros still works after a much longer idle gap - an hour away from
-  the desk rather than 30 seconds (question 6).
+  the desk rather than 30 seconds (question 6). Detailed logging now records
+  what the meter saw, so a recurrence leaves evidence.
 - Behaviour across Windows sleep/resume, and on battery (question 7).
-- Whether holding an unattributed input for 250 ms actually stops the trackpad
-  waking keep-alive (question 18). The timing is measured, the logic is
-  unit-tested, the hardware is untried.
-- How JAWS reads the settings dialog (question 19). Real controls and correct
-  tab order are confirmed from outside; the reading is not.
+- Whether dropping the mouse handling costs anything noticeable in use
+  (question 22). It should make waking *quicker*, since the 250 ms hold is
+  gone, at the price of a trackpad brush taking the headset back.
+- Whether the version 6 common controls change how the dialog reads
+  (question 23). The app had no manifest at all until now.
 
 ### What is next
 
-**The Milestone 4 hardware round.** `test.txt` is the script; Tests 27-32. It
-covers the dialog under JAWS and, in three minutes at the top, the trackpad fix
-that came out of the third Milestone 3 round.
+**The Milestone 5 hardware round.** `test.txt` is the script; Tests 33-38.
 
-What the round has to answer is only ever one thing: **how JAWS actually reads
-the dialog.** Everything checkable from this machine has been checked by
-driving the running app from another process - the controls are real, the tab
-order is right, every setting populates and saves, a bad hotkey is refused, the
-global hotkey keeps working while the dialog is open. None of that says whether
-the reading makes sense to somebody who cannot see it.
+It is a smaller round than the last four, because Milestone 5 mostly *removes*
+things. What it has to answer: does the app still behave with the mouse
+handling gone, does the dialog still read well after being reworded and given
+real common controls, and is the refusal message now enough to write a hotkey
+correctly on the second attempt.
 
-**Then Milestone 5.**
-
-The console harness is **kept alongside** the tray, on its own stdin thread,
-rather than replaced as originally planned. It is the only diagnostic interface
-that exists, the tester is already fluent in it, and throwing it away before the
-GUI is proven on hardware would leave nothing to fall back on. Milestone 6 drops
-it and switches to the windows subsystem.
-
-After the round: **Milestone 4, the settings dialog** - which carries the
-tester's request that the timeout be easy to change, and now also their request
-to be able to customise the hotkey ("good to be able to customise it in the
-settings").
+**Then Milestone 6, and shipping.** Autostart is already built. What is left is
+dropping the console harness and switching to the windows subsystem, a help
+file with buttons that open it, a size-tuned release build, a README, and a
+plan for the antivirus and SmartScreen problem.
 
 ### Things a fresh session should not re-litigate
 
-- Rust with `winsafe` for native Win32 controls. Not a drawn-UI toolkit; JAWS is
-  the whole point. `native-windows-gui` is unmaintained - do not use it.
+- Real Win32 controls from a **dialog template compiled by rc.exe**. Not a
+  drawn-UI toolkit, and not `winsafe` either - see section 5. JAWS is the whole
+  point. `native-windows-gui` is unmaintained.
 - Hard release (disconnecting Bluetooth) is **not** being built. Soft release
   was proven sufficient.
 - Keep-alive never starts because audio was detected. Only explicit request or
   user input. Section 4.1 explains why.
 - Zeros is the default signal. Sine is a last resort and forces fixed release.
-
+- **Telling the keyboard from the mouse is closed.** Four rounds, three
+  mechanisms, the tester's own decision to drop it. Do not reopen it without
+  being asked.
 ---
 
 **Date:** 2026-08-29
@@ -215,7 +215,7 @@ So soft release is sufficient. Closing the WASAPI client frees the headset for t
 | Language | **Rust** | ~1 MB single portable exe, no runtime, no installer. Easy to hand to other people. Direct WASAPI access, which suits an app that is fundamentally about audio stream lifetime. |
 | GUI | **Real Win32 controls via `winsafe`** | Non-negotiable for a screen reader tool: real `HWND` controls are accessible to JAWS for free. Drawn-UI toolkits (egui, iced, Slint) reconstruct an accessibility tree via AccessKit — works, but consistently worse under JAWS. **Note:** `native-windows-gui`, the crate most tutorials recommend, is no longer maintained. `winsafe` (v0.0.28, July 2026) is the live alternative. |
 | Toolchain | rustup + MSVC (Visual Studio Build Tools) | The GNU toolchain avoids the download but adds COM/linking friction. Not worth it. |
-| Wake on input | **Keyboard by default, mouse optional and off** (revised 2026-09-05) | Requested after Milestone 2 testing. Once idle release has fired, the next sound is often a notification, and its first word gets clipped. Touching a key is a reliable sign speech is about to be wanted. Switching off by hand disarms it, so releasing for the phone still sticks. The hardware round then asked for the mouse to be excluded: the tester does not use one and can brush the trackpad by accident, which takes the headset back off the phone. |
+| Wake on input | **Any input, on by default** (revised 2026-09-05) | Requested after Milestone 2 testing. Once idle release has fired, the next sound is often a notification, and its first word gets clipped. Touching the machine is a reliable sign speech is about to be wanted. Switching off by hand disarms it, so releasing for the phone still sticks. The same round asked for the *mouse* to be excluded; three mechanisms were built for that over four rounds, all of them failed on a real trackpad, and the tester asked for the feature to be dropped. See 4.1. |
 | Idle timeout | **30 s** (revised 2026-08-30) | 60 s felt too long in use once waking on input made re-arming cheap. |
 | Feedback | **Earcons** (distinct short tones for on/off) | Played through the target device, so hearing the tone also proves the headset is awake. Optional speech can layer on later. |
 
@@ -227,7 +227,7 @@ So soft release is sufficient. Closing the WASAPI client frees the headset for t
 
 ```
 RELEASED       --hotkey--------------------------->  KEEPING_ALIVE
-RELEASED       --keyboard input, if armed--------->  KEEPING_ALIVE
+RELEASED       --user input, if armed------------->  KEEPING_ALIVE
 KEEPING_ALIVE  --hotkey / timeout expires-------->  RELEASED
 ```
 
@@ -244,8 +244,8 @@ word JAWS spoke would have grabbed it straight back, roughly a second later.
 **Audio never starts keep-alive; it only postpones release.**
 
 **User input is different in kind, and does start it** (added after Milestone 2
-testing, at the tester's suggestion). Keyboard and mouse activity is not caused
-by our own output, so it cannot form the feedback loop that makes audio-waking
+testing, at the tester's suggestion). Typing and pointing are not caused by our
+own output, so they cannot form the feedback loop that makes audio-waking
 useless. It also closes a real gap: after an automatic release, the next thing
 to make a sound is often a notification, and that first word would be clipped.
 
@@ -254,66 +254,58 @@ hook. A small unsigned binary that reads every keystroke is exactly the shape
 antivirus heuristics flag, which this project already expects to fight at
 Milestone 6. `GetLastInputInfo` returns only a timestamp, never key data.
 
-**Keyboard versus mouse (added 2026-09-05).** The hardware round asked for the
-mouse to stop waking keep-alive: the tester does not use one, and brushing the
-trackpad by accident takes the headset back off the phone. `GetLastInputInfo`
-reports a single timestamp for all input and cannot say what caused it, so the
-source is inferred by pairing it with `GetCursorPos`: if the timestamp advanced
-and the cursor also moved, call it the mouse; if it advanced and the cursor sat
-still, call it the keyboard.
+**Keyboard versus mouse: tried three ways, and dropped (closed 2026-09-05).**
+Milestone 2's round asked for the mouse to stop waking keep-alive: the tester
+does not use one, and brushing the trackpad by accident takes the headset back
+off the phone. `GetLastInputInfo` reports a single timestamp for all input and
+cannot say what caused it, so something had to supply the missing half. Three
+mechanisms were built, and **every one of them failed on the trackpad**:
 
-**That approach failed twice on hardware and has been abandoned.** Round one:
-the *end* of a trackpad sweep defeats it, because taking a finger off the pad
-is itself an input event arriving after the pointer has already stopped, which
-is the exact signature of a keypress. Round two added a settling window
-requiring the pointer to have been still for 500 ms, and the trackpad still woke
-keep-alive every time, short flicks included. A pointing device evidently
-produces input that the cursor position does not account for, and no amount of
-tightening the inference was going to find it.
+1. Pair the timestamp with `GetCursorPos`: pointer moved, call it the mouse;
+   pointer still, call it the keyboard. Defeated by the *end* of a sweep -
+   lifting a finger is itself an input event, arriving after the pointer has
+   already stopped, which is the exact signature of a keypress.
+2. The same, with a settling window requiring the pointer to have been still
+   for 500 ms. A sweep still woke keep-alive every time, short flicks included.
+3. Raw mouse input, so the mouse reported itself rather than being inferred -
+   usage page 1, usage 2, `RIDEV_INPUTSINK`, payload never read. This mechanism
+   was **correct**: the diagnostic log showed 42 events attributed properly.
+   It still failed, because of a race between two clocks rather than anything
+   about identifying the device. `GetLastInputInfo` is stamped the instant
+   input lands; `WM_INPUT` must be queued and dispatched to us afterwards, so
+   a poll landing in the gap finds a stale pointer tick. Only the *leading*
+   event of a sweep can lose that race - and the leading event is the one that
+   wakes, which is why the fault looked like a misidentification for two
+   rounds. Holding an unaccounted-for input for 250 ms closed that race, was
+   measured from the tester's own log rather than guessed, was unit-tested
+   including the failing case, and the trackpad woke keep-alive anyway.
 
-**The mouse now reports itself (2026-09-05).** `input::watch_pointer` registers
-for **raw mouse input** - usage page 1, usage 2 - with `RIDEV_INPUTSINK`, so
-every event from a mouse or trackpad reaches the hidden window even though it is
-never in the foreground. Each one records a timestamp. Input whose timestamp
-coincides with recent pointing-device activity is the mouse; anything else is
-the keyboard.
+After the fourth round the tester called it: "Please give up on this feature
+now and remove all code that was there to facilitate it. It was just a
+nice-to-have anyway and I'm happy to let it go for now."
 
-This is exact where the cursor was not: it sees buttons, wheels, and contacts
-that move the pointer nowhere.
+**So all input wakes keep-alive, and nothing tries to say what caused it.**
+`wake_on_mouse` is gone, along with the raw input registration and its
+system-wide `WM_INPUT` stream, the settling window and the held decision.
 
-**It keeps the property the whole design rests on.** Only the mouse usage page
-is registered, and the payload is never read - `GetRawInputData` is not called,
-and nothing else that could report what happened is either. That a pointing
-device did something is the entire content. A keystroke never enters the process
-in any form, so the objection that ruled out a keyboard hook does not apply.
-Registering for raw *keyboard* input would carry exactly that objection, which
-is why it is not done.
+What that costs is bounded and known: a trackpad brush takes the headset back
+from the phone, and the hotkey takes it straight off again. The property that
+makes a deliberate handover stick is untouched - switching off *by hand* still
+disarms waking entirely, so a stray finger cannot undo it.
 
-A settling window survives, now anchored to real mouse events rather than to
-cursor coordinates, and widened to a second. It covers the trailing events a
-pointing device produces around an interaction - a contact ending, a click
-landing after a movement, a gesture the system turns into something else. It
-costs a keyboard-only user nothing, because they produce no mouse events for it
-to hang off.
+What it buys back: waking is immediate again rather than a quarter of a second
+late, there is no `WM_INPUT` for every pointer movement on the machine, and the
+app is materially smaller and simpler.
 
-Where this is still wrong: a keypress within a second of mouse activity is
-attributed to the mouse and missed, so waking waits for the next keypress. That
-only affects someone who uses both, and someone who uses both would turn
-`wake_on_mouse` on, where the distinction stops mattering.
-
-**What it costs.** A `WM_INPUT` for every pointer movement, system-wide.
-Measured at about 75 microseconds each, which at a precision trackpad's 125 Hz
-is roughly 1 % of one core *while the pointer is actually moving* and nothing at
-all when it stops. Idle cost is unchanged at 0.3 %. Acceptable; if it ever is
-not, the registration is only needed when `wake_on_input` is on and
-`wake_on_mouse` is off, and could be dropped the rest of the time.
-
-Deliberately *not* solved with `GetAsyncKeyState` polled over the key range.
+There is a lesson here worth keeping, because it cost four rounds. The
+mechanism was right by round three and the diagnosis was right by round four,
+and it still did not work. **A feature nobody would miss should be given a
+budget before it is started, not after.**
 
 Deliberately *not* solved with `GetAsyncKeyState` polled over the key range.
 That would be exact, but sweeping every virtual key code in a loop is a
-textbook keylogger signature - worse for Milestone 6 than the hook we already
-rejected.
+textbook keylogger signature - worse for Milestone 6 than the hook already
+rejected above.
 
 - **KEEPING_ALIVE** — WASAPI render stream open on the target device, emitting the configured keep-alive signal.
 - **RELEASED** — stream fully closed (`IAudioClient` released, not merely paused — a paused stream may still hold the endpoint). Optionally, Bluetooth audio profile disconnected.
@@ -337,27 +329,20 @@ Consequence for Milestone 2: **the engine must log state transitions to a file, 
 
 **The signal/metering conflict is now moot.** It was real: sine at 1% (0.01) would have tripped our own detector and prevented release. But zeros won 2.3, and zeros has a literal peak of 0.0, so there is no self-detection risk at all on the default path. The coupling only returns if someone switches to sine for other hardware - at which point the app should either force the per-session method or refuse to combine sine with idle-based release. **Guard against that combination in code rather than leaving it as a trap.**
 
-**Telling the keyboard from the mouse, and the race that hid in it.** The
-tester asked in Milestone 2 for the mouse to stop waking keep-alive. Three
-attempts were needed. Two tried to infer the source from the cursor position
-and both failed on hardware; the mouse now reports itself through raw mouse
-input, mouse usage page only, payload never read, so the no-key-data property
-that ruled out a keyboard hook is intact.
+**What the meter is asked to say now (added 2026-09-05).** Detailed logging
+records the two threshold crossings and the level each was decided on -
+`audio detected, peak 0.4935` and `audio stopped, peak 0.0000; letting go in
+4s unless something plays`. The transitions only, not the ten readings a
+second in between. This exists because of the observability problem two
+paragraphs up: the two questions still open about the meter, whether digital
+silence still works after a long gap and what a sleep or resume does, cannot be
+watched happening and can only be read back afterwards. See 4.6.
 
-That mechanism was right and still failed a third time, because of a race
-between two clocks rather than anything about identifying the device.
-`GetLastInputInfo` is stamped by the system the instant input lands; `WM_INPUT`
-must be queued and dispatched to us afterwards. A poll landing in the gap finds
-a pointer tick that is still stale and calls the input a keypress. Only the
-*leading* event of a sweep can lose that race - after it the pointer tick is
-never stale again - and the leading event is precisely the one that wakes,
-which is why the fault looked like a misidentification for two rounds.
-
-So an input no pointing device accounts for is **held for 250 ms and judged
-when the wait is up**. Input the mouse already accounts for is decided
-immediately; there is nothing left to wait for. The hold must not restart on
-each new input, or somebody typing steadily would never pause long enough to be
-noticed at all - a unit test pins that.
+**Telling the keyboard from the mouse: closed, unsolved (2026-09-05).** Three
+mechanisms over four hardware rounds, the last of them correct about the
+mechanism *and* correct about the race that broke it, and the trackpad woke
+keep-alive every time. Dropped at the tester's request; the full account is in
+4.1, because what remains is a decision rather than a design.
 
 ### 4.3 Settings
 
@@ -369,11 +354,11 @@ All of these are now in the dialog (Milestone 4) unless marked otherwise:
 - Idle timeout: seconds, default 30 s (settled 2026-08-30, confirmed 2026-09-05). **Must be easy to change from the dialog** - the tester asked for this directly.
 - Fixed timer duration - the same field; only one mode applies at a time
 - Global hotkey: user-assignable. **Typed, not captured** - see below.
-- Second global hotkey to open the dialog, default `Ctrl+Win+F11`
-- Wake on input: keyboard on by default; mouse a separate option, off by default (see 4.1)
+- Second global hotkey to open the dialog, **off by default**, with `Ctrl+Win+F11` offered and kept in the file so switching it on is one checkbox (see 4.6)
+- Wake on input: on by default. Any input, with no attempt to tell the keyboard from the mouse (see 4.1)
 - Start with Windows: on/off. **Kept in the registry, not the config file** - see below.
 - Earcons: on/off, volume (shown as a percentage; "10" is far easier to hear and retype than "0.1")
-- Logging on/off, and the diagnostic detail flag
+- Logging on/off, and detailed logging for troubleshooting, off by default (see 4.6)
 
 Dropped from this list: **hard release**, now deferred indefinitely (see 2.4).
 
@@ -547,6 +532,83 @@ These are requirements, not nice-to-haves:
 4. The settings dialog is a real dialog — Escape cancels, Enter confirms, standard behaviour.
 5. State changes are always audible (earcons), never visual-only.
 
+### 4.6 What the Milestone 4 round settled (Milestone 5)
+
+**The settings hotkey is optional, and off.** `Ctrl+Win+F11` opened the dialog
+from anywhere. The tester's answer to whether that was worth a combination
+taken from every other program: "It won't be used often enough to warrant a
+hotkey, so having it in the tray only is my current preference. Maybe make the
+option to have a settings hotkey available in the settings dialogue, offering
+the current ctrl+win+f11 option by default."
+
+So a checkbox decides whether it is claimed, the field beside it stays filled
+with `Ctrl+Win+F11` whether or not the checkbox is ticked, and the default is
+off. Turning it off actually drops the registration, which is the whole point;
+turning it on claims it without a restart.
+
+This brushes against CLAUDE.md's rule that the tray must never be the only
+route to a feature, so it is worth being explicit that it is not. With the
+hotkey off, the dialog is reachable from the tray - which is keyboard-driven
+with `Win+B` and was signed off in the third Milestone 3 round - and from the
+console's `settings` command until Milestone 6 removes it. The hotkey remains
+one checkbox away. The rule exists because tray menus are awkward with a screen
+reader, not because they are forbidden, and the tester chose this.
+
+**A refused hotkey now says how to write one.** The message read correctly and
+returned the focus to the right field, and the tester asked it to go further:
+"give examples of how to correctly write all the possible modifier keys... If
+the order of modifier keys is important, make that clear."
+
+`Hotkey::parse` reports which of five mistakes was made - nothing typed, an
+unknown word, two keys, modifiers with no key, a key with no modifier - so the
+message names the actual fault. After it comes one shared `HOW_TO_WRITE`
+string, used by the dialog, the console and the config loader alike, listing
+every accepted modifier spelling and every key name. A test asserts that
+everything the parser accepts appears in it, so the two cannot drift apart -
+which is the failure mode the tester actually met.
+
+**The order does not matter, and the text says so**, along with capitalisation
+and spacing. A test pins that too.
+
+**Every control reads on its own.** "Remember that a screenreader user hears
+options in isolation. e.g. for me, as the developper, its obvious that the 'let
+go of them' option refers to the headphones. This may however not be obvious to
+a new user." No label in the dialog now depends on another, or on its group
+heading, to make sense.
+
+**Logging: a split, not a choice.** Asked for directly - "I don't foresee
+myself or other users wanting to keep a log, but understand that this is
+helpful for development and trouble-shooting. So maybe make a 'debug mode'
+checkbox available... But I'd actually like your steer on best practise here."
+
+The steer taken, and the reasoning, because this is a judgement rather than a
+finding:
+
+- **The ordinary log stays on.** It is one line per state change - a few
+  hundred bytes a day - and it is the only evidence that exists in an app whose
+  behaviour cannot be watched as it happens. Every hardware round so far that
+  produced a fix rather than a guess produced it from this file, and the ones
+  that produced guesses were the rounds before it existed. A log that is off
+  when the problem happens is worth nothing.
+- **Detailed logging stays off** until something is being looked into, because
+  it is several times longer and only useful to somebody reading it closely.
+- **What "detailed" now means** is the peak meter crossing the audio threshold
+  in each direction, with the level, and how long each device took to open.
+  Those are exactly the measurements behind questions 6 and 7. It previously
+  meant the keyboard-or-mouse reasoning, which no longer exists.
+
+**The app finally has a manifest.** Found while checking the dialog from
+outside: there was none at all, though section 5 had assumed one, so the
+process got the version 5 common controls. That made this the only dialog on
+the machine not built from the same controls as every other - which is the
+entire argument for using a template rather than a toolkit. It is embedded
+through the `.rc` that rc.exe already compiles, so it costs no dependency
+against the size budget.
+
+Being straight about it: this was tried as a fix for the unannounced group
+headings and made no difference at all to the accessibility tree. It is kept
+because an app with a dialog should have one, not because it solved anything.
+
 ---
 
 ## 5. Stack
@@ -556,7 +618,7 @@ These are requirements, not nice-to-haves:
 
 - **`embed-resource`** — a *build* dependency, running rc.exe over `stablesound.rc`. Nothing of it ships. Weighed against the size budget and it costs nothing at runtime; the compiled template itself is a couple of kilobytes.
 - **`windows-sys`** or **`windows`** — WASAPI (`IAudioClient`, `IAudioRenderClient`, `IMMDeviceEnumerator`, `IAudioMeterInformation`), plus `RegisterHotKey` and `Shell_NotifyIcon`
-- **`embed-manifest`** — build dependency, for the app manifest
+- **The application manifest** - `stablesound.manifest`, referenced from `stablesound.rc` as `RT_MANIFEST` so rc.exe embeds it. **No crate**: `embed-manifest` was in this list for a long time and was never actually added, so until 2026-09-05 the exe had no manifest at all and got the version 5 common controls. Going through the `.rc` costs nothing, since it is compiled anyway. See 4.6.
 - Release profile tuned for size: `opt-level = "z"`, LTO, `panic = "abort"`, strip symbols
 
 Target: single self-contained `.exe`, roughly 300 KB – 1 MB, no installer.
@@ -664,28 +726,68 @@ The three remaining wakes in the round had no pointer event behind them at all
 (ages of 6 s, 56 s and 219 s). Those were the genuine keypresses of Tests 25.8
 and 25.9, correctly handled then and untouched by the fix.
 
-### Still open after the third round
+### Resolved by the Milestone 4 round (2026-09-05)
 
-18. **Does holding the decision stop the trackpad waking keep-alive?** The
-    mechanism is now understood rather than guessed at, the timing figure is
-    measured from the tester's own log, and the logic is unit-tested including
-    the leading-event case that failed. But it has never been tried against a
-    real trackpad. Folded into the Milestone 4 round as Test 27; the tester
-    said the trackpad is "a nice to have, not a dealbreaker" and asked to move
-    on.
+Raw results are in `test-milestone-4.txt`, Tests 27-32.
 
-19. **How does JAWS read the settings dialog?** Everything checkable from this
-    machine has been: real `#32770`, real controls, every label immediately
-    before the control it names, every input a tab stop, all settings
-    populating and saving, a bad hotkey refused with the focus returned to it,
-    and the global hotkey still working while the dialog is open. None of that
-    says whether the labels make sense heard aloud, whether the five groups
-    help or get in the way, or whether the error messages land. Tests 28-31.
+18. ~~Does holding the decision stop the trackpad waking keep-alive?~~ **No.**
+    "Yes, it stayed off for a few swipes, but then turned keep-alive on", and a
+    flick, a tap and a rest-and-lift all woke it. That is the third mechanism
+    to fail, and the tester ended it: "Please give up on this feature now and
+    remove all code that was there to facilitate it." Closed as abandoned, not
+    as solved. See 4.1.
 
-20. **Is a second global hotkey welcome, or one combination too many?**
-    `Ctrl+Win+F11` opens the settings. Every global hotkey is taken from every
-    other program on the machine, and the tester may prefer to reach the dialog
-    only through the tray. Easy to drop if so. Test 29.
+    The keyboard side was flawless again: never woke without a keypress, never
+    failed to wake with one, and the added 250 ms was barely perceptible - "I
+    noticed it, but only because you mentioned it. Very tiny difference."
+
+19. ~~How does JAWS read the settings dialog?~~ **Correctly, and this was the
+    question the milestone rested on.** "The tab key read all the controls
+    well. The dialogue behaves like a model accessible app, well done!" The
+    combo box choices read sensibly, `Alt` with an underlined letter jumped to
+    the right control, the refusal message for a bad hotkey was read out and
+    the focus came back to the offending field, and the toggle hotkey went on
+    working while the dialog was open with no second dialog opening.
+
+    Two things came out of it, both now built: a group heading that JAWS never
+    announced (question 21), and one label that only made sense if you had
+    heard the heading (fixed; see 4.6).
+
+20. ~~Is a second global hotkey welcome, or one combination too many?~~ **One
+    too many.** "It won't be used often enough to warrant a hotkey, so having
+    it in the tray only is my current preference." Now an option, off by
+    default. See 4.6.
+
+### Still open after the Milestone 4 round
+
+21. **Can JAWS be made to announce the group headings?** It named every control
+    correctly but never the group it was in, and the tester wants them: "Having
+    them read out would be helpful for a new user." Nothing found from this
+    side does it. The obvious lever turned out to be already pulled - `WS_GROUP`
+    on the first control of each group, which rc.exe adds to every `LTEXT` by
+    default, so it was present all along and announced nothing. The version 6
+    common controls made no difference either. What JAWS actually uses is
+    geometry, the `GROUPBOX` rectangle enclosing the focused control, and that
+    has always been true here too, checked by reading the live control
+    rectangles out of the running dialog.
+
+    Which leaves JAWS' own verbosity setting as the likely answer, and that is
+    the tester's to check rather than ours to change. Test 35 asks. **The
+    mitigation is already in and does not depend on the answer:** no control's
+    label leans on its group heading any more.
+
+22. **Does dropping the mouse handling cost anything in daily use?** It should
+    make waking noticeably *quicker* - the 250 ms hold is gone - at the price
+    of a trackpad brush taking the headset back from the phone. The tester
+    accepted that trade in advance. Test 33 and Test 38 ask whether it feels
+    right in practice.
+
+23. **Do the version 6 common controls change how the dialog reads?** The app
+    had no manifest at all until now, so the dialog was built from the version
+    5 controls when it was signed off. Version 6 is what every other dialog on
+    the machine uses, so this should be neutral or better - but the dialog
+    passed a JAWS round on the old controls, and that is the thing being
+    changed underneath it. Test 34.
 
 ### Noted, not a defect
 
@@ -743,7 +845,7 @@ Not worth fixing in the harness - Milestone 3 makes state changes audible throug
 
 The console harness in `main.rs` was scaffolding for testing the engine. Milestone 3 adds the tray and hotkey **alongside** it rather than replacing it, so there is still a diagnostic interface while the GUI is unproven; Milestone 6 removes it.
 
-**Milestone 3 - control surface. DONE (2026-09-05), three hardware rounds. Sound signed off in the second, tray in the third. One fix - the trackpad race - is unproven on hardware; question 18.**
+**Milestone 3 - control surface. DONE (2026-09-05), three hardware rounds. Sound signed off in the second, tray in the third. The trackpad fix failed a fourth round in Milestone 4 and the feature was then dropped; question 18.**
 
 Built: the global hotkey with its own parser and a refusal to register a bare key; earcons rendered into the keep-alive stream, with an anti-click envelope; the tray icon, its real Win32 menu and an icon drawn in code; the hidden window and message loop; and the keyboard-only wake change carried over from Milestone 2's round. Design detail in 4.4.
 
@@ -829,7 +931,7 @@ Cost: waking on the keyboard is 250 ms later than it was. That lands where it is
 
 **Not verified:** the fix against a real trackpad. Question 18, folded into the Milestone 4 round.
 
-**Milestone 4 - settings. BUILT (2026-09-05), hardware round pending.**
+**Milestone 4 - settings. DONE (2026-09-05), hardware round passed.**
 
 Built: the settings dialog as a real Win32 dialog template; a second global hotkey that opens it; a `Settings...` item in the tray menu and a `settings` console command; "start when I sign in"; and runtime switching of the log. Design detail in 4.3.
 
@@ -851,24 +953,109 @@ Built: the settings dialog as a real Win32 dialog template; a second global hotk
 - "Start when I sign in" reads 0 with no `Run` value and 1 with one, writes the quoted exe path, and removes it again.
 - 41 unit tests, `cargo clippy --all-targets -- -D warnings` clean. Release binary **290 KB**, up from 268 KB, against the ~1 MB budget.
 
-**Not verifiable from here, and the only thing the round is for: how JAWS actually reads it.** Real controls and correct tab order do not guarantee that the labels make sense heard aloud, that the groups help rather than get in the way, or that the error messages land. Round is `test.txt`, Tests 27-32.
+**The round answered the only question it was for: JAWS reads it correctly.** The tester: "The dialogue behaves like a model accessible app." Results below; raw notes in `test-milestone-4.txt`.
 
-**Milestone 5 — polish.** Whatever the Milestone 4 round asks for.
+**Milestone 4 hardware round (2026-09-05), raw notes in `test-milestone-4.txt`:**
 
-**What the tester wants in it**, asked directly in the second round and worth building to rather than guessing:
-- The idle timeout (carried from Milestone 2 - "editing a config file by hand does not count as easy").
-- The hotkey.
-- The keep-alive signal type, "in case needed for different headsets".
-- Earcon volume.
-- The device to keep awake, "in case the headset isn't set as the default device - some users may have their screen reader on the headset while doing audio work or being on a meeting over the default speakers". Note this is a use case the current design already supports but has never been tested.
-- Start automatically on system start, as a simple toggle. New scope: currently Milestone 6.
+- Test 27, the trackpad one last time: **failed, for the third mechanism and
+  the fourth round.** A sweep, a flick, a tap and a rest-and-lift all woke
+  keep-alive. The keyboard side was flawless, and the 250 ms hold was barely
+  perceptible: "I noticed it, but only because you mentioned it." Ended by the
+  tester's request to drop the feature. See question 18.
+- Test 28, reading the dialog: **passed, and this was the milestone.** "The tab
+  key read all the controls well. The dialogue behaves like a model accessible
+  app, well done!" Two follow-ups: the group headings were not announced, and
+  "let go of them" made no sense heard in isolation.
+- Test 29, changing something: **passed.** The timeout changed and took effect,
+  the tray's `Settings...` item opened the dialog, Escape cancelled cleanly.
+  The second hotkey was judged not worth its combination.
+- Test 30, a bad hotkey: **passed.** The message was read out and the focus
+  came back to the offending field. Asked for more in the message itself.
+- Test 31, the hotkey while the dialog is open: **passed**, which is the whole
+  justification for the dialog being modeless. It toggled with its tone, the
+  dialog stayed up and still worked, and asking again raised the existing one
+  rather than opening a second. "No, very good."
+- Test 32, living with it: **passed.** No clipping, nothing unasked-for, and
+  the dialog judged enough on its own to retire the console window.
 
-**Milestone 5 - hard release. DEFERRED, probably not needed.** Soft release was confirmed sufficient on the AeroClip (see 2.4), so this is no longer planned work. Revisit only if another headset needs it, or if the 3-second handover becomes annoying. Reference if it ever happens: `m2jean/ToothTray`.
+**Milestone 5 - polish. BUILT (2026-09-05), hardware round pending.**
 
-**Milestone 6 — ship.** Autostart, size-tuned release build, README, and a plan for the antivirus/SmartScreen problem — a small unsigned binary that opens audio devices and registers global hotkeys fits the profile AV heuristics dislike. Options: submit false-positive reports to the major vendors, or look at code signing.
+Entirely made of what the Milestone 4 round asked for. Design detail in 4.6,
+and in 4.1 for the removal.
 
-**Current position (2026-09-05):** Milestones 0, 1 and 2 complete and hardware-tested. Milestone 3's audio behaviour is finished and signed off; its tray and its mouse handling have each failed two rounds, have been rebuilt on different mechanisms, and await a third.
+Built:
 
+1. **The mouse-versus-keyboard feature removed**, at the tester's request after
+   its fourth failed round. Out with it went the raw input registration and its
+   system-wide `WM_INPUT` stream, the settling window, the two-clock race, the
+   250 ms hold, `wake_on_mouse`, the `mouse` console command and the dialog's
+   checkbox. Waking is immediate again.
+2. **The settings hotkey made optional and off by default**, with the
+   combination kept and offered so switching it on is one checkbox.
+3. **A refused hotkey now names the mistake** - one of five - and is followed
+   by one shared string listing every modifier spelling and key name, and
+   saying that order, spacing and capitalisation do not matter.
+4. **Every dialog label made to read on its own**, depending on neither its
+   neighbours nor its group heading.
+5. **Detailed logging given real content**: the peak meter crossing the audio
+   threshold in each direction with the level, and how long each device took to
+   open. It had lost its only content when the input handling went.
+6. **An application manifest**, so the dialog is built from the same version 6
+   common controls as every other dialog on the machine. There was none at all
+   before.
+
+Two defects found while checking the above, both fixed:
+
+- **A UTF-8 byte order mark ate the config file's first setting.** The file is
+  documented as safe to edit by hand and several Windows editors offer to add
+  one. One ignored line among many that work is an unpleasant way to fail.
+- **Five message strings had had their line continuations flattened** into runs
+  of literal spaces, four of them long before this branch.
+
+**Verified by driving the running app from another process:**
+
+- The dialog is a real `#32770` of genuine `ComboBox`, `Edit` and `Button`
+  controls. Every input carries `WS_TABSTOP`, every label sits immediately
+  before the control it names, and each group's first control carries
+  `WS_GROUP`. Read out of the live dialog, not out of the template.
+- Every `GROUPBOX` rectangle encloses its own controls - the thing JAWS
+  actually uses - which is how question 21 was narrowed down.
+- The settings hotkey is **not** registered by default, and **is** registered
+  when the config asks for it. Both confirmed from the log.
+- Detailed logging adds `device opened in 30 ms` and, with a tone played
+  through the default output, `audio detected, peak 0.4935` followed by
+  `audio stopped, peak 0.0000; letting go in 4s unless something plays`. With
+  it off, neither line appears.
+- 35 unit tests, including one asserting that everything `Hotkey::parse`
+  accepts is named in the advice string, so the two cannot drift apart.
+- `cargo clippy --all-targets -- -D warnings` clean. Release binary **296 KB**,
+  up from 290 KB, against the ~1 MB budget.
+
+**Not verifiable from here:** whether the version 6 controls changed how the
+dialog reads, whether the reworded labels land, whether the refusal message is
+now enough, and whether losing the mouse handling is felt in daily use. Round
+is `test.txt`, Tests 33-38.
+
+**Hard release. DEFERRED, probably not needed.** Soft release was confirmed sufficient on the AeroClip (see 2.4), so this is no longer planned work. Revisit only if another headset needs it, or if the 3-second handover becomes annoying. Reference if it ever happens: `m2jean/ToothTray`.
+
+**Milestone 6 - ship.** Size-tuned release build, README, and a plan for the antivirus/SmartScreen problem - a small unsigned binary that opens audio devices and registers global hotkeys fits the profile AV heuristics dislike. Options: submit false-positive reports to the major vendors, or look at code signing.
+
+Two things the Milestone 4 round confirmed belong here rather than earlier:
+
+- **Drop the console harness** and switch to the windows subsystem. It was kept
+  through Milestones 3 to 5 because it was the only diagnostic interface and
+  the GUI was unproven. The GUI is proven now: "The dialogue is enough and I
+  would be comfortable with the console window removed."
+- **A help file, and a button that opens it** in both the settings dialog and
+  the tray menu. Asked for, for "eventually". It needs the documentation to
+  exist first, which is the README above.
+
+Autostart is already built, in Milestone 4.
+
+**Current position (2026-09-05):** Milestones 0 to 4 complete and
+hardware-tested. The settings dialog passed its JAWS round. Milestone 5 is
+built and awaits a round; it is mostly removal, and the one thing the tester
+asked for that could not be delivered is the group headings - question 21.
 ---
 
 ## 8. Sources
