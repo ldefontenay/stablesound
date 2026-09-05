@@ -20,6 +20,7 @@ mod hotkey;
 mod input;
 mod log;
 mod settings;
+mod startup;
 mod tray;
 
 use std::path::{Path, PathBuf};

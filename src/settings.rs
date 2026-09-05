@@ -60,6 +60,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
 
 use crate::config::{Config, DeviceSelector, Release, Signal};
 use crate::hotkey::Hotkey;
+use crate::startup;
 
 /// Posted to the message loop to ask for the dialog. The console reads
 /// `settings` on its own thread, and only the thread that owns the queue may
@@ -80,6 +81,7 @@ const IDC_HOTKEY: i32 = 1009;
 const IDC_LOGGING: i32 = 1010;
 const IDC_DIAGNOSTICS: i32 = 1011;
 const IDC_SET_HOTKEY: i32 = 1012;
+const IDC_STARTUP: i32 = 1013;
 
 /// Combo box order. The template is the other half of this contract; changing
 /// one without the other silently mislabels a setting, so both are written out
@@ -280,6 +282,9 @@ fn populate(hwnd: HWND, state: &State) {
     set_text(hwnd, IDC_SET_HOTKEY, &cfg.settings_hotkey.to_string());
     check(hwnd, IDC_LOGGING, cfg.logging);
     check(hwnd, IDC_DIAGNOSTICS, cfg.diagnostics);
+    // Read from the registry rather than the config, because that is what
+    // actually decides it - see `startup`.
+    check(hwnd, IDC_STARTUP, startup::is_enabled());
 }
 
 /// Build a config from the controls, or explain what is wrong and return
@@ -375,6 +380,24 @@ fn read(hwnd: HWND, state: &State) -> Option<Config> {
             ));
         }
         notify(hwnd, &text);
+    }
+
+    // Last, and only once everything else has been accepted: this one writes
+    // to the registry rather than into the config we are about to return, so
+    // it must not happen on a path that then bails out.
+    if checked(hwnd, IDC_STARTUP) != startup::is_enabled() {
+        if let Err(e) = startup::set(checked(hwnd, IDC_STARTUP)) {
+            // Not worth refusing the whole dialog over. Everything else the
+            // user changed is good, and saying so beats silently doing
+            // nothing.
+            notify(
+                hwnd,
+                &format!(
+                    "Your other settings were saved, but StableSound could not \
+                     change whether it starts when you sign in.\n\n{e}"
+                ),
+            );
+        }
     }
 
     Some(cfg)

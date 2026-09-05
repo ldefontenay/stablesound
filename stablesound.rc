@@ -15,7 +15,7 @@
 //      label moves focus to the next control that can take it, which is what
 //      makes Alt+O reach the device list.
 //
-// Mnemonics in use: O S L A K M P V H T W D. OK and Cancel deliberately have
+// Mnemonics in use: O S L A K M P V H T W D I. OK and Cancel deliberately have
 // none - they are the default and cancel buttons, reached with Enter and
 // Escape.
 
@@ -35,8 +35,9 @@
 #define IDC_LOGGING      1010
 #define IDC_DIAGNOSTICS  1011
 #define IDC_SET_HOTKEY   1012
+#define IDC_STARTUP      1013
 
-IDD_SETTINGS DIALOGEX 0, 0, 290, 356
+IDD_SETTINGS DIALOGEX 0, 0, 290, 392
 STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
 CAPTION "StableSound Settings"
 FONT 9, "Segoe UI", 400, 0, 0x1
@@ -84,6 +85,10 @@ BEGIN
     CONTROL         "Include extra &diagnostic detail in the log", IDC_DIAGNOSTICS,
                     "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 14, 310, 262, 10
 
-    DEFPUSHBUTTON   "OK", IDOK, 175, 335, 50, 14
-    PUSHBUTTON      "Cancel", IDCANCEL, 233, 335, 50, 14
+    GROUPBOX        "Starting up", -1, 7, 331, 276, 32
+    CONTROL         "Start StableSound when I sign &in", IDC_STARTUP,
+                    "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 14, 346, 262, 10
+
+    DEFPUSHBUTTON   "OK", IDOK, 175, 371, 50, 14
+    PUSHBUTTON      "Cancel", IDCANCEL, 233, 371, 50, 14
 END
