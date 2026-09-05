@@ -44,17 +44,18 @@ use std::sync::mpsc::Sender;
 
 use windows::core::PCWSTR;
 use windows::Win32::Foundation::{HWND, LPARAM, WPARAM};
+use windows::Win32::System::Diagnostics::Debug::MessageBeep;
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::Controls::{
     CheckDlgButton, IsDlgButtonChecked, BST_CHECKED, BST_UNCHECKED,
 };
 use windows::Win32::UI::Input::KeyboardAndMouse::SetFocus;
 use windows::Win32::UI::WindowsAndMessaging::{
-    CreateDialogParamW, DestroyWindow, GetDlgItem, GetDlgItemInt, GetDlgItemTextW,
-    GetWindowLongPtrW, IsDialogMessageW, IsWindow, MessageBoxW, SendDlgItemMessageW, SetDlgItemInt,
-    SetDlgItemTextW, SetForegroundWindow, SetWindowLongPtrW, ShowWindow, CB_ADDSTRING,
-    CB_GETCURSEL, CB_SETCURSEL, GWLP_USERDATA, IDCANCEL, IDOK, MB_ICONEXCLAMATION,
-    MB_ICONINFORMATION, MB_OK, MESSAGEBOX_STYLE, MSG, SW_SHOW, WM_CLOSE, WM_COMMAND, WM_INITDIALOG,
+    CreateDialogParamW, DestroyWindow, DialogBoxParamW, EndDialog, GetDlgItem, GetDlgItemInt,
+    GetDlgItemTextW, GetWindowLongPtrW, IsDialogMessageW, IsWindow, SendDlgItemMessageW,
+    SetDlgItemInt, SetDlgItemTextW, SetForegroundWindow, SetWindowLongPtrW, ShowWindow,
+    CB_ADDSTRING, CB_GETCURSEL, CB_SETCURSEL, GWLP_USERDATA, IDCANCEL, IDOK, MB_ICONEXCLAMATION,
+    MB_ICONINFORMATION, MESSAGEBOX_STYLE, MSG, SW_SHOW, WM_CLOSE, WM_COMMAND, WM_INITDIALOG,
     WM_NCDESTROY,
 };
 
@@ -69,6 +70,7 @@ pub const WM_OPEN_SETTINGS: u32 = windows::Win32::UI::WindowsAndMessaging::WM_AP
 
 /// Must match `stablesound.rc`.
 const IDD_SETTINGS: u16 = 100;
+const IDD_MESSAGE: u16 = 101;
 const IDC_DEVICE: i32 = 1001;
 const IDC_SIGNAL: i32 = 1002;
 const IDC_RELEASE: i32 = 1003;
@@ -82,6 +84,7 @@ const IDC_DIAGNOSTICS: i32 = 1011;
 const IDC_SET_HOTKEY: i32 = 1012;
 const IDC_STARTUP: i32 = 1013;
 const IDC_USE_SET_HOTKEY: i32 = 1014;
+const IDC_MESSAGE: i32 = 1015;
 
 /// Combo box order. The template is the other half of this contract; changing
 /// one without the other silently mislabels a setting, so both are written out
@@ -434,7 +437,7 @@ fn read_hotkey(hwnd: HWND, id: i32) -> Option<Hotkey> {
 /// JAWS reads be the field to correct, rather than leaving the user to hunt
 /// for it.
 fn complain(hwnd: HWND, text: &str, focus_on: i32) {
-    box_message(hwnd, text, MB_OK | MB_ICONEXCLAMATION);
+    show_message(hwnd, text, MB_ICONEXCLAMATION);
     unsafe {
         if let Ok(control) = GetDlgItem(Some(hwnd), focus_on) {
             let _ = SetFocus(Some(control));
@@ -443,22 +446,69 @@ fn complain(hwnd: HWND, text: &str, focus_on: i32) {
 }
 
 fn notify(hwnd: HWND, text: &str) {
-    box_message(hwnd, text, MB_OK | MB_ICONINFORMATION);
+    show_message(hwnd, text, MB_ICONINFORMATION);
 }
 
-fn box_message(hwnd: HWND, text: &str, style: MESSAGEBOX_STYLE) {
-    let text = wide(text);
-    // Deliberately not "StableSound Settings": that is the parent dialog's
-    // title, and a screen reader announcing the same name again would read as
-    // though nothing had happened.
-    let caption = wide("StableSound");
+/// Say something, in a window whose text can be read back with the arrow keys.
+///
+/// This is a `MessageBoxW` replacement, and the reason it exists is the
+/// Milestone 5 round: the advice shown when a hotkey is refused was judged
+/// worth reading in full but too long to take in from one announcement, and a
+/// message box offers no way to go back over it short of the JAWS cursor.
+/// `IDD_MESSAGE` puts the same text in a read-only edit, which reads on focus
+/// the way a message box does and then re-reads a line at a time.
+///
+/// `sound` keeps the one thing a message box gave that a plain dialog does
+/// not: the system's own exclamation or information ding, which arrives before
+/// any speech and says which kind of message this is.
+///
+/// Modal, like the message box it replaces, so the global hotkey is not
+/// serviced while it is up. Unchanged from before, and it is a window that
+/// exists to be dismissed.
+fn show_message(hwnd: HWND, text: &str, sound: MESSAGEBOX_STYLE) {
     unsafe {
-        MessageBoxW(
+        let _ = MessageBeep(sound);
+    }
+    // Edit controls want CRLF. A bare newline reaches one as a stray control
+    // character rather than a line break, which the screen reader then has to
+    // read around.
+    let text = wide(&text.replace('\n', "\r\n"));
+    unsafe {
+        let Ok(instance) = GetModuleHandleW(None) else {
+            return;
+        };
+        DialogBoxParamW(
+            Some(instance.into()),
+            PCWSTR(IDD_MESSAGE as usize as *const u16),
             Some(hwnd),
-            PCWSTR(text.as_ptr()),
-            PCWSTR(caption.as_ptr()),
-            style,
+            Some(message_proc),
+            LPARAM(text.as_ptr() as isize),
         );
+    }
+}
+
+unsafe extern "system" fn message_proc(
+    hwnd: HWND,
+    message: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+) -> isize {
+    match message {
+        WM_INITDIALOG => {
+            SetDlgItemTextW(hwnd, IDC_MESSAGE, PCWSTR(lparam.0 as *const u16)).ok();
+            // Non-zero: the first tab stop is the message itself, which is
+            // where the focus belongs - it is the whole point of the window.
+            1
+        }
+        WM_COMMAND => {
+            let id = (wparam.0 & 0xFFFF) as i32;
+            if id == IDOK.0 || id == IDCANCEL.0 {
+                let _ = EndDialog(hwnd, id as isize);
+                return 1;
+            }
+            0
+        }
+        _ => 0,
     }
 }
 

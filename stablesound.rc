@@ -34,7 +34,7 @@
 //
 // Mnemonics in use: O S L A K P V H U T W D I. OK and Cancel deliberately
 // have none - they are the default and cancel buttons, reached with Enter and
-// Escape.
+// Escape. IDD_MESSAGE has its own namespace and reuses M.
 
 #include <windows.h>
 
@@ -46,6 +46,7 @@
 1 RT_MANIFEST "stablesound.manifest"
 
 #define IDD_SETTINGS      100
+#define IDD_MESSAGE       101
 
 #define IDC_DEVICE       1001
 #define IDC_SIGNAL       1002
@@ -60,6 +61,7 @@
 #define IDC_SET_HOTKEY   1012
 #define IDC_STARTUP      1013
 #define IDC_USE_SET_HOTKEY 1014
+#define IDC_MESSAGE      1015
 
 IDD_SETTINGS DIALOGEX 0, 0, 306, 394
 STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
@@ -122,4 +124,33 @@ BEGIN
 
     DEFPUSHBUTTON   "OK", IDOK, 191, 373, 50, 14, WS_GROUP
     PUSHBUTTON      "Cancel", IDCANCEL, 249, 373, 50, 14
+END
+
+// What StableSound says when it cannot accept something, in place of a
+// message box.
+//
+// The Milestone 5 round asked for this, about the advice shown when a hotkey
+// is refused: "Its long, but instructive. A Jaws user needs to use the Jaws
+// cursor or to virtualise the control to absorb all the detail, which may not
+// be within the abilities of a more novice user. Putting the information in a
+// read-only edit field would solve this, by making it possible to use the
+// cursor keys to review the text."
+//
+// So: a read-only multi-line EDIT, which is the first tab stop and therefore
+// where the focus lands. A screen reader reads it on focus exactly as a
+// message box would, and then the arrow keys walk it a line or a word or a
+// character at a time, with no cursor mode to switch into. Nothing else in
+// the dialog competes for the focus - one button, reached by Tab, and Enter
+// or Escape dismisses it from wherever you are.
+IDD_MESSAGE DIALOGEX 0, 0, 304, 244
+STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "StableSound"
+FONT 9, "Segoe UI", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Message, which the arrow keys will read back:",
+                    -1, 7, 7, 290, 8
+    EDITTEXT        IDC_MESSAGE, 7, 19, 290, 198,
+                    ES_MULTILINE | ES_READONLY | WS_VSCROLL | WS_GROUP |
+                    WS_TABSTOP
+    DEFPUSHBUTTON   "OK", IDOK, 247, 223, 50, 14, WS_GROUP
 END
