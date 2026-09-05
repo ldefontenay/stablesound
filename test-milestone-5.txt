@@ -81,7 +81,7 @@ Build and run from the repo root:
 Have the AeroClips connected and set as the default output.
 
 ANSWER - did the app start cleanly?
-
+Yes.
 
 ===========================================================
 TEST 33 - THE TRACKPAD, NOW THAT NOTHING IS WATCHING IT
@@ -98,19 +98,19 @@ Steps:
 4. Press a key.
 
 ANSWER - did keep-alive come back on?
-
+Yes.
 
 5. Compare this with last time, if you can. Waking should now be a
    quarter of a second quicker than it was in your last round.
 
 ANSWER - does typing after a pause bring the sound back any quicker
 than it did, or does it feel the same?
-
+Feels nearly the same. Happy with how it is.
 
 6. Now sweep the trackpad. It is expected to wake keep-alive.
 
 ANSWER - did it? (Expected: yes. If it does not, something is wrong.)
-
+Yes.
 
 7. Press Ctrl+Win+F12 to switch keep-alive OFF by hand. Then sweep the
    trackpad again, and type a few keys.
@@ -118,10 +118,10 @@ ANSWER - did it? (Expected: yes. If it does not, something is wrong.)
 ANSWER - did keep-alive stay off? This is the part that matters most
 in the whole round: switching off by hand has to keep the headset free
 for your phone, whatever you touch afterwards.
-
+Yes, it stayed off.
 
 ANYTHING ODD:
-
+No, all behaviour as expected.
 
 ===========================================================
 TEST 34 - THE DIALOG, ON NEW CONTROLS
@@ -137,28 +137,28 @@ Steps:
 
 ANSWER - did it open, and did JAWS announce it the same way it did last
 time?
-
+Yes, felt like the same good experience.
 
 2. Tab all the way through, to the end and round again.
 
 ANSWER - did every control still read with its name and its value? If
 any one reads differently from last time - better or worse - that is
 the thing I need to know.
-
+Everything still worked the same. No issues while tabbing through. Groups are not announced, but the controls are self-explanatory so this really does not matter.
 
 3. Try Alt with an underlined letter again - Alt+O for the device,
    Alt+K for the keyboard checkbox, Alt+V for tone volume.
 
 ANSWER - do the shortcuts still work?
-
+Yes, no problem.
 
 4. Arrow through the two combo boxes near the top without opening them.
 
 ANSWER - do the choices still read sensibly?
-
+Yes, still the same.
 
 ANYTHING ODD:
-
+No, everything works perfectly.
 
 ===========================================================
 TEST 35 - THE WORDING, AND THE GROUP HEADINGS
@@ -172,20 +172,20 @@ Steps:
 ANSWER - is there any control left that only makes sense if you already
 know what it is about? "Let go of the headphones" is the one you named
 last time; I want to know about the ones I missed.
-
+All items read clearly and are easy to understand.
 
 2. There is a new checkbox in the Hotkeys group: "Also use a hotkey to
    open these settings".
 
 ANSWER - reading it and the field after it, is it clear what it does and
 that the field is the combination it would use?
-
+Yes.
 
 3. The group headings. There are six: keeping the headphones awake,
    waking up again, tones, hotkeys, the log file, and starting up.
 
 ANSWER - does JAWS name any of them as you tab into a group?
-
+No, but due to the options being very clear, this does not matter.
 
 4. If not - and I expect not - please check one JAWS setting for me.
    In Settings Center (Insert+6), search for "group". There is an
@@ -193,20 +193,20 @@ ANSWER - does JAWS name any of them as you tab into a group?
 
 ANSWER - what is that setting called on your machine, and is it on or
 off?
-
+Its called "show control group info" and it was already on, which is the default setting.
 
 5. If it was off, turn it on and tab through the dialog again.
 
 ANSWER - does JAWS name the groups now?
-
+Setting was alredy on at first check.
 
 ANSWER - if it does, would you rather leave that setting on generally,
 or would you prefer I found another way? This decides whether question
 21 in the plan is closed or still open.
-
+This is not an issue, and no further work on this is needed.
 
 ANYTHING ODD:
-
+No.
 
 ===========================================================
 TEST 36 - THE SETTINGS HOTKEY, NOW OPTIONAL
@@ -218,7 +218,7 @@ Steps:
 
 ANSWER - did nothing happen? It should now do nothing, because the
 combination belongs to other programs again.
-
+Nothing happened.
 
 2. Open the settings from the tray. Find "Also use a hotkey to open
    these settings" and tick it. Press OK.
@@ -226,19 +226,19 @@ combination belongs to other programs again.
 3. Press Ctrl+Win+F11.
 
 ANSWER - did the dialog open, without you having restarted anything?
-
+Yes.
 
 4. Open the settings again, untick the same box, press OK, then press
    Ctrl+Win+F11 once more.
 
 ANSWER - did it stop working again?
-
+Yes.
 
 ANSWER - which way would you like it shipped, off as it is now, or on?
-
+Actually, ship with the settings hotkey on. In the documentation later, we can recommend that the hotkey can be disabled once the user has completed tweaking the application settings to their satisfaction.
 
 ANYTHING ODD:
-
+No.
 
 ===========================================================
 TEST 37 - GETTING A HOTKEY WRONG ON PURPOSE
@@ -261,31 +261,31 @@ Steps:
 ANSWER - for each one, did the message say what was actually wrong with
 that particular attempt, rather than the same general complaint four
 times?
-
-   a. f12:
-   b. ctrl:
-   c. ctrl+a+b:
-   d. ctrl+banana:
+Yes, very clear.
+   a. f12: good
+   b. ctrl: good
+   c. ctrl+a+b: good
+   d. ctrl+banana: good
 
 
 2. The message is long - the fault, then how to write one.
 
 ANSWER - is it too long to listen to? Would you rather have the fault
 alone, with the explanation somewhere you could ask for it?
-
+Its long, but instructive. A Jaws user needs to use the Jaws cursor or to virtualise the control to absorb all the detail, which may not be within the abilities of a more novis user. Putting the information in a read-only edit field would solve this, by making it possible to use the cursor keys to review the text. The text itself is excellent.
 
 ANSWER - after hearing it once, would you know how to write a valid
 combination without asking me?
-
+No, important to review the detail more carefully, see above.
 
 3. Now set it to something you would actually like to keep, and press
    OK.
 
 ANSWER - did the new combination work straight away?
-
+Yes.
 
 ANYTHING ODD:
-
+I tried using ctrl+win+; but ; was not available as an option. If there isn't a good reason for not having punctuation keys available, please fix this.
 
 ===========================================================
 TEST 38 - LIVING WITH IT
@@ -295,15 +295,16 @@ Half an hour of ordinary work. Then, near the end, five minutes with
 the detailed log on.
 
 ANSWER - did speech ever clip?
-
+No
 
 ANSWER - now that the trackpad wakes keep-alive again, did that get in
 the way? Be honest about this one - it is the trade I asked you to
 accept and it can be revisited.
 
+No, its fine.I've learned to avoid touching it.
 
 ANSWER - did the headset go to your phone when you wanted it to?
-
+Yes.
 
 4. Open the settings, tick "Detailed logging, for troubleshooting",
    press OK. Work for five minutes, then open the log from the tray
@@ -312,15 +313,15 @@ ANSWER - did the headset go to your phone when you wanted it to?
 ANSWER - the log should now have lines about audio starting and
 stopping, with a level, and how long each device took to open. Are they
 there, and do they read clearly?
-
+Yes, they are there and read clearly.
 
 ANSWER - the ordinary log I have argued should stay on. Having seen
 both, do you agree, or would you rather it were off by default and you
 turned it on when you needed it?
-
+Please have logging off by default and it can then be turned on when needed for development or trouble-shooting.
 
 ANYTHING ODD:
-
+No.
 
 ===========================================================
 ANYTHING ELSE
@@ -328,3 +329,4 @@ ANYTHING ELSE
 
 ANSWER - anything at all, in any of this, that felt wrong or that you
 would want done differently:
+Error in how the system tray displays: With keep-alive off, it correctly displays "StableSound: headphones free". With keep-alive on, it displays "StableSound: headphones free StableSound: headphones awake ". Please fix this.
