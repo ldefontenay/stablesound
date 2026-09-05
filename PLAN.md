@@ -1,10 +1,11 @@
 # StableSound - research findings and build plan
 
-## 0. Where we are (updated 2026-08-30)
+## 0. Where we are (updated 2026-09-05)
 
 **Read this first when picking the project up.**
 
-Milestones 0, 1, 2 complete. Milestone 3 is next.
+Milestones 0, 1 and 2 are complete, hardware round included. Milestone 3 is
+under way.
 
 ### What exists and works
 
@@ -21,22 +22,40 @@ Release binary is **248 KB**, against a ~1 MB budget.
 - JAWS speech reads ~0.56 on the device peak meter; the threshold is 0.0005.
 - Speech correctly postpones release; quiet correctly triggers it.
 - The log is readable and complete (the user's words: "Yes, clear").
+- Device-loss recovery works. Disconnecting the AeroClip and reconnecting it
+  ten seconds later brought keep-alive back on its own - no typing, no stuck
+  state, no message spam. The Milestone 2 Test 5 failure is closed.
+- Waking on input holds up in real use, and a manual switch-off correctly
+  stays off, so the iPhone can still take the headset.
+- 30 s beats 60 s as the idle timeout.
 
-### What is built but NOT yet hardware-tested
+### What the hardware round asked for
 
-- **Device-loss recovery.** Milestone 2's Test 5 failed: disconnecting the
-  headphones stopped the engine permanently. Rewritten since (intent is now
-  separate from stream, so a lost device is retried rather than fatal) but
-  **nobody has confirmed the fix on real hardware.** This is the first thing to
-  test next session - see Test 8 in `test.txt`.
-- **Wake on input** in real daily use. Verified with synthetic input; not lived
-  with yet.
+Two changes came out of Tests 8-10, both from the tester, both now design:
+
+- **Do not wake on the mouse.** The tester works without a mouse and can brush
+  the trackpad by accident, which grabs the headset back. Waking stays on
+  keyboard input; mouse waking becomes an option, off by default. See 4.1.
+- **Make the timeout easy to change.** Editing a config file by hand does not
+  count as easy. This is a requirement for the Milestone 4 dialog, not a
+  nice-to-have.
+
+### Known residual risks, still untested
+
+- Whether zeros still works after a much longer idle gap - an hour away from
+  the desk rather than 30 seconds (question 6).
+- Behaviour across Windows sleep/resume, and on battery (question 7).
 
 ### What is next
 
 **Milestone 3: global hotkey, earcons, tray icon.** That is what turns this from
-a console harness into something usable. `main.rs` is scaffolding and gets
-replaced.
+a console harness into something usable.
+
+The console harness is **kept alongside** the tray for now, on its own stdin
+thread, rather than replaced as originally planned. It is the only diagnostic
+interface that exists, the tester is already fluent in it, and throwing it away
+before the GUI is proven on hardware would leave nothing to fall back on.
+Milestone 6 drops it and switches to the windows subsystem.
 
 ### Things a fresh session should not re-litigate
 
@@ -129,7 +148,7 @@ So soft release is sufficient. Closing the WASAPI client frees the headset for t
 | Language | **Rust** | ~1 MB single portable exe, no runtime, no installer. Easy to hand to other people. Direct WASAPI access, which suits an app that is fundamentally about audio stream lifetime. |
 | GUI | **Real Win32 controls via `winsafe`** | Non-negotiable for a screen reader tool: real `HWND` controls are accessible to JAWS for free. Drawn-UI toolkits (egui, iced, Slint) reconstruct an accessibility tree via AccessKit — works, but consistently worse under JAWS. **Note:** `native-windows-gui`, the crate most tutorials recommend, is no longer maintained. `winsafe` (v0.0.28, July 2026) is the live alternative. |
 | Toolchain | rustup + MSVC (Visual Studio Build Tools) | The GNU toolchain avoids the download but adds COM/linking friction. Not worth it. |
-| Wake on input | **On by default** (added 2026-08-30) | Requested after Milestone 2 testing. Once idle release has fired, the next sound is often a notification, and its first word gets clipped. Touching a key is a reliable sign speech is about to be wanted. Switching off by hand disarms it, so releasing for the phone still sticks. |
+| Wake on input | **Keyboard by default, mouse optional and off** (revised 2026-09-05) | Requested after Milestone 2 testing. Once idle release has fired, the next sound is often a notification, and its first word gets clipped. Touching a key is a reliable sign speech is about to be wanted. Switching off by hand disarms it, so releasing for the phone still sticks. The hardware round then asked for the mouse to be excluded: the tester does not use one and can brush the trackpad by accident, which takes the headset back off the phone. |
 | Idle timeout | **30 s** (revised 2026-08-30) | 60 s felt too long in use once waking on input made re-arming cheap. |
 | Feedback | **Earcons** (distinct short tones for on/off) | Played through the target device, so hearing the tone also proves the headset is awake. Optional speech can layer on later. |
 
@@ -141,7 +160,7 @@ So soft release is sufficient. Closing the WASAPI client frees the headset for t
 
 ```
 RELEASED       --hotkey--------------------------->  KEEPING_ALIVE
-RELEASED       --user input, if armed------------->  KEEPING_ALIVE
+RELEASED       --keyboard input, if armed--------->  KEEPING_ALIVE
 KEEPING_ALIVE  --hotkey / timeout expires-------->  RELEASED
 ```
 
@@ -167,6 +186,30 @@ Input is detected with `GetLastInputInfo`, deliberately not a `WH_KEYBOARD_LL`
 hook. A small unsigned binary that reads every keystroke is exactly the shape
 antivirus heuristics flag, which this project already expects to fight at
 Milestone 6. `GetLastInputInfo` returns only a timestamp, never key data.
+
+**Keyboard versus mouse (added 2026-09-05).** The hardware round asked for the
+mouse to stop waking keep-alive: the tester does not use one, and brushing the
+trackpad by accident takes the headset back off the phone. `GetLastInputInfo`
+reports a single timestamp for all input and cannot say what caused it, so the
+source is inferred by pairing it with `GetCursorPos`: if the timestamp advanced
+and the cursor also moved, call it the mouse; if it advanced and the cursor sat
+still, call it the keyboard.
+
+That keeps the privacy and antivirus properties intact - a timestamp and a
+cursor coordinate, still no key data and still no hook. It is a heuristic, and
+worth being honest about where it is wrong:
+
+- A mouse **click or wheel** with no movement reads as keyboard, and will wake.
+  Acceptable: unlike a trackpad brush, clicking is deliberate.
+- A trackpad touch too light to move the cursor reads as keyboard. In practice
+  a brush that registers as input almost always moves the pointer.
+- A keypress in the same 100 ms tick as a cursor move is attributed to the
+  mouse and missed. Worst case is that waking waits for the next keypress.
+
+Deliberately *not* solved with `GetAsyncKeyState` polled over the key range.
+That would be exact, but sweeping every virtual key code in a loop is a
+textbook keylogger signature - worse for Milestone 6 than the hook we already
+rejected.
 
 - **KEEPING_ALIVE** — WASAPI render stream open on the target device, emitting the configured keep-alive signal.
 - **RELEASED** — stream fully closed (`IAudioClient` released, not merely paused — a paused stream may still hold the endpoint). Optionally, Bluetooth audio profile disconnected.
@@ -195,12 +238,14 @@ Consequence for Milestone 2: **the engine must log state transitions to a file, 
 - Target device: default output, or a specific device (remembered by name, surviving re-plugging)
 - Keep-alive signal: fluctuate / inaudible sine (frequency + amplitude) / pure zeros
 - Release mode: idle-based (default) or fixed timer
-- Idle timeout: seconds/minutes, default around 60s — needs tuning against real use
+- Idle timeout: seconds, default 30 s (settled 2026-08-30, confirmed 2026-09-05). **Must be easy to change from the dialog** - the tester asked for this directly.
 - Fixed timer duration
-- Hard release: on/off
 - Global hotkey: user-assignable
+- Wake on input: keyboard on by default; mouse a separate option, off by default (see 4.1)
 - Start with Windows: on/off
 - Earcons: on/off, volume
+
+Dropped from this list: **hard release**, now deferred indefinitely (see 2.4).
 
 Stored as a small config file next to the exe if that location is writable, otherwise in `%APPDATA%` — this keeps the portable build genuinely portable.
 
@@ -239,13 +284,17 @@ Raw results are in `test.txt`.
 3. ~~Which keep-alive signal does the AeroClip need?~~ **Zeros is enough.** See 2.3.
 4. ~~How long does the AeroClip take to reconnect after a hard release?~~ **Moot** - hard release is no longer being built.
 
+### Resolved by Milestone 2 hardware testing (2026-09-05)
+
+Raw results are in `test.txt`, Tests 8-10.
+
+5. ~~What idle timeout feels right?~~ **30 s**, confirmed in use ("did the 30 second timeout feel better than 60? Yes"). The tester added that changing it should be easy - a requirement for the Milestone 4 dialog, not just a default.
+
+8. ~~Does device-loss recovery actually work?~~ **Yes.** Disconnecting the AeroClip mid-session and reconnecting it ten seconds later brought keep-alive back with no typing, no stuck state and no repeated messages, and the log told the story clearly. The Test 5 failure is closed. One reporting wrinkle came out of it - see Milestone 2 in section 7.
+
+9. ~~Does waking on input become annoying in practice?~~ **No**, and the disarm-on-manual-off rule did its job: after switching off by hand, typing did not take the headset back and the iPhone could claim it. But the tester asked for one change - **the mouse should not wake it**, because they do not use a mouse and can brush the trackpad by accident. Now design; see 4.1.
+
 ### Still open
-
-5. ~~What idle timeout feels right?~~ **Answered: 30 s**, chosen by the tester after Milestone 2, on the reasoning that waking on input makes a shorter timeout safe. Now the default. Revisit after daily use.
-
-8. **Does device-loss recovery actually work?** The Milestone 2 rewrite is unverified on hardware. Highest-priority test next session.
-
-9. **Does waking on input become annoying in practice?** It could hold the headset when you only wanted to glance at the laptop. The disarm-on-manual-off rule is meant to prevent the worst case, but only real use will tell.
 
 6. **Does zeros still work after a much longer idle gap?** Testing used 20-30 second gaps. Real use involves far longer ones - an hour away from the desk, or a laptop that has slept. If clipping reappears after a long gap, fluctuate is the next thing to try. **Residual risk, watch for it in daily use.**
 
@@ -265,7 +314,7 @@ Run with `cargo run` from `spike/`. Commands: `on`, `off`, `zeros`, `fluct`, `si
 
 Connect the AeroClip and make it the default output device first — the spike targets the default endpoint and reports which one it picked at startup.
 
-**Milestone 2 - core engine. DONE (2026-08-30), pending a hardware round.**
+**Milestone 2 - core engine. DONE (2026-08-30), hardware round closed 2026-09-05.**
 
 Built: the three keep-alive signals, device selection by name with fallback to default, the state machine, device peak-meter idle detection, clean stream teardown, file-based transition logging, and a plain-text config file.
 
@@ -290,11 +339,25 @@ Verified automatically:
 3. **Default idle timeout 60 s to 30 s**, at the tester's preference.
 4. **Fixed a bug in the wake feature found by its own test.** The check short-circuited on the config flag, so while waking was off the input watcher never refreshed its baseline; switching it on then compared against a stale timestamp and fired a spurious wake immediately. The watcher is now polled unconditionally and the flag consulted afterwards.
 
-Still unverified on hardware: the device-loss fix itself, and how waking on input feels in daily use.
+**Second hardware round (2026-09-05), raw notes in `test.txt`:**
+- Test 8, device-loss recovery: **passed.** Disconnect, wait, reconnect - it came back on its own. The Test 5 fix holds.
+- Test 9, waking on input: **passed**, including the part that matters most - after a manual `off`, typing did not take the headset back and the iPhone could claim it.
+- Test 10, living with it: **passed.** No clipping, 30 s better than 60 s, waking never got in the way.
 
-The console harness in `main.rs` is scaffolding for testing the engine. Milestones 3 and 4 replace it with the hotkey and the settings dialog; the engine underneath is the real thing.
+**One reporting wrinkle, worth knowing about.** During Test 8 the tester saw no `MOVED` or `INTERRUPTED` line, yet recovery plainly worked and the log recorded the device switch. That is the console harness, not the engine: `main.rs` drains the event channel only just before it blocks on `lines.next()`, so an event that arrives while it is waiting for input is not printed until the next time Enter is pressed. The engine writes the log file directly from its own thread, which is why the log was complete and the console was not.
 
-**Milestone 3 — control surface.** Global hotkey registration, earcons for on/off, tray icon for sighted users and for a visible quit.
+Not worth fixing in the harness - Milestone 3 makes state changes audible through earcons, which is the real answer, and the log already covers after-the-fact reading. Recorded because it will otherwise look like a bug the next time somebody reads a transcript.
+
+**Change requested and carried forward:** waking on input should ignore the mouse (now design, see 4.1), and the idle timeout needs an easy way to change it (Milestone 4).
+
+The console harness in `main.rs` was scaffolding for testing the engine. Milestone 3 adds the tray and hotkey **alongside** it rather than replacing it, so there is still a diagnostic interface while the GUI is unproven; Milestone 6 removes it.
+
+**Milestone 3 — control surface. IN PROGRESS.** Global hotkey registration, earcons for on/off, tray icon for sighted users and for a visible quit. Also carries the keyboard-only wake change from the Milestone 2 hardware round.
+
+Two design points settled before starting:
+
+- **Earcons play on the existing keep-alive stream, before it is torn down.** Playing the off-earcon after release would reopen the device and snatch it straight back from the phone, undoing the thing the app exists to do. So the tone is queued into the render buffer and the stream closes once it has drained. The on-earcon needs no special handling: the stream is being opened anyway. Playing through the target device is also the point - hearing the tone proves the headset is awake.
+- **The console harness stays**, on its own stdin thread feeding the same command channel as the hotkey and tray.
 
 **Milestone 4 — settings.** The `winsafe` dialog, config load/save, second hotkey to open settings. Test the whole dialog under JAWS with the screen off.
 
@@ -302,7 +365,7 @@ The console harness in `main.rs` is scaffolding for testing the engine. Mileston
 
 **Milestone 6 — ship.** Autostart, size-tuned release build, README, and a plan for the antivirus/SmartScreen problem — a small unsigned binary that opens audio devices and registers global hotkeys fits the profile AV heuristics dislike. Options: submit false-positive reports to the major vendors, or look at code signing.
 
-**Current position:** Milestones 0 and 1 complete. Milestone 2 under way.
+**Current position (2026-09-05):** Milestones 0, 1 and 2 complete and hardware-tested. Milestone 3 under way.
 
 ---
 

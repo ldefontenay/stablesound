@@ -398,26 +398,26 @@ Steps:
 
 ANSWER - did it report moving to another device? Look for a line
 starting with "MOVED" or "INTERRUPTED".
-
+No.
 
 6. Wait about 10 seconds, then reconnect the AeroClips and make them
    the default again.
 
 ANSWER - did it move back to the AeroClips on its own, WITHOUT you
 typing "on"?
-
+Yes.
 
 ANSWER - did it get stuck, spam messages, or behave oddly at any
 point?
-
+No.
 
 7. Now quit, and read stablesound.log.
 
 ANSWER - does the log tell a clear story of what happened?
-
+Yes, device switching was handled.
 
 ANYTHING ODD:
-
+No, worked well from my perspective.
 
 ===========================================================
 TEST 9 - DOES WAKING ON INPUT FEEL RIGHT?
@@ -441,23 +441,23 @@ Steps:
 
 ANSWER - did keep-alive come back on by itself? Look for "woken by
 input".
-
+Yes.
 
 6. Now type: off      (an explicit, by-hand switch off)
 7. Press some keys, move the mouse.
 
 ANSWER - did it STAY off this time? It should. Typing should not
 undo a deliberate switch-off.
-
+Yes, stayed off.
 
 8. Check your iPhone can take over at this point.
 
 ANSWER - could the phone take the headphones while keep-alive was
 off by hand?
-
+Yes.
 
 ANYTHING ODD:
-
+No, all as expected.
 
 ===========================================================
 TEST 10 - LIVE WITH IT
@@ -467,15 +467,16 @@ Type "on" and just use the laptop for a while - ideally a real work
 session, and ideally including picking up your phone at some point.
 
 ANSWER - did the 30 second timeout feel better than 60?
-
+Yes, but it would be good to have an easy way to alter the timeout.
 
 ANSWER - did waking on input ever get in the way? For instance,
 grabbing the headphones back when you wanted your phone to have
 them?
-
+No, but ideally waking on input should not be triggered by the mouse, as I don't use the mouse and may accidentally touch the trackpad. Maybe make mouse activation an option if technically possible. If too complex, leave as is.
 
 ANSWER - anything else that felt wrong, or that you would want
 changed before we add the hotkey?
-
+No.
 
 ANYTHING ODD:
+No.
