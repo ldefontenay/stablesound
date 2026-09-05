@@ -74,6 +74,7 @@ Build and run from the repo root:
 Have the AeroClips connected and set as the default output.
 
 ANSWER - did the app start cleanly?
+Yes.
 
 
 ===========================================================
@@ -90,37 +91,39 @@ Steps:
 
 ANSWER - did keep-alive stay off? It should. It will not announce
 itself either way, so the way to tell is that nothing happens.
+Yes, it stayed off for a few swipes, but then turned keep-alive on.
 
 
 6. Try a short flick. Then tap the trackpad without moving. Then rest a
    finger on it and lift it off again. No keys during any of this.
 
 ANSWER - did any of those wake it?
+Yes, always woke up.
 
 
 7. Now press a key.
 
 ANSWER - did keep-alive come back on?
-
+Yes.
 
 8. Work normally for a few minutes, using the keyboard as you usually
    would.
 
 ANSWER - did keep-alive ever wake when you had not touched a key?
-
+No.
 
 ANSWER - did it ever fail to wake when you did touch a key?
-
+No.
 
 9. This is the one I am least sure about. Waking on a keypress is now a
    quarter of a second slower than it was.
 
 ANSWER - did typing after a pause feel any slower to bring the sound
 back, or did you notice nothing?
-
+I noticed it, but only because you mentioned it. Very tiny difference.
 
 ANYTHING ODD:
-
+Mouse still wakes keep-alive up despite various attempts at fixing the problem. Please give up on this feature now and remove all code that was there to facilitate it. It was just a nice-to-have anyway and I'm happy to let it go for now. This should simplify the app a bit.
 
 ===========================================================
 TEST 28 - OPENING THE DIALOG, AND READING IT
@@ -131,7 +134,7 @@ Steps:
 1. Press Ctrl+Win+F11.
 
 ANSWER - did a dialog open, and what did JAWS say when it did?
-
+Yes, a dialogue opened. Jaws said "StableSound Settings" and read the first control in the dialogue for device selection. This is the perfect expected behaviour.
 
 2. Press Tab slowly all the way through the dialog, to the end and
    round again. Do not change anything yet.
@@ -140,6 +143,7 @@ ANSWER - this is the important one. For each thing you land on, did
 JAWS tell you what it was and what it was set to? Please say which ones
 read well and which did not. If any control was read without a name, or
 with the wrong name, that is exactly what I need to know.
+This was perfect. The tab key read all the controls well. The dialogue behaves like a model accessible app, well done!
 
 
 3. The dialog is in five groups: keeping the headphones awake, waking
@@ -147,28 +151,28 @@ with the wrong name, that is exactly what I need to know.
 
 ANSWER - did JAWS announce the groups, and did they help you find your
 way around, or did they get in the way?
-
+No, Jaws did not read the group. Having them read out would be helpful for a new user.
 
 4. Try Alt with an underlined letter - for example Alt+O for the output
    device, Alt+K for the keyboard checkbox, Alt+V for tone volume.
 
 ANSWER - did those jump you to the right place?
-
+Yes. They also activate checkboxes, which is normal.
 
 5. Find the two combo boxes near the top and arrow through their
    choices without opening them.
 
 ANSWER - did the choices read sensibly? The device one should offer
 "Default output (follow Windows)" and then your real devices.
-
+Yes, they read sensibly.
 
 ANSWER - is anything in the dialog worded confusingly? These are my
 words and you are the one who has to hear them. Anything you would say
 differently is worth telling me.
-
+Remember that a screenreader user hears options in isolation. e.g. for me, as the developper, its obvious that the "let go of them" option refers to the headphones. This may however not be obvious to a new user, so the option should read something like "let go device" or "stop keep-alive signal". To my mind, the rest of the dialogue is ok, but I may be biased, so see what you think.
 
 ANYTHING ODD:
-
+No, lovely work.
 
 ===========================================================
 TEST 29 - CHANGING SOMETHING
@@ -180,38 +184,38 @@ Steps:
 2. Press Enter, or Tab to OK and press it.
 
 ANSWER - did the dialog close?
-
+Yes.
 
 3. Type: status
 
 ANSWER - does it say the timeout is 20?
-
+Yes.
 
 4. Switch keep-alive on with Ctrl+Win+F12 and leave it alone.
 
 ANSWER - did it release after about twenty seconds rather than thirty?
-
+Yes.
 
 5. Open the settings again, this time from the tray: Windows+B, arrow to
    StableSound, press the Applications key, and choose "Settings...".
 
 ANSWER - was the Settings item there, and did it open the dialog?
-
+Yes, it was there and opened the dialogue.
 
 6. Press Escape.
 
 ANSWER - did the dialog close and leave everything as it was?
-
+Yes.
 
 7. About the second hotkey. Ctrl+Win+F11 now belongs to StableSound and
    no other program can use it.
 
 ANSWER - is that worth it to you, or would you rather reach the settings
 only from the tray and have the combination back?
-
+It won't be used often enough to warrant a hotkey, so having it in the tray only is my current preference. Maybe make the option to have a settings hotkey available in the settings dialogue, offering the current ctrl+win+f11 option by default.
 
 ANYTHING ODD:
-
+No.
 
 ===========================================================
 TEST 30 - WHEN YOU TYPE SOMETHING WRONG
@@ -226,28 +230,31 @@ Steps:
 3. Press OK.
 
 ANSWER - what happened, and did JAWS read it to you?
-
+Jaws read the error message, which is very good.
 
 ANSWER - after you dismissed the message, where was the focus? It is
 meant to put you back in the field that was wrong.
-
+Yes, focus was back in the field that was wrong.
 
 4. Now put it back to ctrl+win+f12 and press OK.
 
 ANSWER - did that work?
-
+Yes.
 
 5. Open the settings again and set the toggle hotkey to something new
    that you would actually like - anything with ctrl, alt, shift or win
    and one key. Press OK, then try the new combination.
 
 ANSWER - did the new hotkey work straight away, without restarting?
+Yes.
 
 
 ANSWER - did the old one stop working?
+Yes.
 
 
 ANYTHING ODD:
+In the error dialogue, give examples of how to correctly write all the possible modifier keys, to make sure that the user knows how to enter valid choices and avoids incorect combinations. Make sure that the dialogue validates that entries are written correctly when ok is pressed. If the order of modifier keys is important, make that clear.
 
 
 ===========================================================
@@ -264,19 +271,19 @@ Steps:
 2. Without closing it, press Ctrl+Win+F12.
 
 ANSWER - did keep-alive toggle, and did you hear the tone?
-
+Yes.
 
 ANSWER - did the dialog stay open and still work afterwards?
-
+Yes.
 
 3. With the dialog open, press Ctrl+Win+F11 again.
 
 ANSWER - did it bring the dialog you already had back to the front,
 rather than opening a second one?
-
+Yes.
 
 ANYTHING ODD:
-
+No, very good.
 
 ===========================================================
 TEST 32 - LIVING WITH IT
@@ -285,22 +292,22 @@ TEST 32 - LIVING WITH IT
 Half an hour of ordinary work.
 
 ANSWER - did speech ever clip?
-
+No.
 
 ANSWER - did keep-alive ever come on or go off when you had not asked?
-
+No.
 
 ANSWER - now that the settings are in a dialog, would you still want the
 typed commands, or is the dialog enough? I plan to remove the console
 window eventually and want to know how much you rely on it.
-
+The dialogue is enough and I would be comfortable with the console window removed.
 
 ANSWER - is there any setting in the dialog you would never touch, or
 any missing that you would want?
-
+Eventually, we'll create a help file / documentation for the app, and a button to open that in the settings and the system tray menu would be good. The setting pertaining to the trackpad/mouse can go as we'll be dropping that feature. I also don't foresee myself or other users wanting to keep a log, but understand that this is helpful for development and trouble-shooting. So maybe make a "debug mode" checkbox available, which when checked also offers the possibility of making the log more verbose. But I'd actually like your steer on best practise here.
 
 ANYTHING ODD:
-
+No.
 
 ===========================================================
 ANYTHING ELSE
@@ -308,3 +315,4 @@ ANYTHING ELSE
 
 ANSWER - anything at all, in any of this, that felt wrong or that you
 would want done differently:
+Nothing apart from what was discussed above.
