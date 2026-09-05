@@ -4,11 +4,13 @@
 
 **Read this first when picking the project up.**
 
-Milestones 0, 1 and 2 are complete, hardware round included. Milestone 3 is
-built and has had **two** hardware rounds. The sound side is finished and
-signed off. Two things failed twice - the tray, and the mouse still waking
-keep-alive - and both have now been rebuilt on different mechanisms rather than
-patched again. A third round is needed.
+Milestones 0, 1, 2 and 3 are complete, hardware rounds included. Milestone 3
+took **three** rounds: the sound side was signed off in the second, the tray in
+the third, and the trackpad was diagnosed in the third from the diagnostic log
+and fixed afterwards. That one fix is the only thing in the app not yet seen
+working on hardware.
+
+**Next is Milestone 4, the settings dialog.**
 
 ### What exists and works
 
@@ -63,35 +65,44 @@ Four came out of Tests 11-18. Two are confirmed fixed:
 - **Tone volume, length and the clipped on-tone.** Done, and confirmed. The
   lead-in silence is now 125 ms, halved again in the second round.
 
-The other two failed a second time, and both diagnoses were wrong:
+The other two failed a second time, and both diagnoses were wrong. Both are now
+settled:
 
-- **The tray still did nothing at all.** Version 4 was accepted - the log now
-  proves it - so that was never the whole story. The real fault was that the
-  shell **sends** the callback, and a sent message is dispatched straight to the
-  window procedure and never returned by `GetMessage`, which is the only place
-  the app was looking. See 4.4.
-- **The trackpad still woke keep-alive.** Inferring the source from the cursor
-  position was the wrong tool twice over. The mouse now reports itself, through
-  raw mouse input. See 4.1.
+- **The tray.** Fixed and signed off in the third round. The shell **sends** its
+  callback, and a sent message is dispatched straight to the window procedure
+  and never returned by `GetMessage`, which was the only place the app looked.
+  The duplicated name and the dead `Enter` were ghost icons left by killed
+  processes. See 4.4.
+- **The trackpad.** Raw mouse input was the right mechanism all along and was
+  working. The fault was a **race**: `GetLastInputInfo` is stamped before
+  `WM_INPUT` is dispatched, so the leading event of a sweep found a stale
+  pointer tick and read as a keypress - and the leading event is the one that
+  wakes. An input no pointing device accounts for is now held 250 ms before it
+  is called the keyboard. See 4.2 and question 17.
+
+A fifth request came out of the third round:
+
+- **A settings item in the tray menu.** The tester asked for one, unprompted,
+  and it belongs with Milestone 4.
 
 ### Known residual risks, still untested
 
 - Whether zeros still works after a much longer idle gap - an hour away from
   the desk rather than 30 seconds (question 6).
 - Behaviour across Windows sleep/resume, and on battery (question 7).
+- Whether holding an unattributed input for 250 ms actually stops the trackpad
+  waking keep-alive (question 18). The timing is measured, the logic is
+  unit-tested, the hardware is untried.
 
 ### What is next
 
-**Milestone 3 needs a third hardware round**, and only for the two things that
-have now failed twice. `test.txt` is the script; Tests 24-26.
+**Milestone 4, the settings dialog** - which carries three things the tester
+has now asked for directly: that the idle timeout be easy to change, that the
+hotkey be customisable, and that the tray menu have a settings item.
 
-Unlike the previous two rounds, both fixes have been **demonstrated on this
-machine** rather than reasoned about - see Milestone 3 in section 7 for what
-was measured and how. What cannot be checked from here is whether the icon the
-tester reaches with `Win+B` is actually ours, which is why every tray callback
-is now written to the log: if `Enter` produces no line, the icon being pressed
-belongs to a dead process, and that is a different problem with a different
-fix.
+**One thing rides along with that round:** the trackpad fix has never been
+tried against a real trackpad. It needs no round of its own - question 18 is a
+three-minute check to fold into the Milestone 4 script.
 
 The console harness is **kept alongside** the tray, on its own stdin thread,
 rather than replaced as originally planned. It is the only diagnostic interface
@@ -316,6 +327,28 @@ This is simpler than enumerating individual audio sessions, and it works because
 Consequence for Milestone 2: **the engine must log state transitions to a file, not just the console.** A log that can be read after the fact, when the headset is quiet, is the only way to verify idle behaviour without the act of observing changing the result. This will matter again when tuning the idle timeout.
 
 **The signal/metering conflict is now moot.** It was real: sine at 1% (0.01) would have tripped our own detector and prevented release. But zeros won 2.3, and zeros has a literal peak of 0.0, so there is no self-detection risk at all on the default path. The coupling only returns if someone switches to sine for other hardware - at which point the app should either force the per-session method or refuse to combine sine with idle-based release. **Guard against that combination in code rather than leaving it as a trap.**
+
+**Telling the keyboard from the mouse, and the race that hid in it.** The
+tester asked in Milestone 2 for the mouse to stop waking keep-alive. Three
+attempts were needed. Two tried to infer the source from the cursor position
+and both failed on hardware; the mouse now reports itself through raw mouse
+input, mouse usage page only, payload never read, so the no-key-data property
+that ruled out a keyboard hook is intact.
+
+That mechanism was right and still failed a third time, because of a race
+between two clocks rather than anything about identifying the device.
+`GetLastInputInfo` is stamped by the system the instant input lands; `WM_INPUT`
+must be queued and dispatched to us afterwards. A poll landing in the gap finds
+a pointer tick that is still stale and calls the input a keypress. Only the
+*leading* event of a sweep can lose that race - after it the pointer tick is
+never stale again - and the leading event is precisely the one that wakes,
+which is why the fault looked like a misidentification for two rounds.
+
+So an input no pointing device accounts for is **held for 250 ms and judged
+when the wait is up**. Input the mouse already accounts for is decided
+immediately; there is nothing left to wait for. The hold must not restart on
+each new input, or somebody typing steadily would never pause long enough to be
+noticed at all - a unit test pins that.
 
 ### 4.3 Settings
 
@@ -558,11 +591,66 @@ Raw results are in `test-milestone-3-round-2.txt`, Tests 19-23.
 
 Also settled, and worth recording because they were the whole point of the milestone: the earcons are **right** - volume, length, shape, no clicks - and automatic transitions are **silent**, with "I heard no tones, which was perfect."
 
-### Still open after the second round
+### Resolved by the third Milestone 3 round (2026-09-05)
 
-15. **Does the tray work from the keyboard?** Failed again, identically: no menu, `Enter` does nothing, and the icon's name still read twice over. The first diagnosis was incomplete - version 4 is accepted, which the log now proves - and the actual fault was that a *sent* message never comes back out of `GetMessage`. That is fixed and demonstrated locally. What cannot be checked from here is whether the icon being pressed is ours at all: if it is a ghost from a killed process, none of this helps. Every callback is now logged, which settles it either way. Test 24.
+Raw results are in `test-milestone-3-round-3.txt`, Tests 24-26.
 
-17. **Does the trackpad still wake keep-alive?** Failed twice. Both fixes tried to infer the source from the cursor position and both were wrong; the mouse now reports itself through raw mouse input. Demonstrated locally on synthesised input, never on a real trackpad. Test 25.
+15. ~~Does the tray work from the keyboard?~~ **Yes, finally.** One icon, not
+    two. JAWS reads `StableSound: headphones free` - once, correctly. `Enter`
+    toggles keep-alive and toggles it exactly once per press. The context menu
+    opens on the Applications key, arrows correctly, and both items work. The
+    diagnosis was right: the shell **sends** its callback, and a sent message
+    never comes back out of `GetMessage`. The tester's verdict: "everything
+    worked beautifully and felt great to use."
+
+    The duplicated name and the dead `Enter` were indeed ghost icons from
+    killed processes - removing the icon on console close fixed both, and the
+    reboot before the round cleared the existing corpses.
+
+17. ~~Does the trackpad still wake keep-alive?~~ **It did, and the log finally
+    said why.** Raw mouse input was the right mechanism and was working - 42
+    events were correctly attributed to the mouse. The fault was a race, not a
+    misidentification, and it is now fixed by holding the decision. See below
+    and 4.2.
+
+### What the log showed about the trackpad
+
+Worth recording in full, because two rounds were lost to guessing at this from
+the outside and the third round's diagnostics settled it in three lines:
+
+```
+12:02:06 input seen, no mouse activity ever recorded -> keyboard
+12:02:06 woken by keyboard input
+12:02:06 input seen, mouse active 0 ms before it -> mouse
+```
+
+Every event of a trackpad sweep **except the first** was attributed correctly.
+The first is the one that wakes. `GetLastInputInfo` is stamped the instant the
+input lands, while `WM_INPUT` has to be queued and dispatched to us afterwards;
+polling in the gap between the two finds a pointer tick that is still stale, so
+the leading event of every sweep read as a keypress. Once a sweep is under way
+the pointer tick is never stale again, which is exactly why the fault looked
+like a misidentification and survived two rounds of being reasoned about.
+
+**How late is `WM_INPUT`, measured?** Both spurious wakes in the round are
+followed within a single 100 ms engine tick by a pointer event aged 16 ms and
+0 ms respectively. So the mouse reports itself in **under 100 ms**. The hold is
+set to 250 ms, which is margin over a measured figure rather than another
+guess, and the log now prints the real number as a negative pointer age
+alongside the wait that caught it - so it can be tightened on evidence.
+
+The three remaining wakes in the round had no pointer event behind them at all
+(ages of 6 s, 56 s and 219 s). Those were the genuine keypresses of Tests 25.8
+and 25.9, correctly handled then and untouched by the fix.
+
+### Still open after the third round
+
+18. **Does holding the decision stop the trackpad waking keep-alive?** The
+    mechanism is now understood rather than guessed at, the timing figure is
+    measured from the tester's own log, and the logic is unit-tested including
+    the leading-event case that failed. But it has never been tried against a
+    real trackpad. Fold into the Milestone 4 round; the tester has said the
+    trackpad is "a nice to have, not a dealbreaker" and asked to move on.
 
 ### Noted, not a defect
 
@@ -620,7 +708,7 @@ Not worth fixing in the harness - Milestone 3 makes state changes audible throug
 
 The console harness in `main.rs` was scaffolding for testing the engine. Milestone 3 adds the tray and hotkey **alongside** it rather than replacing it, so there is still a diagnostic interface while the GUI is unproven; Milestone 6 removes it.
 
-**Milestone 3 - control surface. BUILT (2026-09-05), two hardware rounds done, sound signed off, tray and mouse rebuilt, third round pending.**
+**Milestone 3 - control surface. DONE (2026-09-05), three hardware rounds. Sound signed off in the second, tray in the third. One fix - the trackpad race - is unproven on hardware; question 18.**
 
 Built: the global hotkey with its own parser and a refusal to register a bare key; earcons rendered into the keep-alive stream, with an anti-click envelope; the tray icon, its real Win32 menu and an icon drawn in code; the hidden window and message loop; and the keyboard-only wake change carried over from Milestone 2's round. Design detail in 4.4.
 
@@ -684,7 +772,27 @@ Two design points settled while building:
 - Cost of the raw input stream measured: ~75 us per event, about 1 % of one core at a trackpad's 125 Hz while moving, nothing when still.
 - 30 unit tests, clippy clean, release binary 273 KB.
 
-**Still not verifiable from here:** whether the icon the tester actually reaches with `Win+B` is ours, and whether a real trackpad behaves like synthesised input. Third round is `test.txt`, Tests 24-26.
+**Still not verifiable from here:** whether the icon the tester actually reaches with `Win+B` is ours, and whether a real trackpad behaves like synthesised input. Third round is `test-milestone-3-round-3.txt`, Tests 24-26.
+
+**Third hardware round (2026-09-05), raw notes in `test-milestone-3-round-3.txt`:**
+
+- Test 24, the tray: **passed, completely.** One icon, name read once and correctly, `Enter` toggles once per press, menu opens on the Applications key and arrows properly, both items work, clean exit and the icon goes. The log carried the `tray callback` lines that would have settled it either way, and they were there. "Everything worked beautifully and felt great to use."
+- Test 25, the trackpad: **failed a third time - but the log said why**, which was the point of building it. See question 17. The keyboard side was flawless: never woke without a keypress, never failed to wake with one.
+- Test 26, living with it: **passed.** No clipping, nothing unasked-for, and the shorter lead-in is good. Verdict: "keyboard perfect, trackpad needs fixing."
+
+The round also produced one request: **a settings item in the tray menu**, which belongs with Milestone 4.
+
+**Fix applied after the third round - the last one:**
+
+**An input that no pointing device accounts for is held before it is judged.** Raw mouse input was never the problem; the two clocks were. `GetLastInputInfo` is stamped the instant input lands, `WM_INPUT` is queued and dispatched afterwards, and a poll landing between the two finds a stale pointer tick - so the *leading* event of every sweep read as a keypress, and the leading event is the one that wakes. Such an input now waits 250 ms and is judged when the wait is up, by which time the `WM_INPUT` explaining it has arrived. Input the mouse already accounts for is still decided on the spot. See 4.2.
+
+The 250 ms is **measured, not guessed**: in the tester's own log both spurious wakes are followed within a single 100 ms engine tick by a pointer event aged 16 ms and 0 ms, putting the real gap under 100 ms. The log now records the figure directly - a negative pointer age next to the wait that caught it - so it can be tightened on evidence rather than reopened as a guess.
+
+Cost: waking on the keyboard is 250 ms later than it was. That lands where it is affordable. Waking from a release means reconnecting Bluetooth, measured at around three seconds, so a quarter-second on the front of it is nothing; and when keep-alive is already on, the wake path only postpones the idle timer.
+
+**Verified:** 38 unit tests, including the leading-event case that failed on hardware, a steady-typing case that would catch a hold which never expires, and the tick-counter wrap. `cargo clippy -- -D warnings` clean.
+
+**Not verified:** the fix against a real trackpad. Question 18, folded into the Milestone 4 round.
 
 **Milestone 4 — settings.** The `winsafe` dialog, config load/save, second hotkey to open settings. Test the whole dialog under JAWS with the screen off.
 

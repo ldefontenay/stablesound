@@ -88,9 +88,10 @@ Then build and run from the repo root:
 Have the AeroClips connected and set as the default output.
 
 ANSWER - did you reboot, or sign out and back in, before running?
+Yes, I rebooted Windows.
 
 ANSWER - did the app start cleanly?
-
+Yes.
 
 ===========================================================
 TEST 24 - THE TRAY
@@ -106,31 +107,39 @@ Steps:
    many StableSound items you find.
 
 ANSWER - how many StableSound entries were there?
+1
 
 ANSWER - what exactly did JAWS read for each one? If the name is still
 read twice over in a single entry, please say so.
+Jaws read "StableSound: headphones free". Perfect.
 
 2. Move to a StableSound icon and press Enter.
 
 ANSWER - did keep-alive toggle? You should hear a tone.
+Yes, very nice.
 
 3. Press Enter on it a few more times.
 
 ANSWER - did each press toggle exactly once, or did any press seem to
 do nothing?
+Each press toggled once.
 
 4. With the icon focused, press the Applications key, or Shift+F10.
 
 ANSWER - did a menu open? If it did, what did JAWS read, and could you
 arrow through the items?
+The menu opened and I could arrow through the items. The menu read: Release the headphones, r; Open the log file, l; Exit StableSound,x
+In a future version of the app, we'll need a menu item to open the app settings, but I'm sure you're already planning that.
 
 5. If the menu opened, choose "Open the log file".
 
 ANSWER - did the log open in something you could read?
+The log opened and I could read the text. The codes meant nothing to me, but that's fine, as I think they're more for your benefit when debugging. In the final version, I wouldn't want the app to be consuming resources on logging anyway, but of course that's important for now.
 
 6. If the menu opened, use it once more and choose "Exit StableSound".
 
 ANSWER - did it quit cleanly, and did the icon disappear?
+Yes, it quit cleanly and the icon disappeared.
 
 7. IMPORTANT, whether or not any of the above worked. Open the log file
    - it is stablesound.log next to the exe - and look near the end for
@@ -138,9 +147,16 @@ ANSWER - did it quit cleanly, and did the icon disappear?
 
 ANSWER - is there a line saying "tray icon added, shell notification
 version 4 accepted"? Please copy it.
+Yes: 2026-09-05 11:34:42 tray icon added, shell notification version 4 accepted
 
 ANSWER - are there any lines saying "tray callback" followed by a
 number? Roughly how many, and please copy two or three.
+There were a large number of them, look at the log and count them if you need an exact number. Here are the first few:
+2026-09-05 11:36:10 tray callback 0x0204
+2026-09-05 11:36:10 tray callback 0x0205
+2026-09-05 11:37:53 tray callback 0x0201
+2026-09-05 11:37:53 tray callback 0x0202
+2026-09-05 11:37:53 tray callback 0x0400
 
 This last answer is the one that matters most. If you pressed Enter on
 the icon and there is no "tray callback" line at all, then the icon you
@@ -148,6 +164,7 @@ pressed does not belong to this program, and that is a completely
 different problem from the one I have been trying to fix.
 
 ANYTHING ODD:
+No, everything worked beautifully and felt great to use.
 
 
 ===========================================================
@@ -167,35 +184,41 @@ Steps:
 
 ANSWER - did keep-alive stay off? It should. Listen for a rising tone,
 which would mean it came back on.
+It came back on. No rising tone, likely due to the requested fix after previous testing round, but the app reported that it came back on.
 
 7. Try a short flick. Then try tapping the trackpad without moving.
    Then try resting a finger on it and lifting it off again. Do not
    touch a key during any of this.
 
 ANSWER - did any of those wake it?
+Yes, woke on all three.
 
 8. Now press a key.
 
 ANSWER - did keep-alive come back on?
+Yes.
 
 9. Work normally for a few minutes, using the keyboard as you usually
    would.
 
 ANSWER - did keep-alive ever wake when you had not touched a key?
+No.
 
 ANSWER - did it ever fail to wake when you did touch a key?
+No.
 
 10. Open the log and look for lines containing "input seen".
 
 ANSWER - please copy three or four of those lines. They read like
 "input seen, mouse active 40 ms before it -> mouse", and they say
 exactly what the app decided and what it decided it on.
+I suggest you read the log yourself, between 12:00 and 12:13. There are a great many such lines and I guess the variations are important.
 
 11. Type: diag off
     (otherwise the log will stay very long)
 
 ANYTHING ODD:
-
+No.
 
 ===========================================================
 TEST 26 - A SHORT SESSION
@@ -205,18 +228,22 @@ Half an hour of ordinary work, with the tray and the trackpad now
 behaving - or not.
 
 ANSWER - did speech ever clip?
+No.
 
 ANSWER - did keep-alive ever come on or go off when you had not asked
 for it?
+No.
 
 ANSWER - is the on-tone better at the shorter delay, or did the start
 of it get clipped again?
+Its good.
 
 ANSWER - anything at all still wrong before we move on to the settings
 dialog?
+Keyboard perfect, trackpad needs fixing.
 
 ANYTHING ODD:
-
+No.
 
 ===========================================================
 ANYTHING ELSE
@@ -224,3 +251,8 @@ ANYTHING ELSE
 
 ANSWER - anything at all, in any of this, that felt wrong or that you
 would want done differently:
+No, the system tray is great.
+
+
+Remark:
+The functionality of the app is great at the moment. The trackpad issue is a nice to have, but not a dealbreaker. If this can't be easily addressed, I'm happy to park it for later and move to the next stage.
