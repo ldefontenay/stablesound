@@ -7,10 +7,11 @@
 Milestones 0, 1, 2 and 3 are complete, hardware rounds included. Milestone 3
 took **three** rounds: the sound side was signed off in the second, the tray in
 the third, and the trackpad was diagnosed in the third from the diagnostic log
-and fixed afterwards. That one fix is the only thing in the app not yet seen
-working on hardware.
+and fixed afterwards.
 
-**Next is Milestone 4, the settings dialog.**
+**Milestone 4, the settings dialog, is built and needs its hardware round.**
+Two things in the app have never been seen working on real hardware: the
+trackpad fix, and the whole dialog. Both are in the one round.
 
 ### What exists and works
 
@@ -80,10 +81,11 @@ settled:
   wakes. An input no pointing device accounts for is now held 250 ms before it
   is called the keyboard. See 4.2 and question 17.
 
-A fifth request came out of the third round:
+A fifth request came out of the third round, and is now done:
 
-- **A settings item in the tray menu.** The tester asked for one, unprompted,
-  and it belongs with Milestone 4.
+- **A settings item in the tray menu.** The tester asked for one, unprompted.
+  Built in Milestone 4, along with a second global hotkey that opens the same
+  dialog - CLAUDE.md does not allow the tray to be the only route to anything.
 
 ### Known residual risks, still untested
 
@@ -93,16 +95,23 @@ A fifth request came out of the third round:
 - Whether holding an unattributed input for 250 ms actually stops the trackpad
   waking keep-alive (question 18). The timing is measured, the logic is
   unit-tested, the hardware is untried.
+- How JAWS reads the settings dialog (question 19). Real controls and correct
+  tab order are confirmed from outside; the reading is not.
 
 ### What is next
 
-**Milestone 4, the settings dialog** - which carries three things the tester
-has now asked for directly: that the idle timeout be easy to change, that the
-hotkey be customisable, and that the tray menu have a settings item.
+**The Milestone 4 hardware round.** `test.txt` is the script; Tests 27-32. It
+covers the dialog under JAWS and, in three minutes at the top, the trackpad fix
+that came out of the third Milestone 3 round.
 
-**One thing rides along with that round:** the trackpad fix has never been
-tried against a real trackpad. It needs no round of its own - question 18 is a
-three-minute check to fold into the Milestone 4 script.
+What the round has to answer is only ever one thing: **how JAWS actually reads
+the dialog.** Everything checkable from this machine has been checked by
+driving the running app from another process - the controls are real, the tab
+order is right, every setting populates and saves, a bad hotkey is refused, the
+global hotkey keeps working while the dialog is open. None of that says whether
+the reading makes sense to somebody who cannot see it.
+
+**Then Milestone 5.**
 
 The console harness is **kept alongside** the tray, on its own stdin thread,
 rather than replaced as originally planned. It is the only diagnostic interface
@@ -352,19 +361,29 @@ noticed at all - a unit test pins that.
 
 ### 4.3 Settings
 
+All of these are now in the dialog (Milestone 4) unless marked otherwise:
+
 - Target device: default output, or a specific device (remembered by name, surviving re-plugging)
-- Keep-alive signal: fluctuate / inaudible sine (frequency + amplitude) / pure zeros
+- Keep-alive signal: fluctuate / inaudible sine / pure zeros. **The sine frequency and amplitude are not in the dialog** - they are a last resort for hardware the other two fail on, they mean nothing without each other, and two more numeric fields in front of every user is a poor trade for that. The config file still carries them, and choosing the tone in the dialog keeps whatever is in the file.
 - Release mode: idle-based (default) or fixed timer
 - Idle timeout: seconds, default 30 s (settled 2026-08-30, confirmed 2026-09-05). **Must be easy to change from the dialog** - the tester asked for this directly.
-- Fixed timer duration
-- Global hotkey: user-assignable
+- Fixed timer duration - the same field; only one mode applies at a time
+- Global hotkey: user-assignable. **Typed, not captured** - see below.
+- Second global hotkey to open the dialog, default `Ctrl+Win+F11`
 - Wake on input: keyboard on by default; mouse a separate option, off by default (see 4.1)
-- Start with Windows: on/off
-- Earcons: on/off, volume
+- Start with Windows: on/off. **Kept in the registry, not the config file** - see below.
+- Earcons: on/off, volume (shown as a percentage; "10" is far easier to hear and retype than "0.1")
+- Logging on/off, and the diagnostic detail flag
 
 Dropped from this list: **hard release**, now deferred indefinitely (see 2.4).
 
 Stored as a small config file next to the exe if that location is writable, otherwise in `%APPDATA%` — this keeps the portable build genuinely portable.
+
+**The hotkeys are typed, not captured.** Windows has a `HOTKEY` control that records whatever combination you press into it. It is wrong here twice over: a screen reader user pressing a combination gets no readable confirmation of what was captured, and the control cannot express the Windows key at all - which the default `Ctrl+Win+F12` needs. A plain edit box holding `ctrl+win+f12` is readable, reviewable, correctable a character at a time, and parsed by the same `Hotkey::parse` that reads the config file, so the dialog and the file cannot disagree.
+
+**"Start with Windows" is not a config setting.** What decides it is a value under the `HKCU` `Run` key. A copy in `stablesound.conf` could disagree with it - somebody clears the value with an autoruns tool, or copies a config between machines - and the checkbox would then report something untrue. The registry is the single source of truth and the dialog reads it directly.
+
+**Two identical hotkeys are pulled apart by `validate`.** A combination can be registered once; the second registration fails and that function is left with no key at all. The dialog refuses it up front and the config loader corrects it.
 
 ### 4.4 The control surface (Milestone 3)
 
@@ -533,7 +552,9 @@ These are requirements, not nice-to-haves:
 ## 5. Stack
 
 - **Rust**, stable-msvc toolchain
-- **`winsafe`** — native Win32 controls, settings dialog. Pinned to an exact version (it's 0.0.x and the API churns). **Not yet a dependency:** Milestone 3 needed a hidden window, a tray icon and a menu, none of which are *controls*, so it used the `windows` crate already present rather than pulling in a second GUI crate early. The choice for the Milestone 4 dialog is still open - `winsafe`, or raw `windows` with a real dialog resource. The constraint in CLAUDE.md is *real Win32 controls*, and both satisfy it; `winsafe` is a means to that end, not the end itself. Decide it at the start of Milestone 4, and weigh that `winsafe` wants to own the main window and message loop, which this app already has.
+- **`winsafe`** — **not used, and now decided against** (2026-09-05). The Milestone 4 dialog is built from a real Win32 dialog template compiled by rc.exe, driven with the `windows` crate the app already depends on. The constraint in CLAUDE.md is *real Win32 controls*, and `winsafe` was only ever a means to that end. Three things settled it: the template gives tab order, mnemonics, the default button, Escape and label-to-control naming from Windows itself, which is more than the constraint asks for; `winsafe` wants to own the main window and message loop, and this app already has one for the tray, hotkey and raw mouse stream; and it would cost a dependency against a hard size budget for controls that come free either way. The whole dialog added **22 KB**.
+
+- **`embed-resource`** — a *build* dependency, running rc.exe over `stablesound.rc`. Nothing of it ships. Weighed against the size budget and it costs nothing at runtime; the compiled template itself is a couple of kilobytes.
 - **`windows-sys`** or **`windows`** — WASAPI (`IAudioClient`, `IAudioRenderClient`, `IMMDeviceEnumerator`, `IAudioMeterInformation`), plus `RegisterHotKey` and `Shell_NotifyIcon`
 - **`embed-manifest`** — build dependency, for the app manifest
 - Release profile tuned for size: `opt-level = "z"`, LTO, `panic = "abort"`, strip symbols
@@ -649,8 +670,22 @@ and 25.9, correctly handled then and untouched by the fix.
     mechanism is now understood rather than guessed at, the timing figure is
     measured from the tester's own log, and the logic is unit-tested including
     the leading-event case that failed. But it has never been tried against a
-    real trackpad. Fold into the Milestone 4 round; the tester has said the
-    trackpad is "a nice to have, not a dealbreaker" and asked to move on.
+    real trackpad. Folded into the Milestone 4 round as Test 27; the tester
+    said the trackpad is "a nice to have, not a dealbreaker" and asked to move
+    on.
+
+19. **How does JAWS read the settings dialog?** Everything checkable from this
+    machine has been: real `#32770`, real controls, every label immediately
+    before the control it names, every input a tab stop, all settings
+    populating and saving, a bad hotkey refused with the focus returned to it,
+    and the global hotkey still working while the dialog is open. None of that
+    says whether the labels make sense heard aloud, whether the five groups
+    help or get in the way, or whether the error messages land. Tests 28-31.
+
+20. **Is a second global hotkey welcome, or one combination too many?**
+    `Ctrl+Win+F11` opens the settings. Every global hotkey is taken from every
+    other program on the machine, and the tester may prefer to reach the dialog
+    only through the tray. Easy to drop if so. Test 29.
 
 ### Noted, not a defect
 
@@ -794,7 +829,31 @@ Cost: waking on the keyboard is 250 ms later than it was. That lands where it is
 
 **Not verified:** the fix against a real trackpad. Question 18, folded into the Milestone 4 round.
 
-**Milestone 4 — settings.** The `winsafe` dialog, config load/save, second hotkey to open settings. Test the whole dialog under JAWS with the screen off.
+**Milestone 4 - settings. BUILT (2026-09-05), hardware round pending.**
+
+Built: the settings dialog as a real Win32 dialog template; a second global hotkey that opens it; a `Settings...` item in the tray menu and a `settings` console command; "start when I sign in"; and runtime switching of the log. Design detail in 4.3.
+
+**Three decisions worth keeping, because each one had a plausible alternative:**
+
+1. **A dialog template, not `winsafe`.** See section 5. The short version: the template gives more accessibility than the constraint asks for, `winsafe` would fight the message loop this app already owns, and the whole dialog cost 22 KB.
+
+2. **Modeless, not modal.** `DialogBoxParamW` would hand its answer straight back instead of over a channel, which is simpler. It also runs its own message loop, and that loop dispatches `WM_HOTKEY` to a window procedure that does not handle it - so the global hotkey would silently stop working for as long as the dialog was open. CLAUDE.md calls the hotkey the primary interface; that is not a trade worth making to save a channel. `IsDialogMessageW` in the existing loop gives the dialog its keyboard behaviour instead, and declines anything belonging to another window.
+
+3. **The console's config is now shared, not copied.** The console harness owned its own `Config`. With a dialog writing settings too, that copy would drift the moment the dialog was used, and `status` would report settings that are not in force - the exact class of thing that has already cost this project two hardware rounds.
+
+**Verified by driving the running app from another process:**
+
+- The dialog is a real `#32770` with 29 controls. Every label sits immediately before the control it names, and every input carries `WS_TABSTOP`. Tab order is template order, so the reading order is the tab order.
+- All settings populate from the config file correctly - device, signal, release mode, timeout, both hotkeys, all five checkboxes and the volume.
+- OK writes them back, saves the file and reloads the engine. A changed hotkey is re-registered live, and the log records the change.
+- A bare key with no modifier is refused: the message box explains, the dialog stays open, the focus returns to the offending field, and nothing is written.
+- **The global hotkey toggles keep-alive twice while the dialog is open, and the dialog stays up.** This is the whole justification for decision 2 above.
+- "Start when I sign in" reads 0 with no `Run` value and 1 with one, writes the quoted exe path, and removes it again.
+- 41 unit tests, `cargo clippy --all-targets -- -D warnings` clean. Release binary **290 KB**, up from 268 KB, against the ~1 MB budget.
+
+**Not verifiable from here, and the only thing the round is for: how JAWS actually reads it.** Real controls and correct tab order do not guarantee that the labels make sense heard aloud, that the groups help rather than get in the way, or that the error messages land. Round is `test.txt`, Tests 27-32.
+
+**Milestone 5 — polish.** Whatever the Milestone 4 round asks for.
 
 **What the tester wants in it**, asked directly in the second round and worth building to rather than guessing:
 - The idle timeout (carried from Milestone 2 - "editing a config file by hand does not count as easy").

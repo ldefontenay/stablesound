@@ -1,0 +1,310 @@
+STABLESOUND - MILESTONE 4, THE SETTINGS DIALOG
+==============================================
+
+Created: 2026-09-05
+Status:  NOT STARTED
+
+There is now a settings dialog. This round is about how it reads with
+JAWS, which is the one thing I cannot check from here.
+
+It starts with three minutes on the trackpad, because that fix came out
+of your last round and has never been tried on real hardware.
+
+Your previous rounds are kept in test-milestone-3.txt,
+test-milestone-3-round-2.txt and test-milestone-3-round-3.txt.
+
+
+WHAT CHANGED
+------------
+
+1. The trackpad. Your log answered it. Three lines in a row, as you
+   swept:
+
+       input seen, no mouse activity ever recorded -> keyboard
+       woken by keyboard input
+       input seen, mouse active 0 ms before it -> mouse
+
+   Watching the mouse was right all along, and it was working - 42
+   events in your session were correctly put down to the mouse. The
+   fault was a race. Windows notes the time of your input the instant
+   your finger lands, but the mouse's own report has to be delivered to
+   the app afterwards. The app looked in the gap between the two, found
+   no mouse activity yet, and called it typing. Only the very first
+   event of a sweep can lose that race - and the first is the one that
+   wakes it.
+
+   So an input that nothing has claimed is now held for a quarter of a
+   second and judged when the wait is up, by which time the mouse has
+   spoken. The quarter second is measured from your log, not guessed:
+   in both of your accidental wakes the mouse reported itself in under
+   a tenth of a second.
+
+   The cost is that the keyboard now wakes keep-alive a quarter of a
+   second later than it did. That should be invisible, because waking
+   from a release means reconnecting Bluetooth anyway, which takes
+   about three seconds. Test 27 asks whether you notice.
+
+2. The settings dialog. Real Windows controls, not drawn ones -
+   combo boxes, edit fields, checkboxes, OK and Cancel, the same kinds
+   of control any Windows dialog has. Three ways to open it:
+
+       - the tray menu, "Settings..."
+       - Ctrl+Win+F11, from anywhere
+       - typing: settings
+
+3. The hotkeys are typed in as text, like "ctrl+win+f12", rather than
+   recorded by pressing them. I think typing is better for you - you
+   can read back what is there and correct one character - but tell me
+   if you would rather press the combination.
+
+4. There is now a second hotkey, Ctrl+Win+F11, which opens the
+   settings. Every global hotkey is one taken away from every other
+   program, so say if you would rather not have it.
+
+5. "Start StableSound when I sign in" is in the dialog.
+
+
+BEFORE YOU START
+----------------
+
+Build and run from the repo root:
+
+    cargo run
+
+Have the AeroClips connected and set as the default output.
+
+ANSWER - did the app start cleanly?
+
+
+===========================================================
+TEST 27 - THE TRACKPAD, ONE LAST TIME
+===========================================================
+
+Steps:
+
+1. Type: idle 10
+2. Type: mouse off
+3. Press Ctrl+Win+F12 to switch keep-alive on.
+4. Sit quietly for about fifteen seconds so it releases on its own.
+5. Now sweep the trackpad deliberately, and do not touch any key.
+
+ANSWER - did keep-alive stay off? It should. It will not announce
+itself either way, so the way to tell is that nothing happens.
+
+
+6. Try a short flick. Then tap the trackpad without moving. Then rest a
+   finger on it and lift it off again. No keys during any of this.
+
+ANSWER - did any of those wake it?
+
+
+7. Now press a key.
+
+ANSWER - did keep-alive come back on?
+
+
+8. Work normally for a few minutes, using the keyboard as you usually
+   would.
+
+ANSWER - did keep-alive ever wake when you had not touched a key?
+
+
+ANSWER - did it ever fail to wake when you did touch a key?
+
+
+9. This is the one I am least sure about. Waking on a keypress is now a
+   quarter of a second slower than it was.
+
+ANSWER - did typing after a pause feel any slower to bring the sound
+back, or did you notice nothing?
+
+
+ANYTHING ODD:
+
+
+===========================================================
+TEST 28 - OPENING THE DIALOG, AND READING IT
+===========================================================
+
+Steps:
+
+1. Press Ctrl+Win+F11.
+
+ANSWER - did a dialog open, and what did JAWS say when it did?
+
+
+2. Press Tab slowly all the way through the dialog, to the end and
+   round again. Do not change anything yet.
+
+ANSWER - this is the important one. For each thing you land on, did
+JAWS tell you what it was and what it was set to? Please say which ones
+read well and which did not. If any control was read without a name, or
+with the wrong name, that is exactly what I need to know.
+
+
+3. The dialog is in five groups: keeping the headphones awake, waking
+   up again, tones, hotkeys, the log file, and starting up.
+
+ANSWER - did JAWS announce the groups, and did they help you find your
+way around, or did they get in the way?
+
+
+4. Try Alt with an underlined letter - for example Alt+O for the output
+   device, Alt+K for the keyboard checkbox, Alt+V for tone volume.
+
+ANSWER - did those jump you to the right place?
+
+
+5. Find the two combo boxes near the top and arrow through their
+   choices without opening them.
+
+ANSWER - did the choices read sensibly? The device one should offer
+"Default output (follow Windows)" and then your real devices.
+
+
+ANSWER - is anything in the dialog worded confusingly? These are my
+words and you are the one who has to hear them. Anything you would say
+differently is worth telling me.
+
+
+ANYTHING ODD:
+
+
+===========================================================
+TEST 29 - CHANGING SOMETHING
+===========================================================
+
+Steps:
+
+1. In the dialog, find "After this many seconds" and set it to 20.
+2. Press Enter, or Tab to OK and press it.
+
+ANSWER - did the dialog close?
+
+
+3. Type: status
+
+ANSWER - does it say the timeout is 20?
+
+
+4. Switch keep-alive on with Ctrl+Win+F12 and leave it alone.
+
+ANSWER - did it release after about twenty seconds rather than thirty?
+
+
+5. Open the settings again, this time from the tray: Windows+B, arrow to
+   StableSound, press the Applications key, and choose "Settings...".
+
+ANSWER - was the Settings item there, and did it open the dialog?
+
+
+6. Press Escape.
+
+ANSWER - did the dialog close and leave everything as it was?
+
+
+7. About the second hotkey. Ctrl+Win+F11 now belongs to StableSound and
+   no other program can use it.
+
+ANSWER - is that worth it to you, or would you rather reach the settings
+only from the tray and have the combination back?
+
+
+ANYTHING ODD:
+
+
+===========================================================
+TEST 30 - WHEN YOU TYPE SOMETHING WRONG
+===========================================================
+
+Steps:
+
+1. Open the settings.
+2. Find "Hotkey to toggle keep-alive" and change it to just: f12
+   (that is deliberately wrong - a key with no Ctrl, Alt, Shift or Win
+   would be taken away from every other program on the machine)
+3. Press OK.
+
+ANSWER - what happened, and did JAWS read it to you?
+
+
+ANSWER - after you dismissed the message, where was the focus? It is
+meant to put you back in the field that was wrong.
+
+
+4. Now put it back to ctrl+win+f12 and press OK.
+
+ANSWER - did that work?
+
+
+5. Open the settings again and set the toggle hotkey to something new
+   that you would actually like - anything with ctrl, alt, shift or win
+   and one key. Press OK, then try the new combination.
+
+ANSWER - did the new hotkey work straight away, without restarting?
+
+
+ANSWER - did the old one stop working?
+
+
+ANYTHING ODD:
+
+
+===========================================================
+TEST 31 - THE HOTKEY WHILE THE DIALOG IS OPEN
+===========================================================
+
+I made a specific choice here and want to know if it was the right one.
+The settings dialog does not lock up the rest of the app, so the toggle
+hotkey still works while it is open.
+
+Steps:
+
+1. Open the settings and leave it open.
+2. Without closing it, press Ctrl+Win+F12.
+
+ANSWER - did keep-alive toggle, and did you hear the tone?
+
+
+ANSWER - did the dialog stay open and still work afterwards?
+
+
+3. With the dialog open, press Ctrl+Win+F11 again.
+
+ANSWER - did it bring the dialog you already had back to the front,
+rather than opening a second one?
+
+
+ANYTHING ODD:
+
+
+===========================================================
+TEST 32 - LIVING WITH IT
+===========================================================
+
+Half an hour of ordinary work.
+
+ANSWER - did speech ever clip?
+
+
+ANSWER - did keep-alive ever come on or go off when you had not asked?
+
+
+ANSWER - now that the settings are in a dialog, would you still want the
+typed commands, or is the dialog enough? I plan to remove the console
+window eventually and want to know how much you rely on it.
+
+
+ANSWER - is there any setting in the dialog you would never touch, or
+any missing that you would want?
+
+
+ANYTHING ODD:
+
+
+===========================================================
+ANYTHING ELSE
+===========================================================
+
+ANSWER - anything at all, in any of this, that felt wrong or that you
+would want done differently:
