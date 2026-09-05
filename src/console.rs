@@ -140,18 +140,6 @@ fn run(shared: &Mutex<Config>, commands: &Sender<Command>, hwnd_bits: isize) {
                 _ => println!("Usage: wake on | wake off"),
             },
 
-            "mouse" => match rest {
-                "on" => {
-                    cfg.wake_on_mouse = true;
-                    apply(cfg, commands);
-                }
-                "off" | "" => {
-                    cfg.wake_on_mouse = false;
-                    apply(cfg, commands);
-                }
-                _ => println!("Usage: mouse on | mouse off"),
-            },
-
             "earcons" => match rest {
                 "on" | "" => {
                     cfg.earcons = true;
@@ -272,10 +260,10 @@ pub fn describe(cfg: &Config) {
     );
     println!(
         "Wake:    {}",
-        match (cfg.wake_on_input, cfg.wake_on_mouse) {
-            (false, _) => "off - only the hotkey starts it".to_string(),
-            (true, false) => "keyboard only".to_string(),
-            (true, true) => "keyboard and mouse".to_string(),
+        if cfg.wake_on_input {
+            "on - any input brings keep-alive back"
+        } else {
+            "off - only the hotkey starts it"
         }
     );
     println!(
@@ -303,8 +291,7 @@ pub fn help() {
     println!("  idle <seconds>        release after N seconds with no audio");
     println!("  fixed <seconds>       release N seconds after switching on");
     println!("  device <name>         target a device by name, or 'device default'");
-    println!("  wake on | wake off    bring keep-alive back on keyboard input");
-    println!("  mouse on | mouse off  let the mouse wake it too (off by default)");
+    println!("  wake on | wake off    bring keep-alive back when you use the machine");
     println!("  earcons on | off      the tones for switching on and off by hand");
     println!("  volume <0.0-1.0>      how loud those tones are");
     println!("  hotkey <combination>  for example: hotkey ctrl+win+f12");

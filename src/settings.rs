@@ -15,9 +15,9 @@
 //! button, Escape to cancel and the reading of a label as its control's name
 //! all come from Windows, so a screen reader meets exactly the dialog it meets
 //! everywhere else. `winsafe` was the other candidate; it wants to own the
-//! window and message loop, which this app already has for the tray, hotkey
-//! and raw mouse stream, and it would have cost a dependency against a hard
-//! size budget for controls we get either way.
+//! window and message loop, which this app already has for the tray and the
+//! hotkey, and it would have cost a dependency against a hard size budget for
+//! controls we get either way.
 //!
 //! # Why it is modeless
 //!
@@ -74,7 +74,6 @@ const IDC_SIGNAL: i32 = 1002;
 const IDC_RELEASE: i32 = 1003;
 const IDC_TIMEOUT: i32 = 1004;
 const IDC_WAKE_INPUT: i32 = 1005;
-const IDC_WAKE_MOUSE: i32 = 1006;
 const IDC_EARCONS: i32 = 1007;
 const IDC_VOLUME: i32 = 1008;
 const IDC_HOTKEY: i32 = 1009;
@@ -273,7 +272,6 @@ fn populate(hwnd: HWND, state: &State) {
     set_int(hwnd, IDC_TIMEOUT, secs);
 
     check(hwnd, IDC_WAKE_INPUT, cfg.wake_on_input);
-    check(hwnd, IDC_WAKE_MOUSE, cfg.wake_on_mouse);
     check(hwnd, IDC_EARCONS, cfg.earcons);
     // Stored as an amplitude, shown as a percentage: "10" is a far easier
     // thing to read out, hear and retype than "0.1".
@@ -330,7 +328,6 @@ fn read(hwnd: HWND, state: &State) -> Option<Config> {
     };
 
     cfg.wake_on_input = checked(hwnd, IDC_WAKE_INPUT);
-    cfg.wake_on_mouse = checked(hwnd, IDC_WAKE_MOUSE);
     cfg.earcons = checked(hwnd, IDC_EARCONS);
 
     let percent = get_int(hwnd, IDC_VOLUME);

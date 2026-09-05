@@ -10,10 +10,10 @@
 //! without any help from us.
 //!
 //! The window exists only to have a message queue. It is never shown. The
-//! hotkey, the tray and the raw mouse stream all arrive here, and `main` reads
-//! them off the queue rather than in a window procedure - which keeps every
-//! decision in one readable loop instead of in a callback that would need
-//! global state to reach the engine.
+//! hotkey and the tray callback both arrive here, and `main` reads them off
+//! the queue rather than in a window procedure - which keeps every decision in
+//! one readable loop instead of in a callback that would need global state to
+//! reach the engine.
 //!
 //! # Why there is a window procedure after all
 //!
@@ -69,8 +69,8 @@ use windows::Win32::UI::WindowsAndMessaging::{
     AppendMenuW, CreateIcon, CreatePopupMenu, CreateWindowExW, DefWindowProcW, DestroyIcon,
     DestroyMenu, DestroyWindow, GetCursorPos, PostMessageW, RegisterClassW, RegisterWindowMessageW,
     SetForegroundWindow, TrackPopupMenu, HICON, MF_SEPARATOR, MF_STRING, TPM_RETURNCMD,
-    TPM_RIGHTBUTTON, WINDOW_EX_STYLE, WM_APP, WM_CONTEXTMENU, WM_INPUT, WM_LBUTTONUP, WM_NULL,
-    WM_RBUTTONUP, WNDCLASSW, WS_OVERLAPPED,
+    TPM_RIGHTBUTTON, WINDOW_EX_STYLE, WM_APP, WM_CONTEXTMENU, WM_LBUTTONUP, WM_NULL, WM_RBUTTONUP,
+    WNDCLASSW, WS_OVERLAPPED,
 };
 
 /// Sent when the icon is activated with `Enter`. Defined by shellapi.h as
@@ -535,16 +535,6 @@ unsafe extern "system" fn wndproc(
                 let _ = PostMessageW(Some(hwnd), WM_TRAY_QUEUED, wparam, lparam);
             }
             LRESULT(0)
-        }
-        // Raw mouse input, which is how the app tells the mouse from the
-        // keyboard. Handled here rather than in the loop so it keeps working
-        // while a menu is open and the loop is not running. The payload is
-        // never read - see `input`.
-        WM_INPUT => {
-            crate::input::note_pointer_event();
-            // Still hand it on: the system reclaims the raw input buffer in
-            // its default handling.
-            unsafe { DefWindowProcW(hwnd, message, wparam, lparam) }
         }
         _ => unsafe { DefWindowProcW(hwnd, message, wparam, lparam) },
     }

@@ -122,7 +122,7 @@ pub enum Event {
         device: String,
         signal: String,
     },
-    /// Started because the user touched the keyboard or mouse.
+    /// Started because the user touched the machine.
     WokenByInput {
         device: String,
     },
@@ -269,20 +269,14 @@ fn run(mut config: Config, log: Log, commands: Receiver<Command>, events: Sender
         // setting on later compares against an ancient timestamp and fires a
         // spurious wake immediately.
         let seen = input.poll();
-        if config.diagnostics && seen.any {
-            log.write(&seen.explain());
-        }
-        if seen.wakes(config.wake_on_input, config.wake_on_mouse) {
+        if seen && config.wake_on_input {
             if rt.intent {
-                // Somebody is here and typing, so do not release out from
-                // under them just because nothing happens to be speaking.
+                // Somebody is here and using the machine, so do not release
+                // out from under them just because nothing happens to be
+                // speaking.
                 rt.last_audio = now;
             } else if rt.armed {
-                log.write(if config.wake_on_mouse {
-                    "woken by keyboard or mouse input"
-                } else {
-                    "woken by keyboard input"
-                });
+                log.write("woken by user input");
                 set_intent_on(&mut rt, Source::Input);
             }
         }

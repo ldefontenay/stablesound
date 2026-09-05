@@ -103,8 +103,8 @@ fn main() {
 
     banner(&cfg, &config_path, &log, &adjustments);
 
-    // Both of these have been wrong on hardware before, so both say so rather
-    // than failing quietly.
+    // This has been wrong on hardware before, so it says so rather than
+    // failing quietly.
     log.write(&format!(
         "tray icon added, shell notification version 4 {}",
         if tray.is_version4() {
@@ -113,18 +113,6 @@ fn main() {
             "REFUSED, falling back to version 3 messages"
         }
     ));
-    match input::watch_pointer(tray.hwnd()) {
-        Ok(()) => log.write("raw mouse input registered"),
-        Err(e) => {
-            // Without it nothing can be attributed to the mouse, so every
-            // input reads as the keyboard and 'mouse off' cannot work.
-            println!("WARNING: could not register for mouse input ({e}).");
-            println!("  Keep-alive will treat trackpad and mouse activity as typing,");
-            println!("  so it may wake when you did not mean it to.");
-            log.write(&format!("raw mouse input NOT registered: {e}"));
-        }
-    }
-
     // Claim the hotkeys before anything else can want them, and say plainly
     // if somebody already has one. A hotkey that silently does nothing is the
     // worst possible failure for the app's primary interface.

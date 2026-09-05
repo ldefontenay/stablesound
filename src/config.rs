@@ -78,8 +78,7 @@ pub struct Config {
     /// idle behaviour cannot be observed live, because reading the output with
     /// a screen reader generates the very audio being measured.
     pub logging: bool,
-    /// Bring keep-alive back automatically when the user touches the keyboard
-    /// or mouse.
+    /// Bring keep-alive back automatically when the user touches the machine.
     ///
     /// Requested after Milestone 2 testing. It fixes a real gap: once idle
     /// release has fired, the next thing to make a sound is often a
@@ -88,15 +87,11 @@ pub struct Config {
     ///
     /// This is *not* the same as waking on detected audio, which was rejected
     /// in `engine`: audio is a consequence of our own output, so it forms a
-    /// loop. Keyboard input is independent of anything the app does.
-    pub wake_on_input: bool,
-    /// Let the *mouse* wake it too, not just the keyboard.
+    /// loop. User input is independent of anything the app does.
     ///
-    /// Off by default, at the tester's request after the Milestone 2 hardware
-    /// round: they work without a mouse, and brushing the trackpad by accident
-    /// took the headset back off their phone. Kept as an option because
-    /// somebody who does use a mouse would reasonably want it.
-    pub wake_on_mouse: bool,
+    /// Any input counts, the mouse included. Excluding the mouse was tried
+    /// three ways over four hardware rounds and abandoned - see `input`.
+    pub wake_on_input: bool,
     /// The global toggle combination. The primary interface, not a shortcut.
     pub hotkey: Hotkey,
     /// The global combination that opens the settings dialog.
@@ -141,7 +136,6 @@ impl Default for Config {
             audio_threshold: 0.0005,
             logging: true,
             wake_on_input: true,
-            wake_on_mouse: false,
             hotkey: Hotkey::default(),
             settings_hotkey: Hotkey::settings_default(),
             earcons: true,
@@ -286,9 +280,6 @@ impl Config {
                 "wake_on_input" => {
                     cfg.wake_on_input = parse_bool(value).unwrap_or(cfg.wake_on_input)
                 }
-                "wake_on_mouse" => {
-                    cfg.wake_on_mouse = parse_bool(value).unwrap_or(cfg.wake_on_mouse)
-                }
                 "settings_hotkey" => match Hotkey::parse(value) {
                     Some(key) => cfg.settings_hotkey = key,
                     None => adjustments.push(Adjustment {
@@ -385,16 +376,12 @@ threshold = {threshold}
 # makes the very sound being measured.
 logging = {logging}
 
-# Bring keep-alive back when you touch the keyboard, so the first word
-# after a pause is not clipped. Switching keep-alive off by hand
-# disables this until you switch it on again - so releasing the headset
-# for your phone is not undone by the next keypress.
+# Bring keep-alive back when you touch the machine, so the first word
+# after a pause is not clipped. Any input counts, the trackpad included.
+# Switching keep-alive off by hand disables this until you switch it on
+# again - so releasing the headset for your phone is not undone by the
+# next keypress.
 wake_on_input = {wake_on_input}
-
-# Let the mouse wake it too, not just the keyboard. Off by default: a
-# trackpad is easy to brush by accident, and that would take the headset
-# back off your phone.
-wake_on_mouse = {wake_on_mouse}
 
 # Global toggle. At least one of ctrl, alt, shift, win - then one key
 # (a letter, a digit, f1 to f24, or space, pause, insert, delete, home,
@@ -427,7 +414,6 @@ diagnostics = {diagnostics}
             threshold = self.audio_threshold,
             logging = self.logging,
             wake_on_input = self.wake_on_input,
-            wake_on_mouse = self.wake_on_mouse,
             hotkey = self.hotkey,
             settings_hotkey = self.settings_hotkey,
             earcons = self.earcons,
@@ -552,7 +538,7 @@ mod tests {
     #[test]
     fn new_milestone_3_settings_round_trip() {
         let cfg = Config {
-            wake_on_mouse: true,
+            wake_on_input: false,
             hotkey: Hotkey::parse("ctrl+alt+shift+s").unwrap(),
             earcons: false,
             earcon_volume: 0.35,
