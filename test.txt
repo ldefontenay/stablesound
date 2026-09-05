@@ -1,0 +1,281 @@
+STABLESOUND - MILESTONE 3, SECOND ROUND
+=======================================
+
+Created: 2026-09-05
+Status:  NOT STARTED
+
+Your first round is kept in test-milestone-3.txt. This file only covers
+the four things you found and what changed because of them.
+
+
+HOW TO USE THIS FILE
+--------------------
+
+Same as last time. Type your notes after each line beginning "ANSWER:".
+Free text, short is fine, and "could not tell" is a useful answer.
+
+The "ANYTHING ODD:" line in each section is the most valuable one, so
+please use it if something felt off even slightly.
+
+
+WHAT CHANGED, AND WHY
+---------------------
+
+Four fixes, all from your notes.
+
+1. Tones now only play when YOU switch keep-alive on or off. The
+   automatic release, and the automatic wake when you next type, are
+   both silent. This is not a setting - it is simply how it works now.
+
+2. "mouse off" now actually works. The bug was not the trackpad sweep,
+   which was being recognised correctly. It was the moment your finger
+   came OFF the pad. That is itself an input event, and it arrives
+   after the pointer has already stopped moving - so it looked exactly
+   like a keypress. The app now waits for the pointer to have been
+   still for half a second before it will call anything the keyboard.
+
+3. The tray menu should work from the keyboard. It was never a menu
+   problem: the icon had never asked Windows for the newer notification
+   protocol, and the older one only ever tells a tray icon about mouse
+   buttons. Enter and the Applications key were producing no message at
+   all. That has been rebuilt rather than patched, so please treat the
+   whole tray as untested again.
+
+4. The tones are quieter and shorter, to your figures - volume 0.1, and
+   about a fifth shorter. The on-tone now starts with a quarter second
+   of silence, so the Bluetooth link has time to come up before the
+   tone begins. That quarter second is a guess. Test 20 asks about it.
+
+Also: switching off should be a little quicker than last time.
+
+
+BEFORE YOU START
+----------------
+
+Build and run from the repo root:
+
+    cargo run
+
+Have the AeroClips connected and set as the default output.
+
+If you have a stablesound.conf file from last time, it still has the
+old volume in it. Either delete it, or type "volume 0.1" and "save"
+once at the start.
+
+ANSWER - did it start cleanly, and did the banner still say the hotkey
+was registered?
+
+
+===========================================================
+TEST 19 - ARE THE AUTOMATIC TONES GONE
+===========================================================
+
+This is the fix for the thing you called annoying.
+
+Steps:
+
+1. Type: idle 10
+   (a short timeout so you are not waiting around)
+2. Press Ctrl+Windows+F12 to switch keep-alive on.
+
+ANSWER - did you hear the rising tone?
+
+3. Now sit quietly for about fifteen seconds. Do not type, do not play
+   anything. The automatic release will happen during this.
+
+ANSWER - did you hear anything at all when it released? You should have
+heard nothing.
+
+4. Now press any key.
+
+ANSWER - did you hear anything when it came back on? Again, you should
+have heard nothing.
+
+5. Press Ctrl+Windows+F12 to switch it off by hand.
+
+ANSWER - did you hear the falling tone this time?
+
+6. Work normally for a few minutes with keep-alive on, letting it
+   release and re-wake on its own several times.
+
+ANSWER - how many tones did you hear in those few minutes, and were any
+of them ones you had not asked for?
+
+ANSWER - is this the behaviour you wanted?
+
+ANYTHING ODD:
+
+
+===========================================================
+TEST 20 - THE TONES THEMSELVES
+===========================================================
+
+Volume is now 0.1 and the notes are about a fifth shorter. The on-tone
+also waits a quarter of a second before it starts.
+
+Steps:
+
+1. Toggle on and off a few times with the hotkey.
+
+ANSWER - is the volume right now?
+
+ANSWER - is the length right now, or still not quite?
+
+ANSWER - do you hear the WHOLE on-tone now, both notes, from the very
+start? This is the one I am least sure of.
+
+2. Listen to how long the on-tone takes to begin after you press the
+   hotkey. It is deliberately delayed by a quarter of a second.
+
+ANSWER - does the on-tone feel slow to arrive? If it does, say so - the
+delay can come down, at the risk of clipping the start again.
+
+3. Now listen to switching OFF a few times.
+
+ANSWER - does switching off feel quicker than last time?
+
+ANSWER - any clicks, pops or crackle at either end of either tone?
+
+ANYTHING ODD:
+
+
+===========================================================
+TEST 21 - THE TRAY FROM THE KEYBOARD
+===========================================================
+
+None of this worked last time. It has been rebuilt on a different
+Windows mechanism, so please treat all of it as new.
+
+Steps:
+
+1. Press Windows+B to move to the notification area, then arrow across
+   to find StableSound. You may need to open the overflow area with the
+   up arrow first.
+
+ANSWER - did you find it, and what exactly did JAWS read out?
+
+2. With keep-alive OFF, read the icon. Then switch keep-alive ON with
+   the hotkey and read it again.
+
+ANSWER - did the wording change to match the state this time? Last time
+it read the old wording and the new wording run together.
+
+ANSWER - is "StableSound: headphones awake" and "StableSound:
+headphones free" about the right amount of words?
+
+3. With the icon focused, press Enter.
+
+ANSWER - did that toggle keep-alive? You should hear a tone.
+
+4. Press Enter on it a few more times.
+
+ANSWER - did each press toggle exactly once, or did any press seem to
+do nothing? (A press that appears to do nothing would mean it toggled
+twice, which is a specific thing I am guarding against and want to
+know about.)
+
+5. With the icon focused, press the Applications key, or Shift+F10.
+
+ANSWER - did a menu open, and could you read the items with the arrow
+keys? What did JAWS read?
+
+6. Choose "Open the log file".
+
+ANSWER - did the log open in something you could read?
+
+7. Open the menu again and choose the first item, which switches
+   keep-alive on or off.
+
+ANSWER - did that work?
+
+8. Open the menu again and choose "Exit StableSound".
+
+ANSWER - did it quit cleanly, and did the icon disappear from the
+notification area?
+
+ANYTHING ODD:
+
+
+===========================================================
+TEST 22 - MOUSE OFF, AND MOUSE ON
+===========================================================
+
+Two things here. The first is the fix. The second is something we
+still have never actually seen work, because last time the step that
+would have shown it came after an "off" command, and switching off by
+hand deliberately stops the keyboard waking it too.
+
+So this time, do NOT type "off" - let the timeout do the releasing.
+
+Steps:
+
+1. Type: idle 10
+2. Type: mouse off
+3. Press the hotkey to switch keep-alive on.
+4. Sit quietly for about fifteen seconds so it releases on its own.
+   (Silently, now.)
+5. Move the trackpad - a good deliberate sweep - and do not touch any
+   key at all afterwards.
+
+ANSWER - did keep-alive stay off? It should. The console will print a
+line if it came back on, and the log will say "woken by keyboard
+input".
+
+6. Wait a few seconds, still not touching the keyboard, and sweep the
+   trackpad again. Try a short flick as well as a long sweep.
+
+ANSWER - still off?
+
+7. Now press a key.
+
+ANSWER - did keep-alive come back on?
+
+8. Type: mouse on
+9. Press the hotkey to switch keep-alive on, then sit quietly for
+   fifteen seconds again so it releases on its own. Do not type "off".
+10. Move the trackpad without touching a key.
+
+ANSWER - with "mouse on", did the trackpad wake it this time? This has
+never actually been confirmed to work.
+
+11. Type: mouse off
+
+ANSWER - over a few minutes of normal work with "mouse off", did the
+trackpad ever wake it when you did not mean it to?
+
+ANSWER - did anything you did with the keyboard ever FAIL to wake it?
+The half-second settling window means a keypress very shortly after
+moving the pointer is ignored, and I would like to know if that is
+noticeable.
+
+ANYTHING ODD:
+
+
+===========================================================
+TEST 23 - LIVE WITH IT
+===========================================================
+
+A real work session, an hour or so if you can, including picking up
+your phone at some point.
+
+ANSWER - did speech ever clip?
+
+ANSWER - did you ever hear a tone you had not asked for?
+
+ANSWER - did the headset hand over to the phone when you wanted it to?
+
+ANSWER - is there anything left about the hotkey, the tones or the tray
+that you would want changed before we build the settings dialog?
+
+ANSWER - one for the dialog: besides the timeout and the hotkey, what
+else would you actually want to change from a settings window?
+
+ANYTHING ODD:
+
+
+===========================================================
+ANYTHING ELSE
+===========================================================
+
+ANSWER - anything at all, in any of this, that felt wrong or that you
+would want done differently:
