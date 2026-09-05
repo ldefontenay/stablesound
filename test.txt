@@ -1,0 +1,226 @@
+STABLESOUND - MILESTONE 3, THIRD ROUND
+======================================
+
+Created: 2026-09-05
+Status:  NOT STARTED
+
+Only two things left: the tray, and the trackpad. Everything about the
+sound is signed off and is not retested here.
+
+Your previous rounds are kept in test-milestone-3.txt and
+test-milestone-3-round-2.txt.
+
+
+A NOTE BEFORE YOU START
+-----------------------
+
+Both of these have now failed twice, and both times I gave you a fix
+based on a diagnosis that turned out to be wrong. So this round is
+built differently.
+
+Neither fix is a guess this time. Both have been demonstrated on this
+machine: the app is driven from another program, and the tray responds
+to a keypress exactly the way the shell delivers one, and a synthetic
+mouse movement is correctly identified as the mouse.
+
+What I still cannot check from here is whether the icon you actually
+reach with Windows+B is the one this app owns, and whether a real
+trackpad behaves like a synthetic one. So the app now writes a line to
+the log every time the tray icon is touched, and can be asked to
+explain each decision it makes about the keyboard and the mouse.
+
+That means if something still fails, the log will say why, and there
+will be no fourth round of guessing.
+
+
+WHAT CHANGED, AND WHY
+---------------------
+
+1. The tray. Version 4, last round's fix, was accepted all along - the
+   log now proves it - so that was never the whole story.
+
+   The real fault: Windows can deliver a message to a program in two
+   ways, and only one of them was being listened to. The hotkey and the
+   timer are "posted", which is the way the app was watching for. The
+   tray callback is "sent", which goes somewhere else entirely and was
+   being thrown away. Every click and every keypress on the icon, since
+   the tray was first built, discarded before anything looked at it.
+
+2. The trackpad. Both previous attempts worked out whether input came
+   from the mouse by watching where the pointer was. That was the wrong
+   tool: a trackpad clearly produces input that the pointer position
+   does not account for, and no amount of refining it was going to
+   find that.
+
+   The mouse now tells us directly. Windows will report mouse activity
+   to a program that asks, so the app asks. It registers for the mouse
+   only, and never reads what the events contain - the time is all it
+   wants - so it still cannot see a keystroke, which was the reason for
+   avoiding this kind of thing in the first place.
+
+3. The icon is now removed when the app is killed, not just when it
+   exits properly. Closing the console window used to leave the icon
+   behind, still listed and still read out, but attached to a program
+   that no longer exists. That may well be why the name has been read
+   twice over both times - one live icon and one corpse. It would also
+   explain Enter doing nothing, since pressing a dead icon cannot do
+   anything.
+
+4. The on-tone now starts after an eighth of a second rather than a
+   quarter, as you suggested.
+
+
+BEFORE YOU START
+----------------
+
+Please REBOOT first, or at least sign out and back in.
+
+This is not superstition. If there are dead StableSound icons left in
+the notification area from previous runs, they will still be there, and
+you would be testing a corpse. A reboot clears them, and point 3 above
+stops new ones appearing. Nothing else in this round will be
+trustworthy without it.
+
+Then build and run from the repo root:
+
+    cargo run
+
+Have the AeroClips connected and set as the default output.
+
+ANSWER - did you reboot, or sign out and back in, before running?
+
+ANSWER - did the app start cleanly?
+
+
+===========================================================
+TEST 24 - THE TRAY
+===========================================================
+
+Please do these steps in order and do not skip step 1 - it is what
+tells us whether there is one icon or several.
+
+Steps:
+
+1. Press Windows+B to move to the notification area, then arrow all the
+   way across it, including the overflow area if you use one. Count how
+   many StableSound items you find.
+
+ANSWER - how many StableSound entries were there?
+
+ANSWER - what exactly did JAWS read for each one? If the name is still
+read twice over in a single entry, please say so.
+
+2. Move to a StableSound icon and press Enter.
+
+ANSWER - did keep-alive toggle? You should hear a tone.
+
+3. Press Enter on it a few more times.
+
+ANSWER - did each press toggle exactly once, or did any press seem to
+do nothing?
+
+4. With the icon focused, press the Applications key, or Shift+F10.
+
+ANSWER - did a menu open? If it did, what did JAWS read, and could you
+arrow through the items?
+
+5. If the menu opened, choose "Open the log file".
+
+ANSWER - did the log open in something you could read?
+
+6. If the menu opened, use it once more and choose "Exit StableSound".
+
+ANSWER - did it quit cleanly, and did the icon disappear?
+
+7. IMPORTANT, whether or not any of the above worked. Open the log file
+   - it is stablesound.log next to the exe - and look near the end for
+   lines containing the word "tray".
+
+ANSWER - is there a line saying "tray icon added, shell notification
+version 4 accepted"? Please copy it.
+
+ANSWER - are there any lines saying "tray callback" followed by a
+number? Roughly how many, and please copy two or three.
+
+This last answer is the one that matters most. If you pressed Enter on
+the icon and there is no "tray callback" line at all, then the icon you
+pressed does not belong to this program, and that is a completely
+different problem from the one I have been trying to fix.
+
+ANYTHING ODD:
+
+
+===========================================================
+TEST 25 - THE TRACKPAD
+===========================================================
+
+Steps:
+
+1. Type: diag on
+   (this makes the app write down its reasoning; the log will be much
+   longer than usual, which is fine and only for this test)
+2. Type: idle 10
+3. Type: mouse off
+4. Press the hotkey to switch keep-alive on.
+5. Sit quietly for about fifteen seconds so it releases on its own.
+6. Now sweep the trackpad deliberately, and do not touch any key.
+
+ANSWER - did keep-alive stay off? It should. Listen for a rising tone,
+which would mean it came back on.
+
+7. Try a short flick. Then try tapping the trackpad without moving.
+   Then try resting a finger on it and lifting it off again. Do not
+   touch a key during any of this.
+
+ANSWER - did any of those wake it?
+
+8. Now press a key.
+
+ANSWER - did keep-alive come back on?
+
+9. Work normally for a few minutes, using the keyboard as you usually
+   would.
+
+ANSWER - did keep-alive ever wake when you had not touched a key?
+
+ANSWER - did it ever fail to wake when you did touch a key?
+
+10. Open the log and look for lines containing "input seen".
+
+ANSWER - please copy three or four of those lines. They read like
+"input seen, mouse active 40 ms before it -> mouse", and they say
+exactly what the app decided and what it decided it on.
+
+11. Type: diag off
+    (otherwise the log will stay very long)
+
+ANYTHING ODD:
+
+
+===========================================================
+TEST 26 - A SHORT SESSION
+===========================================================
+
+Half an hour of ordinary work, with the tray and the trackpad now
+behaving - or not.
+
+ANSWER - did speech ever clip?
+
+ANSWER - did keep-alive ever come on or go off when you had not asked
+for it?
+
+ANSWER - is the on-tone better at the shorter delay, or did the start
+of it get clipped again?
+
+ANSWER - anything at all still wrong before we move on to the settings
+dialog?
+
+ANYTHING ODD:
+
+
+===========================================================
+ANYTHING ELSE
+===========================================================
+
+ANSWER - anything at all, in any of this, that felt wrong or that you
+would want done differently:
