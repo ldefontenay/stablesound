@@ -48,14 +48,20 @@ Two changes came out of Tests 8-10, both from the tester, both now design:
 
 ### What is next
 
-**Milestone 3: global hotkey, earcons, tray icon.** That is what turns this from
-a console harness into something usable.
+**Milestone 3 is built and needs a hardware round.** Hotkey, earcons and tray
+all work, and none of them has been near the AeroClip. `test.txt` is the script;
+Tests 11-18. The things most likely to come back wrong are matters of taste
+rather than correctness - earcon volume and length, and whether hearing a tone
+every time keep-alive re-arms itself becomes a nuisance.
 
-The console harness is **kept alongside** the tray for now, on its own stdin
-thread, rather than replaced as originally planned. It is the only diagnostic
-interface that exists, the tester is already fluent in it, and throwing it away
-before the GUI is proven on hardware would leave nothing to fall back on.
-Milestone 6 drops it and switches to the windows subsystem.
+The console harness is **kept alongside** the tray, on its own stdin thread,
+rather than replaced as originally planned. It is the only diagnostic interface
+that exists, the tester is already fluent in it, and throwing it away before the
+GUI is proven on hardware would leave nothing to fall back on. Milestone 6 drops
+it and switches to the windows subsystem.
+
+After the round: **Milestone 4, the settings dialog** - which carries the
+tester's request that the timeout be easy to change.
 
 ### Things a fresh session should not re-litigate
 
@@ -249,7 +255,51 @@ Dropped from this list: **hard release**, now deferred indefinitely (see 2.4).
 
 Stored as a small config file next to the exe if that location is writable, otherwise in `%APPDATA%` — this keeps the portable build genuinely portable.
 
-### 4.4 Accessibility rules
+### 4.4 The control surface (Milestone 3)
+
+**Hotkey.** `Ctrl+Win+F12`, chosen by the user. `RegisterHotKey` takes a
+combination away from every other program for as long as we hold it, so the
+default is deliberately obscure, and a combination with no modifier is refused
+outright - registering a bare F12 would swallow that key system-wide. Registered
+with `MOD_NOREPEAT`, so holding the keys toggles once. If registration fails the
+app says so loudly: a hotkey that silently does nothing is the worst possible
+failure for the primary interface.
+
+**Earcons, and when the off-tone plays.** Rising two notes for on, falling for
+off, with a few milliseconds of fade at each end - a sine that starts at full
+amplitude clicks, and on headphones the click is more noticeable than the tone.
+
+The non-obvious part is the ordering. The natural design, "release the device,
+then play a tone", is wrong: opening the device again to play it would take the
+headset straight back off the phone, a moment after handing it over. So the tone
+is queued into the stream that is **already open**, and the stream closes once it
+has drained.
+
+That forced a second change. The render buffer was being filled as full as it
+would go, which meant up to 500 ms of already-queued silence sitting in front of
+anything new - so a tone would trail the keypress by half a second. `pump` now
+maintains 200 ms of queued audio rather than filling the buffer, leaving 300 ms
+of headroom for a descheduled thread. Measured: a release takes 125 ms without an
+earcon and 340 ms with one, against a 1 s drain ceiling that exists so a device
+which stops consuming cannot wedge the engine.
+
+**Known gap:** an earcon can only play through an open stream, so switching off
+when nothing is open is silent. Believed harmless - if no stream is open the
+headset is not being held - but it is Test 18.
+
+**Tray.** A convenience, never the only route to anything. Real Win32 menu, so
+JAWS reads it unaided; state carried in the tooltip as words, with colour only as
+a bonus for sighted users. The icon is drawn in code rather than embedded, which
+costs a few hundred bytes of logic instead of a few kilobytes of resource. The
+`TaskbarCreated` broadcast is handled, so the icon survives an Explorer restart.
+
+**One hidden window, one message loop.** The window exists only to have a message
+queue; the hotkey and the tray both post to it. Every message is handled in the
+loop rather than in a window procedure, because a procedure would need global
+state to reach the engine, and this way the whole control surface reads top to
+bottom in one place.
+
+### 4.5 Accessibility rules
 
 These are requirements, not nice-to-haves:
 
@@ -264,7 +314,7 @@ These are requirements, not nice-to-haves:
 ## 5. Stack
 
 - **Rust**, stable-msvc toolchain
-- **`winsafe`** — native Win32 controls, settings dialog. Pinned to an exact version (it's 0.0.x and the API churns).
+- **`winsafe`** — native Win32 controls, settings dialog. Pinned to an exact version (it's 0.0.x and the API churns). **Not yet a dependency:** Milestone 3 needed a hidden window, a tray icon and a menu, none of which are *controls*, so it used the `windows` crate already present rather than pulling in a second GUI crate early. The choice for the Milestone 4 dialog is still open - `winsafe`, or raw `windows` with a real dialog resource. The constraint in CLAUDE.md is *real Win32 controls*, and both satisfy it; `winsafe` is a means to that end, not the end itself. Decide it at the start of Milestone 4, and weigh that `winsafe` wants to own the main window and message loop, which this app already has.
 - **`windows-sys`** or **`windows`** — WASAPI (`IAudioClient`, `IAudioRenderClient`, `IMMDeviceEnumerator`, `IAudioMeterInformation`), plus `RegisterHotKey` and `Shell_NotifyIcon`
 - **`embed-manifest`** — build dependency, for the app manifest
 - Release profile tuned for size: `opt-level = "z"`, LTO, `panic = "abort"`, strip symbols
@@ -299,6 +349,16 @@ Raw results are in `test.txt`, Tests 8-10.
 6. **Does zeros still work after a much longer idle gap?** Testing used 20-30 second gaps. Real use involves far longer ones - an hour away from the desk, or a laptop that has slept. If clipping reappears after a long gap, fluctuate is the next thing to try. **Residual risk, watch for it in daily use.**
 
 7. **Does the AeroClip behave the same on battery, or after a Windows sleep/resume cycle?** Sound Keeper carries explicit handling for modern-standby suspend/resume events, which suggests this bites in practice. Not yet tested.
+
+### Opened by Milestone 3, for the next hardware round
+
+10. **Do the earcons sound right?** Volume, length and shape are all guesses. 20 % amplitude, two notes, under 200 ms. Test 12.
+
+11. **Do the automatic earcons become a nuisance?** This is the one to watch. Every time keep-alive re-arms on a keypress you now hear a rising tone, and every automatic release 30 s later gives you a falling one. Over a working hour that could be a handful of tones, or it could be maddening. If it is, the fix is small - an option to sound only on changes the user asked for - but it should not be built on spec. Test 17.
+
+12. **Is the off-tone heard in full before the headset lets go?** The whole ordering design rests on it. Test 13.
+
+13. **Does `Ctrl+Win+F12` clash with anything in JAWS?** Chosen because Windows and the Game Bar leave it alone, but the tester's JAWS setup is the thing that matters and has not been checked. Test 14.
 
 ---
 
@@ -352,11 +412,23 @@ Not worth fixing in the harness - Milestone 3 makes state changes audible throug
 
 The console harness in `main.rs` was scaffolding for testing the engine. Milestone 3 adds the tray and hotkey **alongside** it rather than replacing it, so there is still a diagnostic interface while the GUI is unproven; Milestone 6 removes it.
 
-**Milestone 3 — control surface. IN PROGRESS.** Global hotkey registration, earcons for on/off, tray icon for sighted users and for a visible quit. Also carries the keyboard-only wake change from the Milestone 2 hardware round.
+**Milestone 3 - control surface. BUILT (2026-09-05), pending a hardware round.**
 
-Two design points settled before starting:
+Built: the global hotkey with its own parser and a refusal to register a bare key; earcons rendered into the keep-alive stream, with an anti-click envelope; the tray icon, its real Win32 menu and an icon drawn in code; the hidden window and message loop; and the keyboard-only wake change carried over from Milestone 2's round. Design detail in 4.4.
 
-- **Earcons play on the existing keep-alive stream, before it is torn down.** Playing the off-earcon after release would reopen the device and snatch it straight back from the phone, undoing the thing the app exists to do. So the tone is queued into the render buffer and the stream closes once it has drained. The on-earcon needs no special handling: the stream is being opened anyway. Playing through the target device is also the point - hearing the tone proves the headset is awake.
+Verified automatically:
+- Startup registers `Ctrl+Win+F12` on this machine, so nothing here is holding it.
+- A full on/off cycle opens and releases the AeroClip cleanly, with no hang and no retry storm.
+- Release latency measured at 125 ms with earcons off and 340 ms with them on, well inside the 1 s drain ceiling - so `drain` is genuinely draining rather than timing out.
+- Config round-trips every new setting; a mistyped hotkey is reported rather than silently dropped.
+- 24 unit tests. `cargo clippy --all-targets -- -D warnings` clean.
+- Release binary **266 KB**, up from 248 KB, against the ~1 MB budget.
+
+**Not tested on hardware. None of it.** Whether the tones are audible and pleasant, whether the off-tone is heard in full before the headset lets go, whether the hotkey clashes with JAWS, whether the tray menu reads properly, and whether automatic earcons become a nuisance. `test.txt`, Tests 11-18.
+
+Two design points settled while building:
+
+- **Earcons play on the existing keep-alive stream, before it is torn down**, and the queued-audio target dropped from 500 ms to 200 ms so the tone does not trail the keypress. See 4.4.
 - **The console harness stays**, on its own stdin thread feeding the same command channel as the hotkey and tray.
 
 **Milestone 4 — settings.** The `winsafe` dialog, config load/save, second hotkey to open settings. Test the whole dialog under JAWS with the screen off.
@@ -365,7 +437,7 @@ Two design points settled before starting:
 
 **Milestone 6 — ship.** Autostart, size-tuned release build, README, and a plan for the antivirus/SmartScreen problem — a small unsigned binary that opens audio devices and registers global hotkeys fits the profile AV heuristics dislike. Options: submit false-positive reports to the major vendors, or look at code signing.
 
-**Current position (2026-09-05):** Milestones 0, 1 and 2 complete and hardware-tested. Milestone 3 under way.
+**Current position (2026-09-05):** Milestones 0, 1 and 2 complete and hardware-tested. Milestone 3 built and awaiting its hardware round.
 
 ---
 

@@ -1,0 +1,482 @@
+STABLESOUND - MILESTONE 1 HARDWARE TESTS
+========================================
+
+Created: 2026-08-30
+Status:  Milestones 1 and 2 COMPLETE. Milestone 2b tests added below, NOT STARTED.
+
+
+HOW TO USE THIS FILE
+--------------------
+
+Each test below has one or more lines beginning with "ANSWER:".
+Type your notes after the colon. Free text is fine - there is no
+format to follow, and short is fine.
+
+If something unexpected happens, use the "ANYTHING ODD:" line in that
+section. Those are often the most useful notes, so please do not skip
+them if something felt off.
+
+If a test cannot be run, write why on the ANSWER line rather than
+leaving it blank. "Could not tell" and "not sure" are useful answers.
+
+When you are done, tell me and I will read this file.
+
+
+SETUP - DO THIS FIRST
+---------------------
+
+1. Turn on the AeroClips and make sure they are connected to BOTH
+   this laptop and your iPhone.
+
+2. Set the AeroClips as the DEFAULT output device in Windows.
+   This matters: the test program uses whatever is default, and
+   right now that is your Realtek speakers.
+
+3. Turn OFF the JAWS built-in setting while testing, so we are not
+   measuring both at once:
+   Insert+6, then Ctrl+Shift+D, then search for "avoid".
+   The setting is "Avoid speech cut-off when using Bluetooth
+   headphones or some cards". Make sure it is UNCHECKED.
+
+4. Start the test program. In the Claude Code prompt, type:
+       !cd spike; cargo run
+
+   On startup it prints which device it picked. Check that it says
+   the AeroClips and not Realtek.
+
+ANSWER - what device name did it print?
+Aeroclips
+
+ANSWER - was the JAWS bluetooth setting successfully turned off?
+Yes.
+
+COMMANDS YOU CAN TYPE IN THE PROGRAM
+------------------------------------
+
+   on       start keep-alive
+   off      stop keep-alive and release the device
+   zeros    use pure silence
+   fluct    use silence with a tiny blip each second (the default)
+   sine     use an inaudible 20 kHz tone
+   watch    toggle reporting of when other audio starts and stops
+   status   show current state
+   quit     exit
+
+Type the command, then press Enter.
+
+
+===========================================================
+TEST 1 - DOES RELEASING FREE THE HEADSET FOR THE IPHONE?
+===========================================================
+
+This is the most important test. The whole design assumes that when
+we stop playing, your phone can take over. If that is wrong, the
+plan changes significantly, so it is worth doing carefully.
+
+Steps:
+
+1. Type: on
+   (You should hear nothing. That is correct.)
+
+2. With keep-alive still running, play something on your iPhone -
+   music, a podcast, VoiceOver, anything.
+
+ANSWER - did the iPhone audio come through the AeroClips, or did the
+laptop keep control?
+The laptop kept control.
+
+3. Now type: off
+
+4. Try the iPhone again.
+
+ANSWER - did the iPhone take over this time?
+Yes, the iPhone took over.
+
+ANSWER - roughly how long did the handover take? A rough count in
+seconds is fine.
+Very fast, about 3 seconds.
+
+5. Repeat steps 1-4 once more, to check it was not a fluke.
+
+ANSWER - did it behave the same the second time?
+Yes.
+
+ANYTHING ODD:
+No, worked as expected.
+
+===========================================================
+TEST 2 - DOES JAWS SPEECH SHOW UP ON THE AUDIO METER?
+===========================================================
+
+This decides how the app detects that you are still using the
+laptop. If JAWS speech is invisible to it, we need a more complex
+approach.
+
+Steps:
+
+1. Type: watch
+   It should say it is watching for audio.
+
+2. Leave keep-alive OFF for this test.
+
+3. Let JAWS speak - read a paragraph, arrow around, anything.
+
+The program should print lines like:
+       AUDIO DETECTED (peak 0.04210)
+       AUDIO STOPPED after 2.3 s (highest peak 0.06180)
+
+ANSWER - did it report audio detected when JAWS spoke? Yes or no.
+Yes.
+
+ANSWER - if yes, roughly what peak numbers did you see?
+0.56111
+
+4. Now stay quiet for about 10 seconds and let JAWS say nothing.
+
+ANSWER - did it report audio stopped? Did the timing seem about
+right?
+Hard to test propperly, as typing and reading triggers the audiometer. I turned off screen highlight eacho, and it felt about right.
+
+5. Now type: on
+   Then let JAWS speak again, with keep-alive running.
+
+ANSWER - did it still correctly report JAWS speech starting and
+stopping, or did it get confused by our own signal?
+Hard to test, as reading the screen influences the results. We may need to just wait and see how this pans out but no obvious problems arose.
+
+ANYTHING ODD:
+No. Just screenreading interfering with testing.
+
+===========================================================
+TEST 3 - WHICH SIGNAL ACTUALLY KEEPS THE AEROCLIPS AWAKE?
+===========================================================
+
+We need to find the quietest signal that works. Quieter is better,
+because a loud signal interferes with Test 2's detection.
+
+Try each mode in the order below. For each one:
+
+  - Type the mode name, then type: on
+  - Then use the laptop normally for 3-5 minutes, with pauses.
+    The important thing is to leave GAPS of 20-30 seconds of
+    silence, then have JAWS speak again. That is when clipping
+    happens.
+  - Note whether the start of speech gets clipped.
+
+Please try them in this order - the first one that works is the one
+we want.
+
+MODE 1 - type: fluct     then: on
+ANSWER - was speech clipped?
+No.
+
+MODE 2 - type: zeros     then: on
+ANSWER - was speech clipped?
+No
+
+MODE 3 - type: sine      then: on
+ANSWER - was speech clipped?
+No.
+
+ANSWER - for comparison, type "off" and use the laptop for a few
+minutes with no keep-alive at all. How bad is the clipping normally?
+This gives us a baseline.
+Speech clips after 2-3 seconds, very annoying.
+
+ANYTHING ODD:
+Possible slight artifact with the sine option, but only happened once and could have been random.
+
+===========================================================
+ANYTHING ELSE
+===========================================================
+
+Anything that surprised you, annoyed you, or that you think I have
+misunderstood about the problem. Also worth noting: did the test
+program itself work well with JAWS, or was anything awkward to read?
+
+NOTES:
+Spike programme worked well and makes me feel very hopeful about the project. Programme nicely accessible.
+
+
+
+===========================================================
+FOR REFERENCE - WHY THESE THREE TESTS
+===========================================================
+
+Test 1 checks the assumption the whole design rests on.
+Test 2 decides how the auto-release timer knows you are still active.
+Test 3 picks the keep-alive signal, and interacts with Test 2 - a
+louder signal makes the detection in Test 2 harder.
+
+If Test 3 concludes we need "sine", then Test 2's simple approach
+will not work and we need a more complex one. That is fine, it just
+needs to be known before building.
+
+
+
+===========================================================
+===========================================================
+MILESTONE 2 TESTS - THE REAL ENGINE
+===========================================================
+===========================================================
+
+Added: 2026-08-30
+Status: COMPLETE - results below, fixes applied
+
+This is the real app now, not the throwaway spike. Three things
+could not be checked without you and the headphones.
+
+To start it:
+    !cargo run
+
+It prints where its settings and log files live. The log is the
+important part - see Test 6.
+
+
+SETUP
+-----
+
+Connect the AeroClips and make them the default output device, as
+before. Keep the JAWS built-in bluetooth setting OFF.
+
+Useful commands inside the program:
+
+    on / off / toggle     control keep-alive
+    idle <seconds>        release after N seconds with no audio
+    fixed <seconds>       release N seconds after switching on
+    signal zeros          the default
+    device <name>         target a device by name
+    device default        follow the Windows default
+    status                show settings
+    save                  write settings to the config file
+    quit                  exit
+
+
+===========================================================
+TEST 4 - DOES JAWS SPEECH POSTPONE THE RELEASE?
+===========================================================
+
+Automated testing proved it releases when nothing is playing. What
+it could NOT prove is the opposite: that speech keeps it alive. That
+is the whole point of idle mode, so it needs checking by hand.
+
+Steps:
+
+1. Type: idle 15
+2. Type: on
+3. Now keep using JAWS continuously - read a document, arrow around,
+   anything, for about a minute. Do not go quiet for more than ~10
+   seconds at a time.
+
+ANSWER - did keep-alive stay ON for that whole minute? It should NOT
+have released while you were still using JAWS.
+Yes, it stayed on.
+
+4. Now stop touching the laptop and stay quiet for 20 seconds.
+
+ANSWER - did it release after about 15 seconds of quiet?
+Yes.
+
+ANYTHING ODD:
+Design issue: Ideally, keep-alive should turn back on when the user starts interacting with the computer, i.e. when a keypress is registered on the keyboard. This would be more intuitive, and would also avoid Jaws grabbing the audio with a random notification. Later on, turning keep-alive on this way could be a setting as per user preference.
+
+===========================================================
+TEST 5 - DOES IT FOLLOW WHEN THE DEFAULT DEVICE CHANGES?
+===========================================================
+
+If you unplug or disconnect the headphones, the app should notice
+and move to whatever Windows switches to.
+
+Steps:
+
+1. Type: device default
+2. Type: fixed 300      (so it will not release during the test)
+3. Type: on
+4. Now disconnect the AeroClips - put them in the case, or turn
+   Bluetooth off.
+
+ANSWER - did the program report moving to another device? It should
+print a line starting with "MOVED".
+No.
+
+5. Reconnect the AeroClips and make them default again.
+
+ANSWER - did it move back?
+No. I had to type "on" again.
+
+ANSWER - did anything crash, hang, or produce an error message?
+No.
+
+ANYTHING ODD:
+Nothing odd. Sound just went to the laptop speaker and back to the aeroclips with keep-alive off. No error messages. All worked well again after the on command.
+
+===========================================================
+TEST 6 - IS THE LOG FILE USEFUL?
+===========================================================
+
+The log exists because we found you cannot watch idle behaviour
+live - reading the screen makes JAWS talk, which is the very sound
+being measured. So the log is how we check what really happened.
+
+Steps:
+
+1. After doing tests 4 and 5, quit the program.
+2. Open the log file. Its location is printed when the program
+   starts - it will be stablesound.log next to the program.
+
+ANSWER - does the log make sense when you read it? Can you tell
+when keep-alive turned on and off, and why it turned off?
+Yes, clear.
+
+ANSWER - is anything missing that you would want recorded?
+No.
+
+ANYTHING ODD:
+No.
+
+===========================================================
+TEST 7 - GENERAL USE
+===========================================================
+
+Type "idle 60" then "on", then just use the laptop normally for a
+while. This is the closest thing to how you would actually use it.
+
+ANSWER - did speech clipping stay away?
+Yes.
+
+ANSWER - did the 60 second timeout feel about right? Too short, too
+long? This is the main number we still need to tune.
+I'd go with 30 seconds for now, especially if keep-alive can be turned on when keyboard activity is registered.
+
+ANSWER - anything about the app that felt wrong or awkward?
+Design issue/idea discussed above.
+
+ANYTHING ODD:
+No, very pleased with tests.
+
+
+===========================================================
+===========================================================
+MILESTONE 2b - RETESTING THE FIXES
+===========================================================
+===========================================================
+
+Added: 2026-08-30
+Status: NOT STARTED
+
+Three changes came out of your last round. Test 8 is the important
+one - it is a retest of the thing that failed.
+
+Start it the same way:
+    !cargo run
+
+New command since last time:
+    wake on | wake off    bring keep-alive back on keyboard/mouse input
+
+The default settings have changed: idle timeout is now 30 seconds
+instead of 60, and waking on input is ON.
+
+
+===========================================================
+TEST 8 - RETEST: DOES IT RECOVER WHEN THE DEVICE GOES?
+===========================================================
+
+This failed last time. The engine stopped for good when the
+headphones disconnected, and you had to type "on" again.
+
+What should happen now: losing the headphones no longer stops it. It
+should keep trying every 2 seconds and reopen on whatever Windows
+switches to, then move back when the AeroClips return.
+
+Steps:
+
+1. Type: wake off        (so input waking does not confuse the test)
+2. Type: device default
+3. Type: fixed 300       (so it will not release mid-test)
+4. Type: on
+5. Disconnect the AeroClips - case them, or turn Bluetooth off.
+
+ANSWER - did it report moving to another device? Look for a line
+starting with "MOVED" or "INTERRUPTED".
+No.
+
+6. Wait about 10 seconds, then reconnect the AeroClips and make them
+   the default again.
+
+ANSWER - did it move back to the AeroClips on its own, WITHOUT you
+typing "on"?
+Yes.
+
+ANSWER - did it get stuck, spam messages, or behave oddly at any
+point?
+No.
+
+7. Now quit, and read stablesound.log.
+
+ANSWER - does the log tell a clear story of what happened?
+Yes, device switching was handled.
+
+ANYTHING ODD:
+No, worked well from my perspective.
+
+===========================================================
+TEST 9 - DOES WAKING ON INPUT FEEL RIGHT?
+===========================================================
+
+This is the feature you suggested. It is on by default now.
+
+The rule to check: turning keep-alive off BY HAND should stay off
+even if you type. But an automatic release should be undone by the
+next keypress. The idea is that deliberately handing the headset to
+your phone sticks, while merely pausing does not.
+
+Steps:
+
+1. Type: wake on
+2. Type: idle 30
+3. Type: on
+4. Walk away or sit quiet for about 40 seconds, so it releases on
+   its own.
+5. Now press a key or move the mouse.
+
+ANSWER - did keep-alive come back on by itself? Look for "woken by
+input".
+Yes.
+
+6. Now type: off      (an explicit, by-hand switch off)
+7. Press some keys, move the mouse.
+
+ANSWER - did it STAY off this time? It should. Typing should not
+undo a deliberate switch-off.
+Yes, stayed off.
+
+8. Check your iPhone can take over at this point.
+
+ANSWER - could the phone take the headphones while keep-alive was
+off by hand?
+Yes.
+
+ANYTHING ODD:
+No, all as expected.
+
+===========================================================
+TEST 10 - LIVE WITH IT
+===========================================================
+
+Type "on" and just use the laptop for a while - ideally a real work
+session, and ideally including picking up your phone at some point.
+
+ANSWER - did the 30 second timeout feel better than 60?
+Yes, but it would be good to have an easy way to alter the timeout.
+
+ANSWER - did waking on input ever get in the way? For instance,
+grabbing the headphones back when you wanted your phone to have
+them?
+No, but ideally waking on input should not be triggered by the mouse, as I don't use the mouse and may accidentally touch the trackpad. Maybe make mouse activation an option if technically possible. If too complex, leave as is.
+
+ANSWER - anything else that felt wrong, or that you would want
+changed before we add the hotkey?
+No.
+
+ANYTHING ODD:
+No.
