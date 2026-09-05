@@ -166,10 +166,7 @@ fn run(shared: &Mutex<Config>, commands: &Sender<Command>, hwnd_bits: isize) {
                     println!("Hotkey set to {key}.");
                     println!("Save, then restart - the combination is claimed at startup.");
                 }
-                None => {
-                    println!("Usage: hotkey ctrl+win+f12");
-                    println!("At least one of ctrl, alt, shift, win, then one key.");
-                }
+                None => println!("{}", crate::hotkey::HOW_TO_WRITE),
             },
 
             "diag" | "diagnostics" => match rest {
@@ -254,9 +251,14 @@ pub fn describe(cfg: &Config) {
     println!("Device:  {device}");
     println!("Signal:  {}", cfg.signal);
     println!("Release: {release}");
+    println!("Hotkey:  {} toggles keep-alive", cfg.hotkey);
     println!(
-        "Hotkey:  {} toggles, {} opens the settings",
-        cfg.hotkey, cfg.settings_hotkey
+        "Settings: {}",
+        if cfg.settings_hotkey_enabled {
+            format!("{} opens them, or the tray menu", cfg.settings_hotkey)
+        } else {
+            "tray menu (Win+B) or type 'settings' - no hotkey".to_string()
+        }
     );
     println!(
         "Wake:    {}",

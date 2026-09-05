@@ -59,7 +59,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
 };
 
 use crate::config::{Config, DeviceSelector, Release, Signal};
-use crate::hotkey::Hotkey;
+use crate::hotkey::{self, Hotkey};
 use crate::startup;
 
 /// Posted to the message loop to ask for the dialog. The console reads
@@ -81,6 +81,7 @@ const IDC_LOGGING: i32 = 1010;
 const IDC_DIAGNOSTICS: i32 = 1011;
 const IDC_SET_HOTKEY: i32 = 1012;
 const IDC_STARTUP: i32 = 1013;
+const IDC_USE_SET_HOTKEY: i32 = 1014;
 
 /// Combo box order. The template is the other half of this contract; changing
 /// one without the other silently mislabels a setting, so both are written out
@@ -277,6 +278,9 @@ fn populate(hwnd: HWND, state: &State) {
     // thing to read out, hear and retype than "0.1".
     set_int(hwnd, IDC_VOLUME, (cfg.earcon_volume * 100.0).round() as u32);
     set_text(hwnd, IDC_HOTKEY, &cfg.hotkey.to_string());
+    check(hwnd, IDC_USE_SET_HOTKEY, cfg.settings_hotkey_enabled);
+    // Filled in even when the checkbox is clear, so turning the hotkey on is
+    // one keystroke rather than one keystroke and a combination to invent.
     set_text(hwnd, IDC_SET_HOTKEY, &cfg.settings_hotkey.to_string());
     check(hwnd, IDC_LOGGING, cfg.logging);
     check(hwnd, IDC_DIAGNOSTICS, cfg.diagnostics);
@@ -344,11 +348,13 @@ fn read(hwnd: HWND, state: &State) -> Option<Config> {
     cfg.earcon_volume = percent as f32 / 100.0;
 
     cfg.hotkey = read_hotkey(hwnd, IDC_HOTKEY)?;
+    cfg.settings_hotkey_enabled = checked(hwnd, IDC_USE_SET_HOTKEY);
     cfg.settings_hotkey = read_hotkey(hwnd, IDC_SET_HOTKEY)?;
     // Windows gives a combination to one registration only, so the second of
     // two identical hotkeys would never fire. Caught here rather than left to
-    // be met later as "the hotkey stopped working".
-    if cfg.hotkey == cfg.settings_hotkey {
+    // be met later as "the hotkey stopped working". Only a collision when the
+    // second one is actually going to be claimed.
+    if cfg.settings_hotkey_enabled && cfg.hotkey == cfg.settings_hotkey {
         complain(
             hwnd,
             "Both hotkeys are set to the same combination.\n\n\
@@ -404,19 +410,16 @@ fn read(hwnd: HWND, state: &State) -> Option<Config> {
 /// was typed does not make sense.
 fn read_hotkey(hwnd: HWND, id: i32) -> Option<Hotkey> {
     let typed = get_text(hwnd, id);
-    match Hotkey::parse(&typed) {
-        Some(key) => Some(key),
-        None => {
+    match Hotkey::parse_detailed(&typed) {
+        Ok(key) => Some(key),
+        Err(fault) => {
+            // What went wrong, then how to write one. The Milestone 4 round
+            // found the old message readable but short of the examples needed
+            // to get it right on the second attempt - so the examples are now
+            // the same text everywhere, from `hotkey`.
             complain(
                 hwnd,
-                &format!(
-                    "'{typed}' is not a combination StableSound can register.\n\n\
-                     It needs at least one of ctrl, alt, shift or win, then one \
-                     key - for example ctrl+win+f12.\n\n\
-                     A key with no modifier is refused on purpose: registering \
-                     it would take that key away from every other program for \
-                     as long as StableSound runs."
-                ),
+                &format!("{}\n\n{}", fault.describe(&typed), hotkey::HOW_TO_WRITE),
                 id,
             );
             None

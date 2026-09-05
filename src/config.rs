@@ -94,12 +94,26 @@ pub struct Config {
     pub wake_on_input: bool,
     /// The global toggle combination. The primary interface, not a shortcut.
     pub hotkey: Hotkey,
-    /// The global combination that opens the settings dialog.
+    /// Whether to claim [`Config::settings_hotkey`] at all.
     ///
-    /// CLAUDE.md requires every function to be reachable without the tray
-    /// menu, and the tray is the only other route to the dialog once the
-    /// console harness goes in Milestone 6. So the settings need a key of
-    /// their own.
+    /// Off by default, and that is the tester's own call after the Milestone 4
+    /// round: "It won't be used often enough to warrant a hotkey, so having it
+    /// in the tray only is my current preference." Every global hotkey is a
+    /// combination taken away from every other program on the machine for as
+    /// long as StableSound runs, and the settings are opened a handful of
+    /// times in a lifetime.
+    ///
+    /// It stays *available*, one checkbox away, because CLAUDE.md requires
+    /// every function to be reachable without the tray menu. The tray is
+    /// keyboard-reachable with `Win+B` and was signed off in the third
+    /// Milestone 3 round, so leaving this off is a preference rather than a
+    /// door being closed.
+    pub settings_hotkey_enabled: bool,
+    /// The global combination that opens the settings dialog, when
+    /// [`Config::settings_hotkey_enabled`] is on.
+    ///
+    /// Kept in the config, and offered in the dialog, even while it is off, so
+    /// that switching it on does not also mean thinking up a combination.
     pub settings_hotkey: Hotkey,
     /// Play a tone when *you* switch keep-alive on or off. On by default:
     /// CLAUDE.md requires state changes to be audible, and for a hotkey pressed
@@ -137,6 +151,7 @@ impl Default for Config {
             logging: true,
             wake_on_input: true,
             hotkey: Hotkey::default(),
+            settings_hotkey_enabled: false,
             settings_hotkey: Hotkey::settings_default(),
             earcons: true,
             // The tester's figure from the Milestone 3 round, having compared
@@ -202,7 +217,8 @@ impl Config {
         // Two identical combinations means the second registration fails and
         // one of the two functions silently has no key at all. Caught here
         // rather than left to be discovered as "the hotkey stopped working".
-        if self.hotkey == self.settings_hotkey {
+        // Only a problem when both are actually claimed.
+        if self.settings_hotkey_enabled && self.hotkey == self.settings_hotkey {
             self.settings_hotkey = Hotkey::settings_default();
             if self.settings_hotkey == self.hotkey {
                 self.settings_hotkey = Hotkey::default();
@@ -279,6 +295,10 @@ impl Config {
                 "logging" => cfg.logging = parse_bool(value).unwrap_or(cfg.logging),
                 "wake_on_input" => {
                     cfg.wake_on_input = parse_bool(value).unwrap_or(cfg.wake_on_input)
+                }
+                "settings_hotkey_enabled" => {
+                    cfg.settings_hotkey_enabled =
+                        parse_bool(value).unwrap_or(cfg.settings_hotkey_enabled)
                 }
                 "settings_hotkey" => match Hotkey::parse(value) {
                     Some(key) => cfg.settings_hotkey = key,
@@ -390,9 +410,15 @@ wake_on_input = {wake_on_input}
 # runs, so obscure is good.
 hotkey = {hotkey}
 
-# Opens the settings dialog, from anywhere. Same rules as above, and the
-# same warning: this combination is taken from every other program while
-# StableSound runs.
+# A second global hotkey that opens the settings dialog from anywhere.
+# Off by default: the settings are opened rarely, and every global hotkey
+# is a combination taken away from every other program while StableSound
+# runs. The tray menu opens them too, with Win+B.
+settings_hotkey_enabled = {settings_hotkey_enabled}
+
+# Which combination that would be. Same rules as the toggle above. Kept
+# here even while it is off, so switching it on does not also mean
+# thinking up a combination.
 settings_hotkey = {settings_hotkey}
 
 # Play a short tone when you switch keep-alive on or off: rising for on,
@@ -415,6 +441,7 @@ diagnostics = {diagnostics}
             logging = self.logging,
             wake_on_input = self.wake_on_input,
             hotkey = self.hotkey,
+            settings_hotkey_enabled = self.settings_hotkey_enabled,
             settings_hotkey = self.settings_hotkey,
             earcons = self.earcons,
             earcon_volume = self.earcon_volume,
@@ -599,11 +626,44 @@ mod tests {
         let mut cfg = Config {
             hotkey: Hotkey::settings_default(),
             settings_hotkey: Hotkey::settings_default(),
+            settings_hotkey_enabled: true,
             ..Config::default()
         };
         let adjustments = cfg.validate();
         assert_eq!(adjustments.len(), 1);
         assert_ne!(cfg.hotkey, cfg.settings_hotkey);
+    }
+
+    #[test]
+    fn a_settings_hotkey_that_is_never_claimed_may_match_the_toggle() {
+        // Nothing registers it, so there is no collision to pull apart, and
+        // correcting it would silently change a setting the user cannot even
+        // see the effect of.
+        let mut cfg = Config {
+            hotkey: Hotkey::settings_default(),
+            settings_hotkey: Hotkey::settings_default(),
+            settings_hotkey_enabled: false,
+            ..Config::default()
+        };
+        assert!(cfg.validate().is_empty());
+        assert_eq!(cfg.settings_hotkey, Hotkey::settings_default());
+    }
+
+    #[test]
+    fn the_settings_hotkey_is_off_by_default_but_still_offered() {
+        // The tester asked for the tray to be the only route, while keeping
+        // the combination one checkbox away - so the field must not be empty.
+        let cfg = Config::default();
+        assert!(!cfg.settings_hotkey_enabled);
+        assert_eq!(cfg.settings_hotkey, Hotkey::settings_default());
+        assert!(
+            Config::parse(
+                "settings_hotkey_enabled = yes
+"
+            )
+            .0
+            .settings_hotkey_enabled
+        );
     }
 
     #[test]

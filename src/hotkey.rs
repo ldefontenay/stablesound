@@ -17,10 +17,11 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
     MOD_SHIFT, MOD_WIN,
 };
 
-/// The ids we register under. Two combinations are claimed: one to toggle
-/// keep-alive, one to open the settings. Both are global, and every global
-/// hotkey is taken away from every other program on the machine, so there is
-/// no third and both defaults are deliberately obscure.
+/// The ids we register under. At most two combinations are claimed: one to
+/// toggle keep-alive, and one to open the settings if the user has asked for
+/// it - it is off by default, because the settings are opened rarely and every
+/// global hotkey is taken away from every other program on the machine. There
+/// is no third, and both defaults are deliberately obscure.
 pub const TOGGLE_ID: i32 = 1;
 pub const SETTINGS_ID: i32 = 2;
 
@@ -62,19 +63,88 @@ impl Hotkey {
     }
 }
 
+/// Why a typed combination could not be used.
+///
+/// Separate variants rather than a bare `None` because the Milestone 4 round
+/// asked for it: the tester met the refusal message, found that it read well,
+/// and then asked that it say how to write a combination correctly. A message
+/// that names the actual fault can do that; one written for every fault at
+/// once cannot.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum ParseError {
+    /// Nothing was typed at all.
+    Empty,
+    /// A word that is neither a modifier nor a key we know.
+    Unknown(String),
+    /// Two keys, rather than a key and its modifiers.
+    TwoKeys,
+    /// Modifiers, but nothing to press with them.
+    NoKey,
+    /// A key with no modifier. Refused on purpose - see the module note.
+    NoModifier,
+}
+
+impl ParseError {
+    /// The sentence that says what went wrong. The advice on how to write a
+    /// combination is added by the caller, and is the same in every case.
+    pub fn describe(&self, typed: &str) -> String {
+        match self {
+            ParseError::Empty => "No hotkey was typed.".to_string(),
+            ParseError::Unknown(word) => {
+                format!("'{word}' is not a modifier or a key StableSound recognises.")
+            }
+            ParseError::TwoKeys => format!(
+                "'{typed}' names two keys. A hotkey is one key, with modifiers held down \
+                 alongside it."
+            ),
+            ParseError::NoKey => {
+                format!("'{typed}' is only modifiers. There has to be a key to press with them.")
+            }
+            ParseError::NoModifier => format!(
+                "'{typed}' has no modifier, and a key on its own is refused on purpose: \
+                 registering it would take that key away from every other program on the \
+                 machine for as long as StableSound is running."
+            ),
+        }
+    }
+}
+
+/// How to write a combination. One string, used by the dialog, the console and
+/// the config loader, so the three cannot drift apart.
+pub const HOW_TO_WRITE: &str = "\
+Write a hotkey as modifiers and one key, joined by plus signs.
+
+The modifiers, spelt any of these ways:
+  ctrl   (or control)
+  alt
+  shift
+  win    (or windows, super, meta)
+
+At least one modifier is needed, and you can use several. The order does not \
+matter, and neither does capitalisation or spacing: ctrl+win+f12, WIN+CTRL+F12 \
+and Control + Windows + F12 are all the same combination.
+
+The key can be a letter, a digit, f1 to f24, or one of: space, pause, break, \
+insert, delete, home, end, pageup, pagedown, up, down, left, right.
+
+For example: ctrl+win+f12, ctrl+alt+shift+s, win+shift+pageup";
+
 impl Hotkey {
-    /// Parse something like `ctrl+win+f12`. Returns `None` for anything it
-    /// cannot make sense of, so a mistyped config falls back to the default
-    /// rather than leaving the app with no way to toggle.
-    pub fn parse(text: &str) -> Option<Hotkey> {
+    /// Parse something like `ctrl+win+f12`, saying why if it cannot.
+    ///
+    /// Order, capitalisation and spacing are all free; only the modifier
+    /// names and the key name have to be recognisable.
+    pub fn parse_detailed(text: &str) -> Result<Hotkey, ParseError> {
         let mut modifiers = 0u32;
         let mut vk = None;
+        let mut typed_anything = false;
 
         for part in text.split('+') {
             let part = part.trim().to_lowercase();
             if part.is_empty() {
                 continue;
             }
+            typed_anything = true;
             match part.as_str() {
                 "ctrl" | "control" => modifiers |= MOD_CONTROL.0,
                 "alt" => modifiers |= MOD_ALT.0,
@@ -84,19 +154,29 @@ impl Hotkey {
                     // A second key, rather than a second modifier, is a
                     // mistake worth rejecting rather than silently ignoring.
                     if vk.is_some() {
-                        return None;
+                        return Err(ParseError::TwoKeys);
                     }
-                    vk = Some(key_code(key)?);
+                    vk = Some(key_code(key).ok_or_else(|| ParseError::Unknown(key.to_string()))?);
                 }
             }
         }
 
-        let vk = vk?;
+        if !typed_anything {
+            return Err(ParseError::Empty);
+        }
+        let vk = vk.ok_or(ParseError::NoKey)?;
         // At least one modifier: see the module note.
         if modifiers == 0 {
-            return None;
+            return Err(ParseError::NoModifier);
         }
-        Some(Hotkey { modifiers, vk })
+        Ok(Hotkey { modifiers, vk })
+    }
+
+    /// Parse, discarding the reason. For callers that only need to know
+    /// whether it worked - a mistyped config falls back to the default rather
+    /// than leaving the app with no way to toggle.
+    pub fn parse(text: &str) -> Option<Hotkey> {
+        Hotkey::parse_detailed(text).ok()
     }
 
     /// Claim the combination system-wide under `id`. Fails if another program
@@ -248,6 +328,76 @@ mod tests {
         assert_eq!(Hotkey::parse(""), None);
         // Two keys is a mistake, not a combination.
         assert_eq!(Hotkey::parse("ctrl+a+b"), None);
+    }
+
+    #[test]
+    fn each_fault_is_named_rather_than_lumped_together() {
+        // The Milestone 4 round asked the refusal message to say how to write
+        // a combination correctly. It can only do that if it knows which
+        // mistake was made.
+        use ParseError::*;
+        assert_eq!(Hotkey::parse_detailed(""), Err(Empty));
+        assert_eq!(Hotkey::parse_detailed("  +  "), Err(Empty));
+        assert_eq!(Hotkey::parse_detailed("ctrl"), Err(NoKey));
+        assert_eq!(Hotkey::parse_detailed("ctrl+alt+win"), Err(NoKey));
+        assert_eq!(Hotkey::parse_detailed("f12"), Err(NoModifier));
+        assert_eq!(Hotkey::parse_detailed("ctrl+a+b"), Err(TwoKeys));
+        assert_eq!(
+            Hotkey::parse_detailed("ctrl+notakey"),
+            Err(Unknown("notakey".into()))
+        );
+        assert_eq!(
+            Hotkey::parse_detailed("ctrl+f99"),
+            Err(Unknown("f99".into()))
+        );
+    }
+
+    #[test]
+    fn every_fault_says_something_specific() {
+        for typed in ["", "ctrl", "f12", "ctrl+a+b", "ctrl+notakey"] {
+            let fault = Hotkey::parse_detailed(typed).unwrap_err();
+            let said = fault.describe(typed);
+            assert!(!said.is_empty(), "{typed} explained itself with nothing");
+            // The advice is added separately and must not be duplicated into
+            // each fault, or the message box would say it twice.
+            assert!(!said.contains("plus signs"), "{typed}: {said}");
+        }
+    }
+
+    #[test]
+    fn the_advice_covers_every_spelling_the_parser_accepts() {
+        // The message and the parser drifting apart is exactly the failure the
+        // tester met: a refusal that does not tell you what would work.
+        for spelling in [
+            "ctrl", "control", "alt", "shift", "win", "windows", "super", "meta",
+        ] {
+            assert!(
+                HOW_TO_WRITE.contains(spelling),
+                "{spelling} is accepted but never mentioned"
+            );
+            assert!(Hotkey::parse(&format!("{spelling}+f12")).is_some());
+        }
+        for named in NAMED {
+            assert!(
+                HOW_TO_WRITE.contains(named.0),
+                "{} is accepted but never mentioned",
+                named.0
+            );
+        }
+        // And it says the thing the tester specifically asked about.
+        assert!(HOW_TO_WRITE.contains("order does not"));
+    }
+
+    #[test]
+    fn the_order_of_modifiers_really_does_not_matter() {
+        let wanted = Hotkey::parse("ctrl+alt+shift+win+f9").unwrap();
+        for text in [
+            "f9+ctrl+alt+shift+win",
+            "win+shift+alt+ctrl+f9",
+            "shift+f9+win+ctrl+alt",
+        ] {
+            assert_eq!(Hotkey::parse(text), Some(wanted), "{text}");
+        }
     }
 
     #[test]

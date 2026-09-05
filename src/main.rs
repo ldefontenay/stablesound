@@ -123,13 +123,22 @@ fn main() {
         "toggles keep-alive",
         &log,
     );
-    let settings_key = claim(
-        cfg.settings_hotkey,
-        tray.hwnd(),
-        hotkey::SETTINGS_ID,
-        "opens the settings",
-        &log,
-    );
+    // Off by default, at the tester's request after the Milestone 4 round.
+    // The tray menu and the console both open the settings, so nothing is
+    // out of reach; this is one combination handed back to the rest of the
+    // machine.
+    let settings_key = cfg
+        .settings_hotkey_enabled
+        .then(|| {
+            claim(
+                cfg.settings_hotkey,
+                tray.hwnd(),
+                hotkey::SETTINGS_ID,
+                "opens the settings",
+                &log,
+            )
+        })
+        .flatten();
 
     println!();
     console::help();
@@ -358,16 +367,47 @@ fn apply_settings(surface: &mut Surface, handle: &engine::Handle, cfg: Config) {
             &surface.log,
         );
     }
-    if cfg.settings_hotkey != previous.settings_hotkey {
-        rebind(
-            &mut surface.settings_key,
-            previous.settings_hotkey,
-            cfg.settings_hotkey,
-            surface.tray.hwnd(),
-            hotkey::SETTINGS_ID,
-            "open the settings",
-            &surface.log,
-        );
+    // Three cases, not one: switched off, switched on, or changed while on.
+    // Dropping the registration is what hands the combination back to the
+    // rest of the machine, which is the whole point of being able to turn it
+    // off.
+    match (
+        previous.settings_hotkey_enabled,
+        cfg.settings_hotkey_enabled,
+    ) {
+        (true, false) => {
+            surface.settings_key = None;
+            println!(
+                "  HOTKEY: {} no longer opens the settings.",
+                previous.settings_hotkey
+            );
+            println!("    Use the tray menu (Win+B), or type: settings");
+            surface.log.write(&format!(
+                "settings hotkey {} released",
+                previous.settings_hotkey
+            ));
+        }
+        (false, true) => {
+            surface.settings_key = claim(
+                cfg.settings_hotkey,
+                surface.tray.hwnd(),
+                hotkey::SETTINGS_ID,
+                "opens the settings",
+                &surface.log,
+            );
+        }
+        (true, true) if cfg.settings_hotkey != previous.settings_hotkey => {
+            rebind(
+                &mut surface.settings_key,
+                previous.settings_hotkey,
+                cfg.settings_hotkey,
+                surface.tray.hwnd(),
+                hotkey::SETTINGS_ID,
+                "open the settings",
+                &surface.log,
+            );
+        }
+        _ => {}
     }
 
     // Takes effect now rather than at the next start: the log is how this
