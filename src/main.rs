@@ -1,27 +1,50 @@
 //! StableSound.
 //!
-//! Milestone 2 exercises the engine from a console harness. The global hotkey
-//! (Milestone 3) and the settings dialog (Milestone 4) replace this front end;
-//! the engine underneath is the real thing.
+//! Keeps Bluetooth headphones awake so screen reader speech is not clipped,
+//! and lets go of them again so a phone can take over.
+//!
+//! This thread owns the message queue. It does nothing but wait for the hotkey,
+//! the tray and the engine, which is why the engine runs elsewhere: WASAPI
+//! objects are not `Send`, so the audio work owns its own thread and everything
+//! reaches it over channels.
+//!
+//! Still a console subsystem binary. The window here is hidden, but the console
+//! harness is deliberately still present - see `console`. Milestone 6 drops it
+//! and switches subsystem.
 
 mod audio;
 mod config;
+mod console;
 mod engine;
+mod hotkey;
 mod input;
 mod log;
+mod tray;
 
-use std::io::{self, BufRead, Write};
-
+use windows::core::PCWSTR;
 use windows::Win32::System::Com::{CoInitializeEx, COINIT_APARTMENTTHREADED};
+use windows::Win32::UI::Shell::ShellExecuteW;
+use windows::Win32::UI::WindowsAndMessaging::{
+    DispatchMessageW, GetMessageW, KillTimer, SetTimer, TranslateMessage, MSG, SW_SHOWNORMAL,
+    WM_CONTEXTMENU, WM_HOTKEY, WM_LBUTTONUP, WM_RBUTTONUP, WM_TIMER,
+};
 
-use crate::config::{Config, DeviceSelector, Release, Signal};
-use crate::engine::{Command, Event};
+use crate::config::Config;
+use crate::engine::{Command, Event, StopReason};
 use crate::log::Log;
+use crate::tray::Tray;
+
+/// Timer that pulls engine events off the channel. The engine cannot post to
+/// this queue itself - it has no window - so the queue asks it instead. A tenth
+/// of a second matches the engine's own tick and is far below the point where
+/// anyone would notice the tray lagging behind the sound.
+const EVENT_TIMER: usize = 1;
+const EVENT_TIMER_MS: u32 = 100;
 
 fn main() {
     // The engine thread initialises COM for itself, but this thread also calls
-    // into WASAPI (listing devices, resolving a device name), and COM is
-    // per-thread. Without this, list_outputs fails with 0x800401F0.
+    // into WASAPI (listing devices) and COM is per-thread. Without this,
+    // list_outputs fails with 0x800401F0.
     unsafe {
         let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
     }
@@ -37,8 +60,218 @@ fn main() {
         },
         false,
     );
+    let log_path = config::log_path();
 
-    println!("StableSound - Milestone 2 engine harness");
+    let mut tray = match Tray::create() {
+        Ok(t) => t,
+        Err(e) => {
+            // No tray means no window, and no window means no hotkey. That is
+            // not something to limp along with silently.
+            eprintln!("Could not create the tray icon or its window: {e}");
+            eprintln!("StableSound cannot run without it.");
+            return;
+        }
+    };
+
+    banner(&cfg, &config_path, &log, &adjustments);
+
+    // Claim the hotkey before anything else can want it, and say plainly if
+    // somebody already has it. A hotkey that silently does nothing is the
+    // worst possible failure for the app's primary interface.
+    let registration = match cfg.hotkey.register(tray.hwnd()) {
+        Ok(r) => {
+            println!("Hotkey:   {} toggles keep-alive.", cfg.hotkey);
+            log.write(&format!("hotkey {} registered", cfg.hotkey));
+            Some(r)
+        }
+        Err(e) => {
+            println!("WARNING: could not register {} ({e}).", cfg.hotkey);
+            println!("  Another program is probably already using it.");
+            println!("  Set a different one with: hotkey <combination>, then save and restart.");
+            println!("  Until then, use the console commands or the tray icon.");
+            log.write(&format!("hotkey {} NOT registered: {e}", cfg.hotkey));
+            None
+        }
+    };
+
+    println!();
+    console::help();
+    println!();
+
+    let handle = engine::spawn(cfg.clone(), log);
+    console::spawn(cfg, handle.commands.clone(), tray.hwnd());
+
+    unsafe {
+        SetTimer(Some(tray.hwnd()), EVENT_TIMER, EVENT_TIMER_MS, None);
+    }
+    pump(&mut tray, &handle, &log_path);
+    unsafe {
+        let _ = KillTimer(Some(tray.hwnd()), EVENT_TIMER);
+    }
+
+    // Order matters on the way out. Releasing the hotkey and the icon before
+    // the engine stops would leave the tray showing a stale state during the
+    // moment the engine spends draining the off-tone.
+    let _ = handle.commands.send(Command::Quit);
+    let _ = handle.thread.join();
+    drop(registration);
+    drop(tray);
+    println!("Stopped.");
+}
+
+/// The message loop.
+///
+/// Everything is handled here rather than in a window procedure. A procedure
+/// would need global state to reach the engine, whereas this can simply borrow
+/// it, and it keeps the whole control surface in one place a reader can follow.
+fn pump(tray: &mut Tray, handle: &engine::Handle, log_path: &std::path::Path) {
+    let mut message = MSG::default();
+
+    loop {
+        // Zero is WM_QUIT, and -1 is an error. `as_bool` would treat -1 as
+        // success and spin forever on a closed queue.
+        let result = unsafe { GetMessageW(&mut message, None, 0, 0) };
+        if result.0 <= 0 {
+            break;
+        }
+
+        match message.message {
+            WM_HOTKEY if message.wParam.0 as i32 == hotkey::TOGGLE_ID => {
+                let _ = handle.commands.send(Command::Toggle);
+            }
+
+            tray::WM_TRAY => {
+                // The mouse message is in the low word of lParam. A left click
+                // toggles - the common case, and what pressing Enter on the
+                // icon from Win+B sends. Right click and the Applications key
+                // both open the menu.
+                match (message.lParam.0 as u32) & 0xFFFF {
+                    WM_LBUTTONUP => {
+                        let _ = handle.commands.send(Command::Toggle);
+                    }
+                    WM_RBUTTONUP | WM_CONTEXTMENU => {
+                        // Blocks while the menu is open, which is fine: the
+                        // engine keeps pumping audio on its own thread.
+                        let chose_quit = menu(tray, handle, log_path);
+                        if chose_quit {
+                            break;
+                        }
+                    }
+                    _ => {}
+                }
+            }
+
+            console::WM_CONSOLE_QUIT => break,
+
+            WM_TIMER if message.wParam.0 == EVENT_TIMER => drain(tray, &handle.events),
+
+            other if tray.is_taskbar_restart(other) => tray.readd(),
+
+            _ => {}
+        }
+
+        unsafe {
+            let _ = TranslateMessage(&message);
+            DispatchMessageW(&message);
+        }
+    }
+}
+
+/// Show the tray menu and act on the choice. Returns true if we should quit.
+fn menu(tray: &Tray, handle: &engine::Handle, log_path: &std::path::Path) -> bool {
+    match tray.show_menu() {
+        Some(tray::CMD_TOGGLE) => {
+            let _ = handle.commands.send(Command::Toggle);
+            false
+        }
+        Some(tray::CMD_OPEN_LOG) => {
+            open_log(log_path);
+            false
+        }
+        Some(tray::CMD_QUIT) => true,
+        _ => false,
+    }
+}
+
+/// Hand the log to whatever the user reads text files with.
+///
+/// Worth a menu item of its own: the log is how this project's behaviour gets
+/// checked, because idle behaviour cannot be watched live - reading the output
+/// with a screen reader makes the very sound being measured.
+fn open_log(path: &std::path::Path) {
+    if !path.exists() {
+        println!("No log file yet at {}", path.display());
+        return;
+    }
+    let wide: Vec<u16> = path
+        .as_os_str()
+        .to_string_lossy()
+        .encode_utf16()
+        .chain(std::iter::once(0))
+        .collect();
+    let verb: Vec<u16> = "open".encode_utf16().chain(std::iter::once(0)).collect();
+    unsafe {
+        ShellExecuteW(
+            None,
+            PCWSTR(verb.as_ptr()),
+            PCWSTR(wide.as_ptr()),
+            PCWSTR::null(),
+            PCWSTR::null(),
+            SW_SHOWNORMAL,
+        );
+    }
+}
+
+/// Take whatever the engine has said since the last tick and reflect it.
+///
+/// The tray only learns the state here. The *audible* feedback is the engine's
+/// job, played through the device being kept awake, because an off-tone has to
+/// be heard before the stream closes.
+fn drain(tray: &mut Tray, events: &std::sync::mpsc::Receiver<Event>) {
+    while let Ok(event) = events.try_recv() {
+        match event {
+            Event::Started { device, signal } => {
+                println!("  KEEP-ALIVE ON - {device}, signal {signal}");
+                tray.set_active(true);
+            }
+            Event::WokenByInput { device } => {
+                println!("  KEEP-ALIVE ON - woken by input, {device}");
+                tray.set_active(true);
+            }
+            Event::Moved { device } => {
+                println!("  MOVED to new default output: {device}");
+                tray.set_active(true);
+            }
+            Event::Stopped { reason } => {
+                println!("  KEEP-ALIVE OFF - {}, device released", describe(&reason));
+                tray.set_active(false);
+            }
+            Event::Interrupted { message } => {
+                println!("  INTERRUPTED - {message} (retrying)");
+            }
+            Event::Substituted { wanted, used } => {
+                println!("  '{wanted}' not found, using '{used}' instead");
+            }
+            Event::Error { message } => println!("  ERROR: {message}"),
+        }
+    }
+}
+
+fn describe(reason: &StopReason) -> &'static str {
+    match reason {
+        StopReason::Requested => "asked to stop",
+        StopReason::IdleTimeout => "idle timeout reached",
+        StopReason::FixedTimeout => "fixed timer expired",
+    }
+}
+
+fn banner(
+    cfg: &Config,
+    config_path: &std::path::Path,
+    log: &Log,
+    adjustments: &[config::Adjustment],
+) {
+    println!("StableSound - Milestone 3");
     println!();
     println!("Settings: {}", config_path.display());
     if !config_path.exists() {
@@ -49,11 +282,11 @@ fn main() {
         None => println!("Log:      disabled"),
     }
     println!();
-    describe(&cfg);
+    console::describe(cfg);
 
     // Report anything validate() corrected, rather than silently changing
     // behaviour behind the user's back.
-    for adjustment in &adjustments {
+    for adjustment in adjustments {
         println!();
         println!("ADJUSTED: {}", adjustment.what);
         println!("  Why: {}", adjustment.why);
@@ -74,195 +307,5 @@ fn main() {
         Ok(_) => println!("No active output devices found."),
         Err(e) => println!("Could not list output devices: {e}"),
     }
-
     println!();
-    help();
-
-    let handle = engine::spawn(cfg.clone(), log);
-    let mut cfg = cfg;
-
-    let stdin = io::stdin();
-    let mut lines = stdin.lock().lines();
-
-    loop {
-        drain_events(&handle.events);
-
-        print!("> ");
-        let _ = io::stdout().flush();
-
-        let Some(Ok(line)) = lines.next() else { break };
-        let input = line.trim_start_matches('\u{feff}').trim().to_lowercase();
-        let (word, rest) = match input.split_once(' ') {
-            Some((w, r)) => (w, r.trim()),
-            None => (input.as_str(), ""),
-        };
-
-        match word {
-            "" => continue,
-            "on" => send(&handle, Command::On),
-            "off" => send(&handle, Command::Off),
-            "toggle" | "t" => send(&handle, Command::Toggle),
-
-            "signal" => match rest {
-                "zeros" => set_signal(&mut cfg, Signal::Zeros, &handle),
-                "fluctuate" | "fluct" => set_signal(&mut cfg, Signal::Fluctuate, &handle),
-                "sine" => set_signal(
-                    &mut cfg,
-                    Signal::Sine {
-                        freq: 20_000.0,
-                        amp: 0.01,
-                    },
-                    &handle,
-                ),
-                _ => println!("Usage: signal zeros | fluctuate | sine"),
-            },
-
-            "idle" | "fixed" => match rest.parse::<u32>() {
-                Ok(secs) => {
-                    cfg.release = if word == "idle" {
-                        Release::Idle { secs }
-                    } else {
-                        Release::Fixed { secs }
-                    };
-                    apply(&mut cfg, &handle);
-                }
-                Err(_) => println!("Usage: {word} <seconds>   for example: {word} 60"),
-            },
-
-            "device" => {
-                cfg.device = if rest.is_empty() || rest == "default" {
-                    DeviceSelector::Default
-                } else {
-                    // Match the original casing from the device list rather
-                    // than the lowercased input.
-                    match original_case_name(rest) {
-                        Some(name) => DeviceSelector::Named(name),
-                        None => {
-                            println!("No output device matches '{rest}'. Using default.");
-                            DeviceSelector::Default
-                        }
-                    }
-                };
-                apply(&mut cfg, &handle);
-            }
-
-            "wake" => match rest {
-                "on" | "" => {
-                    cfg.wake_on_input = true;
-                    apply(&mut cfg, &handle);
-                }
-                "off" => {
-                    cfg.wake_on_input = false;
-                    apply(&mut cfg, &handle);
-                }
-                _ => println!("Usage: wake on | wake off"),
-            },
-
-            "save" => match cfg.save(&config_path) {
-                Ok(()) => println!("Saved to {}", config_path.display()),
-                Err(e) => println!("Could not save: {e}"),
-            },
-
-            "status" => describe(&cfg),
-            "help" | "?" => help(),
-            "quit" | "exit" | "q" => break,
-            other => println!("Unknown command: {other}. Type help for the list."),
-        }
-    }
-
-    let _ = handle.commands.send(Command::Quit);
-    let _ = handle.thread.join();
-    println!("Stopped.");
-}
-
-fn send(handle: &engine::Handle, cmd: Command) {
-    let _ = handle.commands.send(cmd);
-    // Give the engine a moment so its event lands before the next prompt.
-    std::thread::sleep(std::time::Duration::from_millis(250));
-    drain_events(&handle.events);
-}
-
-fn set_signal(cfg: &mut Config, signal: Signal, handle: &engine::Handle) {
-    cfg.signal = signal;
-    apply(cfg, handle);
-}
-
-/// Push settings to the engine, reporting anything validation corrected.
-fn apply(cfg: &mut Config, handle: &engine::Handle) {
-    for adjustment in cfg.validate() {
-        println!("ADJUSTED: {}", adjustment.what);
-        println!("  Why: {}", adjustment.why);
-    }
-    let _ = handle.commands.send(Command::Reload(Box::new(cfg.clone())));
-    describe(cfg);
-}
-
-fn original_case_name(lowercased: &str) -> Option<String> {
-    audio::device::list_outputs().ok().and_then(|devices| {
-        devices
-            .into_iter()
-            .find(|d| d.name.to_lowercase() == lowercased)
-            .map(|d| d.name)
-    })
-}
-
-fn describe(cfg: &Config) {
-    let device = match &cfg.device {
-        DeviceSelector::Default => "default output".to_string(),
-        DeviceSelector::Named(n) => n.clone(),
-    };
-    let release = match cfg.release {
-        Release::Idle { secs } => format!("idle - release after {secs}s with no audio"),
-        Release::Fixed { secs } => format!("fixed - release {secs}s after switching on"),
-    };
-    println!("Device:  {device}");
-    println!("Signal:  {}", cfg.signal);
-    println!("Release: {release}");
-    println!(
-        "Wake:    {}",
-        if cfg.wake_on_input {
-            "on - input brings keep-alive back"
-        } else {
-            "off - only the hotkey starts it"
-        }
-    );
-}
-
-fn drain_events(events: &std::sync::mpsc::Receiver<Event>) {
-    while let Ok(event) = events.try_recv() {
-        match event {
-            Event::Started { device, signal } => {
-                println!("  KEEP-ALIVE ON - {device}, signal {signal}")
-            }
-            Event::WokenByInput { device } => {
-                println!("  KEEP-ALIVE ON - woken by input, {device}")
-            }
-            Event::Interrupted { message } => {
-                println!("  INTERRUPTED - {message} (retrying)")
-            }
-            Event::Stopped { reason } => {
-                println!("  KEEP-ALIVE OFF - {reason:?}, device released")
-            }
-            Event::Moved { device } => println!("  MOVED to new default output: {device}"),
-            Event::Substituted { wanted, used } => {
-                println!("  '{wanted}' not found, using '{used}' instead")
-            }
-            Event::Error { message } => println!("  ERROR: {message}"),
-        }
-    }
-}
-
-fn help() {
-    println!("Commands (type, then press Enter):");
-    println!("  on / off / toggle     control keep-alive");
-    println!("  signal zeros          pure silence (default, works on the AeroClip)");
-    println!("  signal fluctuate      silence plus a tiny blip each second");
-    println!("  signal sine           inaudible tone; forces fixed release mode");
-    println!("  idle <seconds>        release after N seconds with no audio");
-    println!("  fixed <seconds>       release N seconds after switching on");
-    println!("  device <name>         target a device by name, or 'device default'");
-    println!("  wake on | wake off    bring keep-alive back on keyboard/mouse input");
-    println!("  save                  write current settings to the config file");
-    println!("  status                show current settings");
-    println!("  quit                  exit");
 }

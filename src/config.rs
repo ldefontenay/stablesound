@@ -9,6 +9,8 @@ use std::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use crate::hotkey::Hotkey;
+
 /// Which output device to keep awake.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum DeviceSelector {
@@ -88,6 +90,21 @@ pub struct Config {
     /// in `engine`: audio is a consequence of our own output, so it forms a
     /// loop. Keyboard input is independent of anything the app does.
     pub wake_on_input: bool,
+    /// Let the *mouse* wake it too, not just the keyboard.
+    ///
+    /// Off by default, at the tester's request after the Milestone 2 hardware
+    /// round: they work without a mouse, and brushing the trackpad by accident
+    /// took the headset back off their phone. Kept as an option because
+    /// somebody who does use a mouse would reasonably want it.
+    pub wake_on_mouse: bool,
+    /// The global toggle combination. The primary interface, not a shortcut.
+    pub hotkey: Hotkey,
+    /// Play a tone on every state change. On by default: CLAUDE.md requires
+    /// state changes to be audible, and for a hotkey pressed with no window in
+    /// front of you the tone is the only feedback there is.
+    pub earcons: bool,
+    /// Earcon amplitude, 0.0 to 1.0.
+    pub earcon_volume: f32,
 }
 
 impl Default for Config {
@@ -103,6 +120,12 @@ impl Default for Config {
             audio_threshold: 0.0005,
             logging: true,
             wake_on_input: true,
+            wake_on_mouse: false,
+            hotkey: Hotkey::default(),
+            earcons: true,
+            // Loud enough to hear over a headset that is still waking, quiet
+            // enough not to startle. Wants checking on hardware.
+            earcon_volume: 0.2,
         }
     }
 }
@@ -158,20 +181,34 @@ impl Config {
             });
         }
 
+        if !(0.0..=1.0).contains(&self.earcon_volume) {
+            let was = self.earcon_volume;
+            self.earcon_volume = self.earcon_volume.clamp(0.0, 1.0);
+            out.push(Adjustment {
+                what: format!("earcon volume clamped from {was} to {}", self.earcon_volume),
+                why: "amplitude runs from 0.0 to 1.0; anything above 1.0 clips, and the                       earcon would come out as a rasp rather than a tone"
+                    .into(),
+            });
+        }
+
         out
     }
 
     pub fn load(path: &Path) -> (Config, Vec<Adjustment>) {
-        let mut cfg = match fs::read_to_string(path) {
+        let (mut cfg, mut adjustments) = match fs::read_to_string(path) {
             Ok(text) => Config::parse(&text),
-            Err(_) => Config::default(),
+            Err(_) => (Config::default(), Vec::new()),
         };
-        let adjustments = cfg.validate();
+        adjustments.extend(cfg.validate());
         (cfg, adjustments)
     }
 
-    fn parse(text: &str) -> Config {
+    /// Reads the file. Anything unparseable keeps its default rather than
+    /// failing the load, but says so - a mistyped hotkey that silently did
+    /// nothing would be maddening to diagnose without sight of the file.
+    fn parse(text: &str) -> (Config, Vec<Adjustment>) {
         let mut cfg = Config::default();
+        let mut adjustments = Vec::new();
         let mut sine_freq = 20_000.0f32;
         let mut sine_amp = 0.01f32;
         let mut signal_name = String::from("zeros");
@@ -207,6 +244,21 @@ impl Config {
                 "wake_on_input" => {
                     cfg.wake_on_input = parse_bool(value).unwrap_or(cfg.wake_on_input)
                 }
+                "wake_on_mouse" => {
+                    cfg.wake_on_mouse = parse_bool(value).unwrap_or(cfg.wake_on_mouse)
+                }
+                "hotkey" => match Hotkey::parse(value) {
+                    Some(key) => cfg.hotkey = key,
+                    None => adjustments.push(Adjustment {
+                        what: format!("hotkey '{value}' ignored, keeping {}", cfg.hotkey),
+                        why: "it should read like 'ctrl+win+f12' - at least one of ctrl,                               alt, shift or win, then one key. A key with no modifier is                               refused because registering it would take that key away from                               every other program"
+                            .into(),
+                    }),
+                },
+                "earcons" => cfg.earcons = parse_bool(value).unwrap_or(cfg.earcons),
+                "earcon_volume" => {
+                    cfg.earcon_volume = value.parse().unwrap_or(cfg.earcon_volume)
+                }
                 _ => {}
             }
         }
@@ -223,7 +275,7 @@ impl Config {
             "fixed" => Release::Fixed { secs: release_secs },
             _ => Release::Idle { secs: release_secs },
         };
-        cfg
+        (cfg, adjustments)
     }
 
     pub fn save(&self, path: &Path) -> std::io::Result<()> {
@@ -277,15 +329,39 @@ threshold = {threshold}
 # makes the very sound being measured.
 logging = {logging}
 
-# Bring keep-alive back when you touch the keyboard or mouse, so the
-# first word after a pause is not clipped. Switching keep-alive off by
-# hand disables this until you switch it on again - so releasing the
-# headset for your phone is not undone by the next keypress.
+# Bring keep-alive back when you touch the keyboard, so the first word
+# after a pause is not clipped. Switching keep-alive off by hand
+# disables this until you switch it on again - so releasing the headset
+# for your phone is not undone by the next keypress.
 wake_on_input = {wake_on_input}
+
+# Let the mouse wake it too, not just the keyboard. Off by default: a
+# trackpad is easy to brush by accident, and that would take the headset
+# back off your phone.
+wake_on_mouse = {wake_on_mouse}
+
+# Global toggle. At least one of ctrl, alt, shift, win - then one key
+# (a letter, a digit, f1 to f24, or space, pause, insert, delete, home,
+# end, pageup, pagedown, up, down, left, right).
+# This combination is taken from every other program while StableSound
+# runs, so obscure is good.
+hotkey = {hotkey}
+
+# Play a short tone on every state change: rising for on, falling for
+# off. It plays through the headphones being kept awake, so hearing it
+# also proves the headset is up.
+earcons = {earcons}
+
+# Earcon loudness, 0.0 to 1.0.
+earcon_volume = {earcon_volume}
 ",
             threshold = self.audio_threshold,
             logging = self.logging,
             wake_on_input = self.wake_on_input,
+            wake_on_mouse = self.wake_on_mouse,
+            hotkey = self.hotkey,
+            earcons = self.earcons,
+            earcon_volume = self.earcon_volume,
         )
     }
 }
@@ -350,13 +426,14 @@ mod tests {
             release: Release::Fixed { secs: 120 },
             ..Config::default()
         };
-        let parsed = Config::parse(&cfg.serialise());
+        let (parsed, adjustments) = Config::parse(&cfg.serialise());
+        assert!(adjustments.is_empty());
         assert_eq!(parsed, cfg);
     }
 
     #[test]
     fn unknown_keys_and_comments_are_ignored() {
-        let cfg = Config::parse("# comment\nnonsense = 1\nsignal = fluctuate\n");
+        let (cfg, _) = Config::parse("# comment\nnonsense = 1\nsignal = fluctuate\n");
         assert_eq!(cfg.signal, Signal::Fluctuate);
     }
 
@@ -402,11 +479,52 @@ mod tests {
     }
 
     #[test]
+    fn new_milestone_3_settings_round_trip() {
+        let cfg = Config {
+            wake_on_mouse: true,
+            hotkey: Hotkey::parse("ctrl+alt+shift+s").unwrap(),
+            earcons: false,
+            earcon_volume: 0.35,
+            ..Config::default()
+        };
+        let (parsed, adjustments) = Config::parse(&cfg.serialise());
+        assert!(adjustments.is_empty());
+        assert_eq!(parsed, cfg);
+    }
+
+    #[test]
+    fn a_bad_hotkey_is_reported_not_silently_dropped() {
+        // Silently ignoring it would leave the user pressing a combination
+        // that does nothing, with no way to tell why.
+        let (cfg, adjustments) = Config::parse("hotkey = f12\n");
+        assert_eq!(cfg.hotkey, Hotkey::default());
+        assert_eq!(adjustments.len(), 1);
+    }
+
+    #[test]
+    fn a_good_hotkey_is_taken() {
+        let (cfg, adjustments) = Config::parse("hotkey = ctrl+alt+shift+k\n");
+        assert_eq!(cfg.hotkey, Hotkey::parse("ctrl+alt+shift+k").unwrap());
+        assert!(adjustments.is_empty());
+    }
+
+    #[test]
+    fn earcon_volume_is_clamped() {
+        let mut cfg = Config {
+            earcon_volume: 4.0,
+            ..Config::default()
+        };
+        let adjustments = cfg.validate();
+        assert_eq!(cfg.earcon_volume, 1.0);
+        assert_eq!(adjustments.len(), 1);
+    }
+
+    #[test]
     fn wake_on_input_round_trips() {
         let cfg = Config {
             wake_on_input: false,
             ..Config::default()
         };
-        assert!(!Config::parse(&cfg.serialise()).wake_on_input);
+        assert!(!Config::parse(&cfg.serialise()).0.wake_on_input);
     }
 }

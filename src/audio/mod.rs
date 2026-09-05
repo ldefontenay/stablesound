@@ -5,5 +5,6 @@
 //! single thread that owns the audio work - see `engine`.
 
 pub mod device;
+pub mod earcon;
 pub mod keepalive;
 pub mod meter;

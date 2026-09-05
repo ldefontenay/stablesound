@@ -25,7 +25,15 @@
 //! word JAWS spoke would take it straight back. Audio only postpones release.
 //!
 //! Input is different in kind: it is not a consequence of our own output, so it
-//! cannot form that loop.
+//! cannot form that loop. By default only *keyboard* input counts - see
+//! `input` for why, and for how the two are told apart.
+//!
+//! # Earcons and release
+//!
+//! The off-tone has to be heard before the device is let go, which means the
+//! release path blocks briefly while the stream drains. Playing it after the
+//! release instead would mean reopening the device, taking the headset back
+//! off the phone a moment after handing it over.
 
 use std::sync::mpsc::{Receiver, Sender, TryRecvError};
 use std::thread::{self, JoinHandle};
@@ -34,6 +42,7 @@ use std::time::{Duration, Instant};
 use windows::Win32::System::Com::{CoInitializeEx, CoUninitialize, COINIT_MULTITHREADED};
 
 use crate::audio::device::{self, OpenDevice};
+use crate::audio::earcon;
 use crate::audio::keepalive::KeepAlive;
 use crate::audio::meter::Meter;
 use crate::config::{Config, DeviceSelector, Release};
@@ -50,6 +59,15 @@ const DEVICE_CHECK: Duration = Duration::from_secs(1);
 /// How long to wait before retrying a device that would not open. Bluetooth
 /// reconnects take a few seconds, so retrying faster just spams the log.
 const RETRY_DELAY: Duration = Duration::from_secs(2);
+
+/// Ceiling on how long a release waits for the off-tone to be heard.
+///
+/// The tone itself is under 200 ms, plus up to another 200 ms of already
+/// queued audio ahead of it, so this is roughly twice what it should ever
+/// need. It exists because draining blocks this thread: a device that has
+/// stopped consuming must not be able to wedge the engine, and a release that
+/// is late is far worse than an earcon that is cut short.
+const EARCON_TIMEOUT: Duration = Duration::from_secs(1);
 
 pub enum Command {
     Toggle,
@@ -187,18 +205,20 @@ fn run(mut config: Config, log: Log, commands: Receiver<Command>, events: Sender
         // --- commands -----------------------------------------------------
         match commands.try_recv() {
             Ok(Command::Quit) | Err(TryRecvError::Disconnected) => {
-                set_intent_off(&mut rt, StopReason::Requested, &log, &events);
+                set_intent_off(&mut rt, &config, StopReason::Requested, &log, &events);
                 break;
             }
             Ok(Command::Toggle) => {
                 if rt.intent {
-                    set_intent_off(&mut rt, StopReason::Requested, &log, &events);
+                    set_intent_off(&mut rt, &config, StopReason::Requested, &log, &events);
                 } else {
                     set_intent_on(&mut rt);
                 }
             }
             Ok(Command::On) => set_intent_on(&mut rt),
-            Ok(Command::Off) => set_intent_off(&mut rt, StopReason::Requested, &log, &events),
+            Ok(Command::Off) => {
+                set_intent_off(&mut rt, &config, StopReason::Requested, &log, &events)
+            }
             Ok(Command::Reload(new_config)) => {
                 config = *new_config;
                 log.write("settings reloaded");
@@ -218,14 +238,18 @@ fn run(mut config: Config, log: Log, commands: Receiver<Command>, events: Sender
         // on the config leaves the watcher's baseline frozen, so switching the
         // setting on later compares against an ancient timestamp and fires a
         // spurious wake immediately.
-        let had_input = input.seen_input();
-        if config.wake_on_input && had_input {
+        let seen = input.poll();
+        if seen.wakes(config.wake_on_input, config.wake_on_mouse) {
             if rt.intent {
                 // Somebody is here and typing, so do not release out from
                 // under them just because nothing happens to be speaking.
                 rt.last_audio = now;
             } else if rt.armed {
-                log.write("woken by keyboard or mouse input");
+                log.write(if config.wake_on_mouse {
+                    "woken by keyboard or mouse input"
+                } else {
+                    "woken by keyboard input"
+                });
                 set_intent_on(&mut rt);
                 rt.started_by_input = true;
             }
@@ -275,7 +299,7 @@ fn run(mut config: Config, log: Log, commands: Receiver<Command>, events: Sender
                     Release::Idle { .. } => StopReason::IdleTimeout,
                     Release::Fixed { .. } => StopReason::FixedTimeout,
                 };
-                set_intent_off(&mut rt, reason, &log, &events);
+                set_intent_off(&mut rt, &config, reason, &log, &events);
                 // An automatic release is not a decision to stay off.
                 rt.armed = true;
                 thread::sleep(TICK);
@@ -319,7 +343,13 @@ fn set_intent_on(rt: &mut Runtime) {
     rt.started_by_input = false;
 }
 
-fn set_intent_off(rt: &mut Runtime, reason: StopReason, log: &Log, events: &Sender<Event>) {
+fn set_intent_off(
+    rt: &mut Runtime,
+    config: &Config,
+    reason: StopReason,
+    log: &Log,
+    events: &Sender<Event>,
+) {
     if !rt.intent {
         return;
     }
@@ -331,6 +361,16 @@ fn set_intent_off(rt: &mut Runtime, reason: StopReason, log: &Log, events: &Send
     }
 
     let held = rt.since_intent.elapsed().as_secs();
+
+    // Say goodbye while the stream is still open. Once it is dropped the
+    // device is gone and anything we played would have to seize it back.
+    if config.earcons {
+        if let Some(active) = rt.stream.as_mut() {
+            active.keepalive.play(earcon::OFF, config.earcon_volume);
+            active.keepalive.drain(EARCON_TIMEOUT);
+        }
+    }
+
     // Dropping releases the IAudioClient, which is what frees the headset.
     let had_stream = rt.stream.take().is_some();
     rt.last_device_name = None;
@@ -389,7 +429,7 @@ fn try_open(rt: &mut Runtime, config: &Config, log: &Log, events: &Sender<Event>
         }
     };
 
-    let keepalive = match KeepAlive::start(&open.device, config.signal) {
+    let mut keepalive = match KeepAlive::start(&open.device, config.signal) {
         Ok(k) => k,
         Err(e) => {
             retry_later(rt, now);
@@ -402,6 +442,13 @@ fn try_open(rt: &mut Runtime, config: &Config, log: &Log, events: &Sender<Event>
             return;
         }
     };
+
+    // Played on every open, including a reopen after the headset came back or
+    // the default output moved. Hearing it through the device is the point: it
+    // says both "keep-alive is on" and "this is where it is on".
+    if config.earcons {
+        keepalive.play(earcon::ON, config.earcon_volume);
+    }
 
     let moved = matches!(&rt.last_device_name, Some(previous) if *previous != open.name);
     log.write(&format!(
