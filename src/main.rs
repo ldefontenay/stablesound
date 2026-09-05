@@ -544,7 +544,7 @@ fn describe(reason: &StopReason) -> &'static str {
 }
 
 fn banner(cfg: &Config, config_path: &Path, log: &Log, adjustments: &[config::Adjustment]) {
-    println!("StableSound - Milestone 4");
+    println!("StableSound - Milestone 5");
     println!();
     println!("Settings: {}", config_path.display());
     if !config_path.exists() {
