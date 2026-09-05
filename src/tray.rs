@@ -118,6 +118,7 @@ pub enum TrayEvent {
 pub const CMD_TOGGLE: i32 = 1;
 pub const CMD_OPEN_LOG: i32 = 2;
 pub const CMD_QUIT: i32 = 3;
+pub const CMD_SETTINGS: i32 = 4;
 
 /// Icon size. 16x16 is what the notification area asks for; Windows scales it
 /// where the display needs something larger.
@@ -351,6 +352,15 @@ impl Tray {
                 MF_STRING,
                 CMD_TOGGLE as usize,
                 PCWSTR(wide(toggle).as_ptr()),
+            );
+            // Asked for by name in the third hardware round. The dialog has
+            // a hotkey of its own as well - CLAUDE.md does not allow the tray
+            // to be the only route to anything.
+            let _ = AppendMenuW(
+                menu,
+                MF_STRING,
+                CMD_SETTINGS as usize,
+                PCWSTR(wide("&Settings...").as_ptr()),
             );
             let _ = AppendMenuW(
                 menu,

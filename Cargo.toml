@@ -22,6 +22,7 @@ windows = { version = "0.62", features = [
     "Win32_Devices_FunctionDiscovery",
     "Win32_UI_Shell_PropertiesSystem",
     "Win32_UI_Input",
+    "Win32_UI_Controls",
     "Win32_UI_Input_KeyboardAndMouse",
     "Win32_UI_WindowsAndMessaging",
     "Win32_UI_Shell",
@@ -29,6 +30,11 @@ windows = { version = "0.62", features = [
     "Win32_System_LibraryLoader",
     "Win32_System_Console",
 ] }
+
+# Build-time only: runs rc.exe over stablesound.rc. Nothing of it ships, and
+# the compiled dialog template costs a couple of kilobytes.
+[build-dependencies]
+embed-resource = "3"
 
 # Size matters: the point of Rust here is a ~1 MB portable exe. See CLAUDE.md.
 [profile.release]

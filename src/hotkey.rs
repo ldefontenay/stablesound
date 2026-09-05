@@ -17,8 +17,12 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
     MOD_SHIFT, MOD_WIN,
 };
 
-/// The id we register under. Only ever one hotkey, so a constant is enough.
+/// The ids we register under. Two combinations are claimed: one to toggle
+/// keep-alive, one to open the settings. Both are global, and every global
+/// hotkey is taken away from every other program on the machine, so there is
+/// no third and both defaults are deliberately obscure.
 pub const TOGGLE_ID: i32 = 1;
+pub const SETTINGS_ID: i32 = 2;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Hotkey {
@@ -41,7 +45,22 @@ impl Default for Hotkey {
     }
 }
 
+const VK_F11: u32 = 0x7A;
 const VK_F12: u32 = 0x7B;
+
+impl Hotkey {
+    /// The default for opening the settings: `Ctrl+Win+F11`.
+    ///
+    /// Next to the toggle key and sharing its modifiers, so the pair is one
+    /// thing to remember rather than two, and equally clear of anything
+    /// Windows claims.
+    pub const fn settings_default() -> Hotkey {
+        Hotkey {
+            modifiers: MOD_CONTROL.0 | MOD_WIN.0,
+            vk: VK_F11,
+        }
+    }
+}
 
 impl Hotkey {
     /// Parse something like `ctrl+win+f12`. Returns `None` for anything it
@@ -80,19 +99,20 @@ impl Hotkey {
         Some(Hotkey { modifiers, vk })
     }
 
-    /// Claim the combination system-wide. Fails if another program holds it.
-    pub fn register(self, hwnd: HWND) -> windows::core::Result<Registration> {
+    /// Claim the combination system-wide under `id`. Fails if another program
+    /// holds it.
+    pub fn register(self, hwnd: HWND, id: i32) -> windows::core::Result<Registration> {
         unsafe {
             // MOD_NOREPEAT so holding the keys down toggles once rather than
             // ten times a second.
             RegisterHotKey(
                 Some(hwnd),
-                TOGGLE_ID,
+                id,
                 HOT_KEY_MODIFIERS(self.modifiers) | MOD_NOREPEAT,
                 self.vk,
             )?;
         }
-        Ok(Registration { hwnd })
+        Ok(Registration { hwnd, id })
     }
 }
 
@@ -118,12 +138,13 @@ impl fmt::Display for Hotkey {
 /// handed back to the rest of the system on exit.
 pub struct Registration {
     hwnd: HWND,
+    id: i32,
 }
 
 impl Drop for Registration {
     fn drop(&mut self) {
         unsafe {
-            let _ = UnregisterHotKey(Some(self.hwnd), TOGGLE_ID);
+            let _ = UnregisterHotKey(Some(self.hwnd), self.id);
         }
     }
 }

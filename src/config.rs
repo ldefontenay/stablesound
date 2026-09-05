@@ -99,6 +99,13 @@ pub struct Config {
     pub wake_on_mouse: bool,
     /// The global toggle combination. The primary interface, not a shortcut.
     pub hotkey: Hotkey,
+    /// The global combination that opens the settings dialog.
+    ///
+    /// CLAUDE.md requires every function to be reachable without the tray
+    /// menu, and the tray is the only other route to the dialog once the
+    /// console harness goes in Milestone 6. So the settings need a key of
+    /// their own.
+    pub settings_hotkey: Hotkey,
     /// Play a tone when *you* switch keep-alive on or off. On by default:
     /// CLAUDE.md requires state changes to be audible, and for a hotkey pressed
     /// with no window in front of you the tone is the only feedback there is.
@@ -136,6 +143,7 @@ impl Default for Config {
             wake_on_input: true,
             wake_on_mouse: false,
             hotkey: Hotkey::default(),
+            settings_hotkey: Hotkey::settings_default(),
             earcons: true,
             // The tester's figure from the Milestone 3 round, having compared
             // 0.1, 0.2 and 0.35 on the AeroClip. The first guess of 0.2 was
@@ -194,6 +202,24 @@ impl Config {
             out.push(Adjustment {
                 what: "timeout changed from 0 to 30 s".into(),
                 why: "a zero timeout would release immediately, making the app pointless".into(),
+            });
+        }
+
+        // Two identical combinations means the second registration fails and
+        // one of the two functions silently has no key at all. Caught here
+        // rather than left to be discovered as "the hotkey stopped working".
+        if self.hotkey == self.settings_hotkey {
+            self.settings_hotkey = Hotkey::settings_default();
+            if self.settings_hotkey == self.hotkey {
+                self.settings_hotkey = Hotkey::default();
+            }
+            out.push(Adjustment {
+                what: format!(
+                    "settings hotkey changed to {}, because it was the same as the toggle",
+                    self.settings_hotkey
+                ),
+                why: "a combination can only be registered once, so the second of two                       identical hotkeys would never fire and that function would have no                       key at all"
+                    .into(),
             });
         }
 
@@ -263,6 +289,17 @@ impl Config {
                 "wake_on_mouse" => {
                     cfg.wake_on_mouse = parse_bool(value).unwrap_or(cfg.wake_on_mouse)
                 }
+                "settings_hotkey" => match Hotkey::parse(value) {
+                    Some(key) => cfg.settings_hotkey = key,
+                    None => adjustments.push(Adjustment {
+                        what: format!(
+                            "settings_hotkey '{value}' ignored, keeping {}",
+                            cfg.settings_hotkey
+                        ),
+                        why: "it should read like 'ctrl+win+f11' - at least one of ctrl,                               alt, shift or win, then one key"
+                            .into(),
+                    }),
+                },
                 "hotkey" => match Hotkey::parse(value) {
                     Some(key) => cfg.hotkey = key,
                     None => adjustments.push(Adjustment {
@@ -366,6 +403,11 @@ wake_on_mouse = {wake_on_mouse}
 # runs, so obscure is good.
 hotkey = {hotkey}
 
+# Opens the settings dialog, from anywhere. Same rules as above, and the
+# same warning: this combination is taken from every other program while
+# StableSound runs.
+settings_hotkey = {settings_hotkey}
+
 # Play a short tone when you switch keep-alive on or off: rising for on,
 # falling for off. It plays through the headphones being kept awake, so
 # hearing it also proves the headset is up.
@@ -387,6 +429,7 @@ diagnostics = {diagnostics}
             wake_on_input = self.wake_on_input,
             wake_on_mouse = self.wake_on_mouse,
             hotkey = self.hotkey,
+            settings_hotkey = self.settings_hotkey,
             earcons = self.earcons,
             earcon_volume = self.earcon_volume,
             diagnostics = self.diagnostics,
@@ -545,6 +588,44 @@ mod tests {
         let adjustments = cfg.validate();
         assert_eq!(cfg.earcon_volume, 1.0);
         assert_eq!(adjustments.len(), 1);
+    }
+
+    #[test]
+    fn the_settings_hotkey_round_trips_and_is_reported_when_wrong() {
+        let cfg = Config {
+            settings_hotkey: Hotkey::parse("ctrl+alt+p").unwrap(),
+            ..Config::default()
+        };
+        let (parsed, adjustments) = Config::parse(&cfg.serialise());
+        assert!(adjustments.is_empty());
+        assert_eq!(parsed.settings_hotkey, cfg.settings_hotkey);
+
+        let (fallback, adjustments) = Config::parse(
+            "settings_hotkey = f11
+",
+        );
+        assert_eq!(fallback.settings_hotkey, Hotkey::settings_default());
+        assert_eq!(adjustments.len(), 1);
+    }
+
+    #[test]
+    fn two_identical_hotkeys_are_pulled_apart() {
+        let mut cfg = Config {
+            hotkey: Hotkey::settings_default(),
+            settings_hotkey: Hotkey::settings_default(),
+            ..Config::default()
+        };
+        let adjustments = cfg.validate();
+        assert_eq!(adjustments.len(), 1);
+        assert_ne!(cfg.hotkey, cfg.settings_hotkey);
+    }
+
+    #[test]
+    fn the_two_hotkeys_do_not_default_to_the_same_combination() {
+        // Registering the same combination twice fails the second time, which
+        // would silently cost whichever function lost the race.
+        let cfg = Config::default();
+        assert_ne!(cfg.hotkey, cfg.settings_hotkey);
     }
 
     #[test]

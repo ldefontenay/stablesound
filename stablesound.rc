@@ -1,0 +1,89 @@
+// StableSound settings dialog.
+//
+// A real Win32 dialog template, compiled by rc.exe and embedded in the exe.
+// CLAUDE.md forbids a drawn-UI toolkit: the primary user is blind and uses
+// JAWS, and a template gives genuine EDIT, COMBOBOX and BUTTON controls with
+// the tab order, mnemonics, default button and Escape handling that Windows
+// provides for free and that a screen reader already knows how to read.
+//
+// Two layout rules matter for the screen reader, and both are load-bearing:
+//
+//   1. Every label comes immediately before the control it names. Tab order
+//      is template order, and a static label is announced as the name of the
+//      control that follows it. Reordering these silently breaks the reading.
+//   2. Every mnemonic is unique within the dialog. A mnemonic on a static
+//      label moves focus to the next control that can take it, which is what
+//      makes Alt+O reach the device list.
+//
+// Mnemonics in use: O S L A K M P V H T W D. OK and Cancel deliberately have
+// none - they are the default and cancel buttons, reached with Enter and
+// Escape.
+
+#include <windows.h>
+
+#define IDD_SETTINGS      100
+
+#define IDC_DEVICE       1001
+#define IDC_SIGNAL       1002
+#define IDC_RELEASE      1003
+#define IDC_TIMEOUT      1004
+#define IDC_WAKE_INPUT   1005
+#define IDC_WAKE_MOUSE   1006
+#define IDC_EARCONS      1007
+#define IDC_VOLUME       1008
+#define IDC_HOTKEY       1009
+#define IDC_LOGGING      1010
+#define IDC_DIAGNOSTICS  1011
+#define IDC_SET_HOTKEY   1012
+
+IDD_SETTINGS DIALOGEX 0, 0, 290, 356
+STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "StableSound Settings"
+FONT 9, "Segoe UI", 400, 0, 0x1
+BEGIN
+    GROUPBOX        "Keeping the headphones awake", -1, 7, 7, 276, 88
+
+    LTEXT           "&Output device:", -1, 14, 22, 88, 8
+    COMBOBOX        IDC_DEVICE, 106, 20, 170, 100,
+                    CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+
+    LTEXT           "Keep-alive &signal:", -1, 14, 40, 88, 8
+    COMBOBOX        IDC_SIGNAL, 106, 38, 170, 100,
+                    CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+
+    LTEXT           "&Let go of them:", -1, 14, 58, 88, 8
+    COMBOBOX        IDC_RELEASE, 106, 56, 170, 100,
+                    CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+
+    LTEXT           "&After this many seconds:", -1, 14, 76, 88, 8
+    EDITTEXT        IDC_TIMEOUT, 106, 74, 48, 12, ES_NUMBER | WS_TABSTOP
+
+    GROUPBOX        "Waking up again", -1, 7, 99, 276, 48
+    CONTROL         "Wake when I use the &keyboard", IDC_WAKE_INPUT,
+                    "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 14, 114, 262, 10
+    CONTROL         "Also wake when I use the &mouse or trackpad", IDC_WAKE_MOUSE,
+                    "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 14, 130, 262, 10
+
+    GROUPBOX        "Tones", -1, 7, 151, 276, 52
+    CONTROL         "&Play a tone when I switch keep-alive on or off", IDC_EARCONS,
+                    "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 14, 166, 262, 10
+    LTEXT           "Tone &volume (percent):", -1, 14, 184, 88, 8
+    EDITTEXT        IDC_VOLUME, 106, 182, 48, 12, ES_NUMBER | WS_TABSTOP
+
+    GROUPBOX        "Hotkeys", -1, 7, 207, 276, 68
+    LTEXT           "&Hotkey to toggle keep-alive:", -1, 14, 220, 88, 16
+    EDITTEXT        IDC_HOTKEY, 106, 220, 170, 12, ES_AUTOHSCROLL | WS_TABSTOP
+    LTEXT           "Hotkey to open these se&ttings:", -1, 14, 238, 88, 16
+    EDITTEXT        IDC_SET_HOTKEY, 106, 238, 170, 12, ES_AUTOHSCROLL | WS_TABSTOP
+    LTEXT           "Ctrl, Alt, Shift or Win, then one key. For example: ctrl+win+f12",
+                    -1, 14, 258, 262, 8
+
+    GROUPBOX        "Log file", -1, 7, 279, 276, 48
+    CONTROL         "&Write a log file", IDC_LOGGING,
+                    "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 14, 294, 262, 10
+    CONTROL         "Include extra &diagnostic detail in the log", IDC_DIAGNOSTICS,
+                    "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 14, 310, 262, 10
+
+    DEFPUSHBUTTON   "OK", IDOK, 175, 335, 50, 14
+    PUSHBUTTON      "Cancel", IDCANCEL, 233, 335, 50, 14
+END

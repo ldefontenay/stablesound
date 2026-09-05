@@ -13,6 +13,7 @@
 
 use std::io::{self, BufRead, Write};
 use std::sync::mpsc::Sender;
+use std::sync::{Arc, Mutex};
 
 use windows::Win32::Foundation::{HWND, LPARAM, WPARAM};
 use windows::Win32::System::Com::{CoInitializeEx, CoUninitialize, COINIT_APARTMENTTHREADED};
@@ -30,14 +31,20 @@ pub const WM_CONSOLE_QUIT: u32 = windows::Win32::UI::WindowsAndMessaging::WM_APP
 /// `HWND` is not `Send`, so the window is handed over as a raw value and put
 /// back together on this side. Sound because the handle is only ever used to
 /// post a message, which is explicitly safe from any thread.
-pub fn spawn(cfg: Config, commands: Sender<Command>, hwnd: HWND) {
+///
+/// The config is *shared* rather than owned, because Milestone 4 gave the
+/// settings a dialog and this is no longer the only thing that writes them.
+/// A private copy would drift the moment the user touched the dialog, and
+/// `status` would then read back settings that are not in force - which is
+/// exactly the kind of thing that costs a hardware round to work out.
+pub fn spawn(shared: Arc<Mutex<Config>>, commands: Sender<Command>, hwnd: HWND) {
     let hwnd_bits = hwnd.0 as isize;
     std::thread::spawn(move || {
         // COM is per-thread, and listing devices needs it here too.
         unsafe {
             let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
         }
-        run(cfg, &commands);
+        run(&shared, &commands, hwnd_bits);
         unsafe {
             let _ = PostMessageW(
                 Some(HWND(hwnd_bits as *mut std::ffi::c_void)),
@@ -50,7 +57,7 @@ pub fn spawn(cfg: Config, commands: Sender<Command>, hwnd: HWND) {
     });
 }
 
-fn run(mut cfg: Config, commands: &Sender<Command>) {
+fn run(shared: &Mutex<Config>, commands: &Sender<Command>, hwnd_bits: isize) {
     let config_path = config::config_path();
     let stdin = io::stdin();
     let mut lines = stdin.lock().lines();
@@ -66,6 +73,12 @@ fn run(mut cfg: Config, commands: &Sender<Command>) {
             None => (input.as_str(), ""),
         };
 
+        // Held for the length of one command, so a command reads and writes
+        // the same settings the dialog is working from. Never held across the
+        // blocking read above, which would freeze the dialog.
+        let Ok(mut guard) = shared.lock() else { break };
+        let cfg = &mut *guard;
+
         match word {
             "" => continue,
             "on" => send(commands, Command::On),
@@ -73,10 +86,10 @@ fn run(mut cfg: Config, commands: &Sender<Command>) {
             "toggle" | "t" => send(commands, Command::Toggle),
 
             "signal" => match rest {
-                "zeros" => set_signal(&mut cfg, Signal::Zeros, commands),
-                "fluctuate" | "fluct" => set_signal(&mut cfg, Signal::Fluctuate, commands),
+                "zeros" => set_signal(cfg, Signal::Zeros, commands),
+                "fluctuate" | "fluct" => set_signal(cfg, Signal::Fluctuate, commands),
                 "sine" => set_signal(
-                    &mut cfg,
+                    cfg,
                     Signal::Sine {
                         freq: 20_000.0,
                         amp: 0.01,
@@ -93,7 +106,7 @@ fn run(mut cfg: Config, commands: &Sender<Command>) {
                     } else {
                         Release::Fixed { secs }
                     };
-                    apply(&mut cfg, commands);
+                    apply(cfg, commands);
                 }
                 Err(_) => println!("Usage: {word} <seconds>   for example: {word} 60"),
             },
@@ -112,17 +125,17 @@ fn run(mut cfg: Config, commands: &Sender<Command>) {
                         }
                     }
                 };
-                apply(&mut cfg, commands);
+                apply(cfg, commands);
             }
 
             "wake" => match rest {
                 "on" | "" => {
                     cfg.wake_on_input = true;
-                    apply(&mut cfg, commands);
+                    apply(cfg, commands);
                 }
                 "off" => {
                     cfg.wake_on_input = false;
-                    apply(&mut cfg, commands);
+                    apply(cfg, commands);
                 }
                 _ => println!("Usage: wake on | wake off"),
             },
@@ -130,11 +143,11 @@ fn run(mut cfg: Config, commands: &Sender<Command>) {
             "mouse" => match rest {
                 "on" => {
                     cfg.wake_on_mouse = true;
-                    apply(&mut cfg, commands);
+                    apply(cfg, commands);
                 }
                 "off" | "" => {
                     cfg.wake_on_mouse = false;
-                    apply(&mut cfg, commands);
+                    apply(cfg, commands);
                 }
                 _ => println!("Usage: mouse on | mouse off"),
             },
@@ -142,11 +155,11 @@ fn run(mut cfg: Config, commands: &Sender<Command>) {
             "earcons" => match rest {
                 "on" | "" => {
                     cfg.earcons = true;
-                    apply(&mut cfg, commands);
+                    apply(cfg, commands);
                 }
                 "off" => {
                     cfg.earcons = false;
-                    apply(&mut cfg, commands);
+                    apply(cfg, commands);
                 }
                 _ => println!("Usage: earcons on | earcons off"),
             },
@@ -154,7 +167,7 @@ fn run(mut cfg: Config, commands: &Sender<Command>) {
             "volume" => match rest.parse::<f32>() {
                 Ok(v) => {
                     cfg.earcon_volume = v;
-                    apply(&mut cfg, commands);
+                    apply(cfg, commands);
                 }
                 Err(_) => println!("Usage: volume <0.0 to 1.0>   for example: volume 0.2"),
             },
@@ -176,11 +189,11 @@ fn run(mut cfg: Config, commands: &Sender<Command>) {
                     cfg.diagnostics = true;
                     println!("Diagnostics on. The log will now record why each");
                     println!("input was called the keyboard or the mouse.");
-                    apply(&mut cfg, commands);
+                    apply(cfg, commands);
                 }
                 "off" => {
                     cfg.diagnostics = false;
-                    apply(&mut cfg, commands);
+                    apply(cfg, commands);
                 }
                 _ => println!("Usage: diag on | diag off"),
             },
@@ -190,7 +203,20 @@ fn run(mut cfg: Config, commands: &Sender<Command>) {
                 Err(e) => println!("Could not save: {e}"),
             },
 
-            "status" => describe(&cfg),
+            "status" => describe(cfg),
+
+            // The dialog has to be created by the thread that owns the message
+            // queue, so this asks rather than does.
+            "settings" | "options" => unsafe {
+                let _ = PostMessageW(
+                    Some(HWND(hwnd_bits as *mut std::ffi::c_void)),
+                    crate::settings::WM_OPEN_SETTINGS,
+                    WPARAM(0),
+                    LPARAM(0),
+                );
+                println!("Opening the settings dialog.");
+            },
+
             "help" | "?" => help(),
             "quit" | "exit" | "q" => break,
             other => println!("Unknown command: {other}. Type help for the list."),
@@ -240,7 +266,10 @@ pub fn describe(cfg: &Config) {
     println!("Device:  {device}");
     println!("Signal:  {}", cfg.signal);
     println!("Release: {release}");
-    println!("Hotkey:  {}", cfg.hotkey);
+    println!(
+        "Hotkey:  {} toggles, {} opens the settings",
+        cfg.hotkey, cfg.settings_hotkey
+    );
     println!(
         "Wake:    {}",
         match (cfg.wake_on_input, cfg.wake_on_mouse) {
@@ -279,6 +308,7 @@ pub fn help() {
     println!("  earcons on | off      the tones for switching on and off by hand");
     println!("  volume <0.0-1.0>      how loud those tones are");
     println!("  hotkey <combination>  for example: hotkey ctrl+win+f12");
+    println!("  settings              open the settings dialog");
     println!("  diag on | diag off    log why input was called keyboard or mouse");
     println!("  save                  write current settings to the config file");
     println!("  status                show current settings");
