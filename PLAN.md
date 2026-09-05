@@ -1,15 +1,17 @@
 # StableSound - research findings and build plan
 
-## 0. Where we are (updated 2026-09-05)
+## 0. Where we are (updated 2026-09-06)
 
 **Read this first when picking the project up.**
 
-Milestones 0, 1, 2, 3 and 4 are complete, hardware rounds included. Milestone 3
-took **three** rounds. Milestone 4 took one and passed: the settings dialog
-reads correctly under JAWS.
+Milestones 0 to 5 are complete, hardware rounds included. Milestone 3 took
+**three** rounds. Milestones 4 and 5 took one each and both passed.
 
-**Milestone 5, polish, is built and needs its hardware round.** It is entirely
-made of what the Milestone 4 round asked for.
+**Milestone 5 passed, and its round asked for five more things, all now
+built.** They are small and none of them changes how the app behaves in the
+main: a tray icon that read its state twice, two defaults reversed, punctuation
+keys in hotkeys, and messages you can read back with the arrow keys. Section
+4.7 has the detail. They need a short round of their own before Milestone 6.
 
 ### What exists and works
 
@@ -47,6 +49,14 @@ Release binary is **296 KB**, against a ~1 MB budget.
   was perfect."
 - The tray works from the keyboard. One icon, read once and correctly, `Enter`
   toggles once per press, the menu opens on the Applications key.
+- **Waking still works with the mouse handling gone**, and the trade it cost
+  is accepted: "No, its fine. I've learned to avoid touching it." A manual
+  switch-off still keeps the headset free whatever is touched afterwards,
+  which was the part that mattered most.
+- **The version 6 common controls changed nothing about how the dialog reads.**
+  "Everything still worked the same. No issues while tabbing through."
+- **The reworded labels all read on their own.** "All items read clearly and
+  are easy to understand."
 - **The settings dialog reads correctly under JAWS.** Every control announced
   with its name and its value, mnemonics working, the choices in the combo
   boxes sensible, a refused hotkey read aloud with the focus returned to the
@@ -85,7 +95,13 @@ The Milestone 4 round then asked for five more, all built in Milestone 5:
   that way, and off by default.
 - **Say how to write a hotkey when one is refused**, with every modifier
   spelling, and whether the order matters. Done; it does not.
-- **A steer on logging.** Asked for directly. See 4.6.
+- **A steer on logging.** Asked for directly, given in 4.6, and then
+  overruled by the next round. See 4.7.
+
+The Milestone 5 round then asked for five more, all built and described in
+4.7: the tray icon reading its state twice, logging off by default, the
+settings hotkey on by default after all, punctuation keys in hotkeys, and
+messages put somewhere the arrow keys can review them.
 
 And two things were confirmed for later rather than acted on now:
 
@@ -100,21 +116,17 @@ And two things were confirmed for later rather than acted on now:
   the desk rather than 30 seconds (question 6). Detailed logging now records
   what the meter saw, so a recurrence leaves evidence.
 - Behaviour across Windows sleep/resume, and on battery (question 7).
-- Whether dropping the mouse handling costs anything noticeable in use
-  (question 22). It should make waking *quicker*, since the 250 ms hold is
-  gone, at the price of a trackpad brush taking the headset back.
-- Whether the version 6 common controls change how the dialog reads
-  (question 23). The app had no manifest at all until now.
+- Whether the five changes from the Milestone 5 round behave under JAWS
+  (question 24). The tray name and the message window were both checked by
+  reading what the accessibility layer exposes, which is the string JAWS is
+  given - but not by listening to JAWS say it.
 
 ### What is next
 
-**The Milestone 5 hardware round.** `test.txt` is the script; Tests 33-38.
-
-It is a smaller round than the last four, because Milestone 5 mostly *removes*
-things. What it has to answer: does the app still behave with the mouse
-handling gone, does the dialog still read well after being reworded and given
-real common controls, and is the refusal message now enough to write a hotkey
-correctly on the second attempt.
+**A short round on the five changes the last one asked for.** `test.txt` is
+the script; Tests 39-43. It is the smallest round yet: the tray icon read
+once, a hotkey on a punctuation key, a refusal message reviewed with the arrow
+keys, and the two reversed defaults met as a new user would meet them.
 
 **Then Milestone 6, and shipping.** Autostart is already built. What is left is
 dropping the console harness and switching to the windows subsystem, a help
@@ -131,6 +143,10 @@ plan for the antivirus and SmartScreen problem.
 - Keep-alive never starts because audio was detected. Only explicit request or
   user input. Section 4.1 explains why.
 - Zeros is the default signal. Sine is a last resort and forces fixed release.
+- **The group headings are closed.** JAWS does not announce them, "Show
+  control group info" was already on, and the tester has ruled: "due to the
+  options being very clear, this does not matter... no further work on this is
+  needed."
 - **Telling the keyboard from the mouse is closed.** Four rounds, three
   mechanisms, the tester's own decision to drop it. Do not reopen it without
   being asked.
@@ -358,7 +374,7 @@ All of these are now in the dialog (Milestone 4) unless marked otherwise:
 - Wake on input: on by default. Any input, with no attempt to tell the keyboard from the mouse (see 4.1)
 - Start with Windows: on/off. **Kept in the registry, not the config file** - see below.
 - Earcons: on/off, volume (shown as a percentage; "10" is far easier to hear and retype than "0.1")
-- Logging on/off, and detailed logging for troubleshooting, off by default (see 4.6)
+- Logging on/off, and detailed logging for troubleshooting, both off by default (see 4.7)
 
 Dropped from this list: **hard release**, now deferred indefinitely (see 2.4).
 
@@ -534,7 +550,9 @@ These are requirements, not nice-to-haves:
 
 ### 4.6 What the Milestone 4 round settled (Milestone 5)
 
-**The settings hotkey is optional, and off.** `Ctrl+Win+F11` opened the dialog
+**The settings hotkey is optional, and off.** *(Reversed by the Milestone 5
+round: it is optional, and on. See 4.7. The reasoning below is unchanged and
+still explains the checkbox.)* `Ctrl+Win+F11` opened the dialog
 from anywhere. The tester's answer to whether that was worth a combination
 taken from every other program: "It won't be used often enough to warrant a
 hotkey, so having it in the tray only is my current preference. Maybe make the
@@ -590,6 +608,10 @@ finding:
   produced a fix rather than a guess produced it from this file, and the ones
   that produced guesses were the rounds before it existed. A log that is off
   when the problem happens is worth nothing.
+
+  **Overruled by the Milestone 5 round, and the log now ships off.** The
+  argument above was put and the tester chose otherwise having seen both. See
+  4.7 for what that costs and who has to carry it.
 - **Detailed logging stays off** until something is being looked into, because
   it is several times longer and only useful to somebody reading it closely.
 - **What "detailed" now means** is the peak meter crossing the audio threshold
@@ -608,6 +630,87 @@ against the size budget.
 Being straight about it: this was tried as a fix for the unannounced group
 headings and made no difference at all to the accessibility tree. It is kept
 because an app with a dialog should have one, not because it solved anything.
+
+### 4.7 What the Milestone 5 round settled (Milestone 5.1)
+
+Five things, none of them large, and one of them a shell bug rather than ours.
+
+**The tray icon read its own state twice.** "With keep-alive off, it correctly
+displays StableSound: headphones free. With keep-alive on, it displays
+StableSound: headphones free StableSound: headphones awake."
+
+Windows 11 keeps whatever `szTip` said at `NIM_ADD` as the icon's *label*, and
+from then on hands a screen reader `"<label> <tooltip>"`, printing it once only
+while the two agree. Registering the icon under its off-state text therefore
+guaranteed the doubling the moment the state changed. This is the shell's rule,
+not a mistake of ours: on the same machine Microsoft's own Windows Security icon
+reads "Windows Security - No actions needed. Windows Security - Actions
+recommended."
+
+So the icon is added as `StableSound` and the tooltip carries the state alone:
+"StableSound Headphones awake". That is the shape every built-in icon already
+uses - "Volume Headphones (soundcore AeroClip): 44%" - and it is shorter than
+what it replaced. Confirmed against the live notification area, off and on and
+off again, by reading the name UI Automation exposes.
+
+**Logging is off by default.** Asked for directly, against the steer given in
+4.6: "Please have logging off by default and it can then be turned on when
+needed for development or trouble-shooting." The argument for keeping it on is
+unchanged and was put; the tester heard it and chose otherwise, having seen
+both. **The consequence has to be carried by the test scripts from now on: a
+round run without switching logging on first leaves nothing behind to read.**
+Every script from Test 39 onwards says so in its opening steps.
+
+**The settings hotkey ships on.** The reverse of what Milestone 4 asked for,
+decided after living without it: "Actually, ship with the settings hotkey on.
+In the documentation later, we can recommend that the hotkey can be disabled
+once the user has completed tweaking the application settings to their
+satisfaction." The reasoning in 4.6 survives intact, only inverted - the moment
+to hand `Ctrl+Win+F11` back to the rest of the machine is once the settings are
+the way you want them, not before you have ever opened them. The help file owes
+this a paragraph.
+
+**Hotkeys can use punctuation keys.** "I tried using ctrl+win+; but ; was not
+available as an option. If there isn't a good reason for not having punctuation
+keys available, please fix this." There was no good reason, only a table that
+stopped at letters, digits and function keys.
+
+Punctuation has no fixed virtual key code the way those do - the key that types
+`;` sits somewhere else on another layout - so the mapping comes from
+`VkKeyScanW` and is read back for display by `MapVirtualKeyW`. Any single
+character is now accepted. Where a character needs Shift, Shift is folded into
+the combination, because that is what the fingers do: `ctrl+win+:` is
+`Ctrl+Win+Shift+;` and is shown that way. AltGr characters are refused, since
+they want Ctrl and Alt held down too and would fight the modifiers rather than
+join them. The plus key is written as the word `plus`, a plus sign being what
+joins the parts together.
+
+**Messages are now read back with the arrow keys.** On the refusal advice: "Its
+long, but instructive. A Jaws user needs to use the Jaws cursor or to
+virtualise the control to absorb all the detail, which may not be within the
+abilities of a more novice user. Putting the information in a read-only edit
+field would solve this, by making it possible to use the cursor keys to review
+the text. The text itself is excellent."
+
+So the text stays and the window changes. `IDD_MESSAGE` is a second dialog
+template whose first tab stop is a read-only multi-line `EDIT`: it is read on
+focus the way a message box is, and then the arrow keys walk it a line or a
+word at a time with no cursor mode to switch into. Every message the dialog
+shows goes through it, not only the hotkey one. `MessageBeep` keeps the one
+thing a message box gave that a plain dialog does not - the system ding that
+arrives ahead of any speech and says which kind of message this is.
+
+It is modal, as the message box was, so the global hotkey is not serviced while
+it is up. That is unchanged rather than a regression, and it is a window that
+exists to be dismissed.
+
+**On the group headings, nothing changed and nothing more will.** The tester
+checked the JAWS setting: "Its called 'show control group info' and it was
+already on, which is the default setting." They still are not announced, and
+the verdict is to leave it: "due to the options being very clear, this does not
+matter... no further work on this is needed." Question 21 is closed unsolved,
+with the mitigation - no label leaning on its heading - already in place and
+confirmed to work.
 
 ---
 
@@ -758,36 +861,43 @@ Raw results are in `test-milestone-4.txt`, Tests 27-32.
     it in the tray only is my current preference." Now an option, off by
     default. See 4.6.
 
-### Still open after the Milestone 4 round
+### Resolved by the Milestone 5 round (2026-09-06)
 
-21. **Can JAWS be made to announce the group headings?** It named every control
-    correctly but never the group it was in, and the tester wants them: "Having
-    them read out would be helpful for a new user." Nothing found from this
-    side does it. The obvious lever turned out to be already pulled - `WS_GROUP`
-    on the first control of each group, which rc.exe adds to every `LTEXT` by
-    default, so it was present all along and announced nothing. The version 6
-    common controls made no difference either. What JAWS actually uses is
-    geometry, the `GROUPBOX` rectangle enclosing the focused control, and that
-    has always been true here too, checked by reading the live control
-    rectangles out of the running dialog.
+Raw results are in `test-milestone-5.txt`, Tests 33-38.
 
-    Which leaves JAWS' own verbosity setting as the likely answer, and that is
-    the tester's to check rather than ours to change. Test 35 asks. **The
-    mitigation is already in and does not depend on the answer:** no control's
-    label leans on its group heading any more.
+21. ~~Can JAWS be made to announce the group headings?~~ **No, and it no longer
+    matters.** "Show control group info" was already on - it is the JAWS
+    default - and the headings are still not announced. The tester closed it:
+    "due to the options being very clear, this does not matter... no further
+    work on this is needed." Closed unsolved. The mitigation carried the whole
+    weight instead and was confirmed to work: every label reads on its own.
 
-22. **Does dropping the mouse handling cost anything in daily use?** It should
-    make waking noticeably *quicker* - the 250 ms hold is gone - at the price
-    of a trackpad brush taking the headset back from the phone. The tester
-    accepted that trade in advance. Test 33 and Test 38 ask whether it feels
-    right in practice.
+22. ~~Does dropping the mouse handling cost anything in daily use?~~ **No.**
+    Waking works, and the quarter second saved is below the threshold of
+    noticing - "feels nearly the same. Happy with how it is." The trade is
+    accepted: "No, its fine. I've learned to avoid touching it." And the part
+    that mattered held - switching keep-alive off by hand keeps the headset
+    free for the phone whatever is touched afterwards.
 
-23. **Do the version 6 common controls change how the dialog reads?** The app
-    had no manifest at all until now, so the dialog was built from the version
-    5 controls when it was signed off. Version 6 is what every other dialog on
-    the machine uses, so this should be neutral or better - but the dialog
-    passed a JAWS round on the old controls, and that is the thing being
-    changed underneath it. Test 34.
+23. ~~Do the version 6 common controls change how the dialog reads?~~ **No,
+    and that is the wanted answer.** "Yes, felt like the same good experience...
+    Everything still worked the same. No issues while tabbing through."
+    Mnemonics, combo boxes and per-control reading all unchanged.
+
+### Still open after the Milestone 5 round
+
+24. **Do the five follow-ups behave under JAWS?** The tray icon now reading its
+    state once, a hotkey on a punctuation key, the refusal message in a
+    read-only edit, and the two reversed defaults. The tray name and the
+    message window were both checked by reading what the accessibility layer
+    exposes - the same string JAWS is handed - but nothing here has been heard
+    spoken. Tests 39-43.
+
+25. **Is the message window better than the message box, or only different?**
+    It is a bigger window with an extra keystroke's worth of structure, and the
+    thing it buys is reviewability. If a short message now feels laborious
+    where a message box was quick, the answer may be to keep the box for one
+    line and the window for the advice. Test 41 asks directly.
 
 ### Noted, not a defect
 
@@ -978,7 +1088,7 @@ Built: the settings dialog as a real Win32 dialog template; a second global hotk
 - Test 32, living with it: **passed.** No clipping, nothing unasked-for, and
   the dialog judged enough on its own to retire the console window.
 
-**Milestone 5 - polish. BUILT (2026-09-05), hardware round pending.**
+**Milestone 5 - polish. DONE (2026-09-06), round passed.**
 
 Entirely made of what the Milestone 4 round asked for. Design detail in 4.6,
 and in 4.1 for the removal.
@@ -1031,10 +1141,46 @@ Two defects found while checking the above, both fixed:
 - `cargo clippy --all-targets -- -D warnings` clean. Release binary **296 KB**,
   up from 290 KB, against the ~1 MB budget.
 
-**Not verifiable from here:** whether the version 6 controls changed how the
-dialog reads, whether the reworded labels land, whether the refusal message is
-now enough, and whether losing the mouse handling is felt in daily use. Round
-is `test.txt`, Tests 33-38.
+**The round passed** - `test-milestone-5.txt`, Tests 33-38. The version 6
+controls changed nothing, the reworded labels read clearly on their own, each
+refusal named the mistake actually made, and losing the mouse handling costs
+nothing anyone can feel. The group headings could not be delivered and are now
+closed as not needed.
+
+**Milestone 5.1 - what that round asked for. BUILT (2026-09-06), round
+pending.** Design detail in 4.7.
+
+1. **The tray icon reads its state once.** It is registered under the app's
+   name and the tooltip carries the state alone, because Windows 11 composes a
+   tray icon's accessible name as its registration label followed by its
+   current tooltip.
+2. **Logging off by default**, reversing the steer given in 4.6, at the
+   tester's decision. Every test script from here on has to ask for it to be
+   switched on first.
+3. **The settings hotkey on by default**, reversing what the Milestone 4 round
+   asked for, at the tester's decision.
+4. **Punctuation keys allowed in hotkeys**, resolved through the keyboard
+   layout rather than a table, with Shift folded in where a character needs it.
+5. **Messages moved into a read-only edit** the arrow keys can review, keeping
+   the system ding that says which kind of message it is.
+
+**Verified by driving the running app from another process:**
+
+- The tray icon's UI Automation name - the string JAWS is handed - reads
+  `StableSound Headphones free` and `StableSound Headphones awake`, off and on
+  and off again, against the live notification area. Before the fix the same
+  probe reproduced the reported doubling exactly.
+- A refused hotkey opens a real `#32770` containing a real `EDIT` with
+  `ES_MULTILINE` and `ES_READONLY`; the focus lands on it, all twenty lines fit
+  without scrolling, Escape and Enter both dismiss it, and the focus returns to
+  the field that was wrong.
+- `hotkey ctrl+win+;` is accepted and reads back as `Ctrl+Win+;`;
+  `ctrl+win+:` becomes `Ctrl+Win+Shift+;`, which is the same keys.
+- 38 unit tests, `cargo clippy --all-targets -- -D warnings` clean. Release
+  binary **297 KB**, up from 296 KB, against the ~1 MB budget.
+
+**Not verifiable from here:** whether any of it sounds right under JAWS.
+Round is `test.txt`, Tests 39-43.
 
 **Hard release. DEFERRED, probably not needed.** Soft release was confirmed sufficient on the AeroClip (see 2.4), so this is no longer planned work. Revisit only if another headset needs it, or if the 3-second handover becomes annoying. Reference if it ever happens: `m2jean/ToothTray`.
 
@@ -1052,10 +1198,11 @@ Two things the Milestone 4 round confirmed belong here rather than earlier:
 
 Autostart is already built, in Milestone 4.
 
-**Current position (2026-09-05):** Milestones 0 to 4 complete and
-hardware-tested. The settings dialog passed its JAWS round. Milestone 5 is
-built and awaits a round; it is mostly removal, and the one thing the tester
-asked for that could not be delivered is the group headings - question 21.
+**Current position (2026-09-06):** Milestones 0 to 5 complete and
+hardware-tested. The settings dialog passed its JAWS round and so did the
+polish that followed it. Five small follow-ups from that round are built and
+await a short round of their own. After that, Milestone 6: drop the console,
+add a help file, write the README, and face the antivirus problem.
 ---
 
 ## 8. Sources

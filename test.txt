@@ -1,0 +1,341 @@
+STABLESOUND - MILESTONE 5.1, THE FIVE THINGS THE LAST ROUND ASKED FOR
+=====================================================================
+
+Created: 2026-09-06
+Status:  NOT STARTED
+
+The shortest round yet. Five tests, about twenty minutes, and four of
+them are one thing each.
+
+Your previous rounds are kept in test-milestones-1-2.txt,
+test-milestone-3.txt, test-milestone-3-round-2.txt,
+test-milestone-3-round-3.txt, test-milestone-4.txt and
+test-milestone-5.txt.
+
+Milestone 5 passed, so nothing below revisits it. This is only the five
+things your answers asked for afterwards.
+
+
+WHAT CHANGED, AND WHY
+---------------------
+
+1. The tray icon no longer says its state twice. You found it reading
+   "StableSound: headphones free StableSound: headphones awake".
+
+   That was Windows, not us, and worth knowing about because it will
+   come up again. Windows 11 remembers whatever the tooltip said at the
+   moment an icon is added, treats that as the icon's name for the rest
+   of the session, and then reads out the name followed by the current
+   tooltip - showing it once only while the two still match. So an icon
+   added saying "headphones free" was always going to read as both the
+   moment the state changed. Microsoft's own Windows Security icon does
+   exactly the same thing on your machine: it reads "Windows Security -
+   No actions needed. Windows Security - Actions recommended."
+
+   The icon is now added as plain "StableSound" and the tooltip carries
+   the state on its own, so it should read "StableSound Headphones
+   awake". That is the same shape as the built-in icons - your volume
+   icon reads "Volume Headphones (soundcore AeroClip): 44%". It is also
+   shorter than what it replaced.
+
+2. Punctuation keys work in hotkeys. You wanted ctrl+win+; and it was
+   refused. There was no good reason for that.
+
+   Which key types a semicolon depends on the keyboard layout, so the
+   app now asks Windows rather than carrying a list of its own. Any
+   single character works. Where a character needs Shift to type it, the
+   Shift becomes part of the combination, because that is what your
+   fingers do anyway - ask for ctrl+win+: and you will be told you have
+   set Ctrl+Win+Shift+;, which is the same three keys. The plus key is
+   the one exception and is written as the word "plus", since a plus
+   sign is what separates the parts.
+
+3. Messages are now in a window you can read back. Your words: "putting
+   the information in a read-only edit field would solve this, by making
+   it possible to use the cursor keys to review the text."
+
+   That is what it is now - a read-only edit field, which the focus
+   lands on when the window opens, so it should be read out just as the
+   old message box was, and then the arrow keys will go back over it a
+   line or a word at a time with no cursor mode to switch into. Enter or
+   Escape closes it, and the focus still returns to the field that was
+   wrong.
+
+   Every message the settings dialog shows now works this way, not only
+   the hotkey one. The system's warning ding still plays first, so you
+   still hear that something was refused before anything is spoken.
+
+4. Logging is off by default, as you asked.
+
+   One consequence, and it falls on me rather than you: when logging is
+   off there is no record of what happened, so every test script from
+   now on has to ask you to switch it on first. This one does, in the
+   step below. If you ever hit something odd outside a test round, the
+   first thing worth doing is turning logging on before trying to
+   reproduce it.
+
+5. The settings hotkey is on by default, as you asked. Ctrl+Win+F11
+   again, and the checkbox to switch it off is still there for once you
+   have the settings the way you want them.
+
+Still waiting for Milestone 6, unchanged: the help file with a button to
+open it, and removing the console window.
+
+
+BEFORE YOU START
+----------------
+
+The two defaults only show themselves on a fresh install, so this round
+starts by making one. In File Explorer, go to the folder:
+
+    C:\Users\ldefo\dev\stablesound\target\debug
+
+and rename the file stablesound.conf to stablesound.conf.keep - that is
+your settings from the last round, and Test 43 puts them back at the
+end.
+
+ANSWER - did you find it and rename it?
+
+
+Then build and run from the repo root:
+
+    cargo run
+
+Have the AeroClips connected and set as the default output.
+
+ANSWER - did the app start cleanly?
+
+
+===========================================================
+TEST 39 - THE TRAY ICON, READ ONCE
+===========================================================
+
+Steps:
+
+1. Press Windows+B and arrow to StableSound. Listen to it.
+
+ANSWER - what does it say, word for word?
+
+
+2. Press Ctrl+Win+F12 to switch keep-alive on. Then Windows+B and arrow
+   to StableSound again.
+
+ANSWER - what does it say now? It should have changed, and it should
+still be one phrase rather than two.
+
+
+3. Switch keep-alive off with Ctrl+Win+F12, and read the icon once more.
+
+ANSWER - back to what it said the first time?
+
+
+4. Now do it a few more times - on, read, off, read, on, read.
+
+ANSWER - does it stay one phrase however many times you switch it? This
+is the part I want to be sure of: what went wrong before only appeared
+after the state had changed.
+
+
+ANYTHING ODD:
+
+
+===========================================================
+TEST 40 - A HOTKEY ON A PUNCTUATION KEY
+===========================================================
+
+Steps:
+
+1. Open the settings from the tray: Windows+B, arrow to StableSound,
+   press the Applications key, choose "Settings...".
+
+2. In "Hotkey to switch keep-alive on and off", type:
+
+       ctrl+win+;
+
+   and press OK.
+
+ANSWER - was it accepted?
+
+
+3. Press Ctrl+Win+; - control, Windows and semicolon together.
+
+ANSWER - did keep-alive toggle?
+
+
+4. Open the settings again and read the hotkey field back.
+
+ANSWER - what does it say? It should read Ctrl+Win+; back to you.
+
+
+5. While you are here, try one that needs Shift. Type:
+
+       ctrl+win+:
+
+   which is a colon, so Shift and the semicolon key. Press OK, then open
+   the settings again and read the field.
+
+ANSWER - what does it say? Ctrl+Win+Shift+; is the expected answer, and
+is the same three keys - I want to know whether being told that is
+clear or merely confusing.
+
+
+6. Set it to whatever you actually want to keep. If you liked
+   ctrl+win+; then that; otherwise back to ctrl+win+f12, or anything
+   else. Press OK and try it.
+
+ANSWER - what did you settle on, and does it work?
+
+
+ANYTHING ODD:
+
+
+===========================================================
+TEST 41 - READING A MESSAGE BACK
+===========================================================
+
+This is the one I most want your opinion on, rather than a yes or no.
+
+Steps:
+
+1. Open the settings. In the hotkey field, type ctrl+banana and press
+   OK.
+
+ANSWER - did you hear the warning ding before anything was spoken?
+
+
+ANSWER - what got read out when the window opened? I expect the whole
+message, the same as the old message box did.
+
+
+2. Now use the arrow keys - up and down, and left and right - to go back
+   over the text.
+
+ANSWER - can you review it a line at a time? A word at a time?
+
+
+ANSWER - did you have to switch into the JAWS cursor or virtualise
+anything, or did it just work from where the focus was?
+
+
+3. Press Escape.
+
+ANSWER - did the window close, and did the focus go back to the hotkey
+field?
+
+
+4. Do it once more, with something wrong in a different way - type
+   ctrl and press OK. This message is two lines rather than twenty.
+
+ANSWER - for a short message like that one, is the window better than
+the old message box, or is it more ceremony than a one-line complaint
+deserves? If the short ones would be better left as they were, say so -
+I can keep the box for short messages and the window for the long
+advice.
+
+
+5. Press Enter this time.
+
+ANSWER - did that close it too?
+
+
+ANYTHING ODD:
+
+
+===========================================================
+TEST 42 - THE TWO NEW DEFAULTS
+===========================================================
+
+You are running without a settings file, so this is what a new user
+meets.
+
+Steps:
+
+1. Press Ctrl+Win+F11.
+
+ANSWER - did the settings dialog open? It should, without you having
+switched anything on.
+
+
+2. Tab to "Write a log file, so a problem can be looked into later".
+
+ANSWER - is it unticked?
+
+
+ANSWER - reading that label cold, is it clear enough that you would know
+to tick it before trying to reproduce a problem? This is the label doing
+the job the default used to do, so I would rather it were wrong now than
+later.
+
+
+3. Tab to "Also use a hotkey to open these settings".
+
+ANSWER - is it ticked, with Ctrl+Win+F11 in the field beside it?
+
+
+4. Untick it and press OK. Then press Ctrl+Win+F11.
+
+ANSWER - did it stop working?
+
+
+5. Open the settings from the tray, tick it again, press OK.
+
+ANSWER - does Ctrl+Win+F11 work again?
+
+
+ANYTHING ODD:
+
+
+===========================================================
+TEST 43 - HALF AN HOUR, WITH THE LOG ON
+===========================================================
+
+Steps:
+
+1. Open the settings and tick "Write a log file, so a problem can be
+   looked into later". Press OK. Leave "Detailed logging" alone unless
+   you want it.
+
+2. Work normally for half an hour or so. Use the hotkey, let it release
+   on its own, hand the headset to your phone and take it back.
+
+ANSWER - did speech ever clip?
+
+
+ANSWER - did anything behave differently from the last round, in any
+way at all?
+
+
+3. Open the log from the tray menu: Windows+B, StableSound, Applications
+   key, "Open log file".
+
+ANSWER - is there a line for everything you did? Anything in it that
+does not read clearly?
+
+
+4. Last thing. Quit StableSound, then in that same folder:
+
+       C:\Users\ldefo\dev\stablesound\target\debug
+
+   delete stablesound.conf and rename stablesound.conf.keep back to
+   stablesound.conf. That restores the settings you had before this
+   round.
+
+ANSWER - done?
+
+
+ANYTHING ODD:
+
+
+===========================================================
+ANYTHING ELSE
+===========================================================
+
+ANSWER - anything at all, in any of this, that felt wrong or that you
+would want done differently:
+
+
+ANSWER - Milestone 6 is next and it is the last one: dropping the
+console window, a help file with a button that opens it, a README, and
+working out what to do about antivirus warnings on an unsigned
+executable. Anything you want added to that list before I start?
+
