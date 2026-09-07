@@ -1,6 +1,6 @@
 # StableSound - research findings and build plan
 
-## 0. Where we are (updated 2026-09-07)
+## 0. Where we are (updated 2026-09-08)
 
 **Read this first when picking the project up.**
 
@@ -22,12 +22,15 @@ window now says what kind of message it is rather than how to read it. See
 
 ### What exists and works
 
-A working console app. `cargo run` from the repo root. It keeps the headphones
+A finished app, waiting on its last hardware round. It keeps the headphones
 awake, releases them on a timer, wakes again when you touch the machine, has a
-tray icon, a global hotkey and a real settings dialog, and logs everything to
-`stablesound.log` next to the exe.
+tray icon, a global hotkey, a real settings dialog and a help document, and can
+log to `stablesound.log` next to the exe.
 
-Release binary is **297 KB**, against a ~1 MB budget.
+**No console window since Milestone 6**, and no window of its own at all until
+it is asked for one. Where the console's output went is described in 6.1.
+
+Release binary is **294 KB**, against a ~1 MB budget.
 
 ### What is proven on hardware
 
@@ -130,16 +133,17 @@ And two things were confirmed for later rather than acted on now:
 
 ### What is next
 
-**Milestone 6, and shipping. Nothing else is outstanding.** Every hardware
-round is closed and every request from every round is either built or
-deliberately abandoned. Autostart is already built. What is left is dropping
-the console harness and switching to the windows subsystem, a help file with
-buttons that open it, a size-tuned release build, a README, and a plan for the
-antivirus and SmartScreen problem.
+**The Milestone 6 hardware round, and then shipping.** Milestone 6 is built:
+the console is gone and the binary is a windows subsystem one, there is a help
+document in HTML with buttons in both the dialog and the tray menu, a second
+copy of the app is prevented and says so, the README and LICENSE are written,
+and the antivirus question has been researched and answered (6.5).
 
-The tester was asked whether anything should be added to that list and said
-no. The Milestone 6 round should also carry the one small thing built after
-5.1 - the reworded message heading (question 26).
+The script is `test-milestone-6.txt`, Tests 44-51. It carries question 26 - the
+reworded message heading, built after the 5.1 round and still unheard - along
+with everything Milestone 6 added.
+
+**Nothing else is outstanding.** After that round it ships.
 
 ### Things a fresh session should not re-litigate
 
@@ -958,8 +962,33 @@ Raw results are in `test-milestone-5-1.txt`, Tests 39-43. Every one passed.
 26. **Does the reworded message heading read well?** It now says what kind of
     message this is - "What went wrong, and how to fix it:" or "What
     happened:" - instead of describing the control, which is what the round
-    asked for. Verified through UI Automation, not heard. It should ride along
-    with the Milestone 6 round rather than earn a round of its own.
+    asked for. Verified through UI Automation, not heard. Riding along with
+    the Milestone 6 round as Test 47.
+
+### Opened by Milestone 6, for its round
+
+27. **Does the help document work as a document?** The whole reason it is HTML
+    in a browser rather than a text file or a read-only edit is heading
+    navigation - `H` between headings, `Insert+F6` for the list. That has been
+    reasoned about and never heard. If it turns out not to help, the format
+    was the wrong choice and a plain text file would have been simpler. Test
+    46.
+
+28. **Is `Exit StableSound` in a safe place?** It is last in tab order, after
+    OK and Cancel, so tabbing one stop too far past the settings reaches OK
+    rather than the button that quits. That is a judgement made without being
+    able to feel it. Test 48 asks directly.
+
+29. **Is anything about the console actually missed?** It was the diagnostic
+    interface for four milestones and the tester was fluent in it. The
+    settings dialog and the log are meant to cover everything it did. Test 51.
+
+30. **Do the failure windows read well?** Three of them - a tray icon that
+    cannot be created, a hotkey another program holds, settings that cannot be
+    saved - and none can be provoked to order, so none has been heard. The
+    hotkey one is the likeliest to be met in real use. Not scripted; it will
+    have to be caught when it happens, which is the reason each one names the
+    path or the combination involved rather than merely saying it failed.
 
 ### Noted, not a defect
 
@@ -1269,11 +1298,23 @@ afterwards.
 
 **Hard release. DEFERRED, probably not needed.** Soft release was confirmed sufficient on the AeroClip (see 2.4), so this is no longer planned work. Revisit only if another headset needs it, or if the 3-second handover becomes annoying. Reference if it ever happens: `m2jean/ToothTray`.
 
-**Milestone 6 - ship. IN PROGRESS**, branch `m6-ship`. Size-tuned release
-build, README, and a plan for the antivirus/SmartScreen problem - a small
-unsigned binary that opens audio devices and registers global hotkeys fits the
-profile AV heuristics dislike. Options: submit false-positive reports to the
-major vendors, or look at code signing.
+**Milestone 6 - ship. BUILT (2026-09-08), hardware round outstanding.**
+Branch `m6-ship`, script `test-milestone-6.txt`, Tests 44-51.
+
+Everything the milestone asked for is built: the console dropped and the
+subsystem switched (6.1), a guard against a second copy (6.2), a test for the
+recurring flattened-continuation defect (6.3), the help document and the three
+dialog buttons (6.4), and the antivirus question researched and answered
+(6.5). The README and LICENSE are written.
+
+**The size-tuned release build needed nothing.** The profile has been
+`opt-level = "z"`, LTO, one codegen unit, `panic = "abort"` and stripped
+symbols since Milestone 0, and the binary is **294 KB** against a ~1 MB
+budget - *smaller* than the 297 KB it started this milestone at, because
+dropping the console gave back more than the help document and the three
+buttons cost. The only thing left to try would be rebuilding the standard
+library, which needs a nightly toolchain, and there is no reason to spend a
+toolchain constraint on 700 KB of headroom.
 
 Two things the Milestone 4 round confirmed belong here rather than earlier:
 
@@ -1551,15 +1592,13 @@ console window and no visible window of its own, and no `conhost` is spawned.
 reads, and the three failure windows, which need a combination to be taken by
 another program to provoke.
 
-**Current position (2026-09-07):** Milestones 0 to 5.1 complete and
-hardware-tested, with nothing outstanding behind them. The settings dialog
-passed its JAWS round, so did the polish that followed it, and so did the five
-follow-ups after that. One small thing - the reworded message heading - is
-built and unheard, and rides along with the next round.
+**Current position (2026-09-08):** Milestones 0 to 5.1 complete and
+hardware-tested, with nothing outstanding behind them, and Milestone 6 built
+and waiting on the round that closes it.
 
-Only Milestone 6 is left: drop the console, add a help file, write the README,
-and face the antivirus problem. The tester was asked whether anything should
-join that list and said no: "this will be a great first version."
+That round is the last one. It carries question 26 from 5.1 and questions 27
+to 30 from Milestone 6, and if it passes there is nothing between here and a
+first release: "this will be a great first version."
 ---
 
 ## 8. Sources

@@ -9,9 +9,10 @@ target/
 *.dll
 *.res
 
-# Local config and logs produced by the app at runtime
+# Local config, logs and the help copy produced by the app at runtime
 stablesound.conf
 stablesound.log
+stablesound-help.html
 
 # Editor / OS
 .vs/

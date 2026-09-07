@@ -1,0 +1,301 @@
+STABLESOUND - MILESTONE 6 HARDWARE ROUND
+Tests 44 to 51.
+
+This is the shipping round. The console window is gone, so StableSound now has
+no window at all until you ask it for one. There is a help document, three new
+buttons in the settings dialog, and a guard against running two copies at once.
+
+One thing rides along from last time: the heading over the message window was
+reworded after the Milestone 5.1 round, and has not been heard yet. That is
+Test 47.
+
+Please fill in the ANSWER lines. Anything you notice that no question asks
+about goes in the ANYTHING ODD line for that section - those have been useful
+every round.
+
+
+BEFORE YOU START
+
+Build the new version and run it:
+
+    cargo build --release
+
+Then run target\release\stablesound.exe
+
+If a StableSound from an earlier session is still running, exit it first, or
+the new one will tell you it is already running - which is Test 50, but let us
+get there in order.
+
+Logging is off by default now, so please turn it on before anything else, or
+there will be nothing to read afterwards:
+
+  1. Press Ctrl+Win+F11 to open the settings.
+  2. Tick "Write a log file, so a problem can be looked into later".
+  3. Tick "Detailed logging, for troubleshooting".
+  4. Press Enter for OK.
+
+Did that work, and did the dialog close?
+ANSWER:
+
+
+TEST 44 - THE CONSOLE IS GONE
+
+For every earlier round, starting StableSound put a console window on screen
+with text in it. It should not any more.
+
+Start StableSound. Did any window appear at all?
+ANSWER:
+
+Did anything appear briefly and then vanish - a flash, or a moment of your
+screen reader reading something?
+ANSWER:
+
+Press Ctrl+Win+F12. Did keep-alive switch on, with its tone, exactly as
+before?
+ANSWER:
+
+Press it again to switch off. Same as before?
+ANSWER:
+
+Alt+Tab through your open windows. Is there a StableSound window in the list
+that should not be there?
+ANSWER:
+
+ANYTHING ODD:
+
+
+TEST 45 - THE TRAY MENU
+
+Press Windows+B and arrow to StableSound, then press the Applications key.
+
+Read down the whole menu with the arrow keys and list the items in order:
+ANSWER:
+
+There should now be a Help item that was not there before. Is it there, and
+does it read clearly?
+ANSWER:
+
+Close the menu with Escape. Did it close without doing anything?
+ANSWER:
+
+ANYTHING ODD:
+
+
+TEST 46 - THE HELP DOCUMENT
+
+Open the tray menu again and choose Help. It should open a page in your
+browser called "StableSound Help".
+
+Did a browser open, and did it have the right page in it?
+ANSWER:
+
+Did anything else appear first - in particular a window asking how you want to
+open the file? That would be a bug, and please say so if you see it.
+ANSWER:
+
+This is the part that decided the format. Press H a few times to move from
+heading to heading. Does that work, and do the headings make sense as a list
+of what the document covers?
+ANSWER:
+
+Try Insert+F6 for the list of headings. Is the list useful - could you find
+what you wanted from it?
+ANSWER:
+
+Read a section or two properly - "The settings, one by one" is the longest.
+Is the writing clear, and is anything explained wrongly or missing?
+ANSWER:
+
+Is there anything you expected to find in the help that is not there?
+ANSWER:
+
+ANYTHING ODD:
+
+
+TEST 47 - THE MESSAGE HEADING (the one riding along)
+
+After the last round the heading over the message text was reworded. It used
+to say "Message, which the arrow keys will read back", and you pointed out
+that your screen reader then said "read only edit" straight afterwards, so the
+same fact was said twice. It now says what kind of message it is instead.
+
+Open the settings with Ctrl+Win+F11. Tab to "Hotkey to switch keep-alive on
+and off", clear it, and type just:  f9
+
+Press Enter for OK. A message window should appear.
+
+What did your screen reader say when the message window opened? Please give
+the words in the order you heard them, as closely as you can.
+ANSWER:
+
+Is the heading better than the old one - does it tell you what you need to
+know without wasting words?
+ANSWER:
+
+Can you still read the message back with the arrow keys, a line at a time?
+ANSWER:
+
+Press Escape. Did the focus go back to the hotkey field that was wrong?
+ANSWER:
+
+Put the hotkey back to  ctrl+win+f12  and press Enter for OK.
+Did that work?
+ANSWER:
+
+ANYTHING ODD:
+
+
+TEST 48 - THE THREE NEW BUTTONS IN THE SETTINGS
+
+Open the settings again with Ctrl+Win+F11.
+
+There are three new buttons: "Open the log file" inside the Log file section,
+and "Help" and "Exit StableSound" along the bottom.
+
+Tab all the way through the dialog from the top. Write down what you hear for
+each of the three new buttons:
+ANSWER:
+
+The buttons at the bottom come in this order when tabbing: OK, then Cancel,
+then Help, then Exit StableSound. Exit is deliberately last, so that tabbing
+one stop too far from the settings lands on OK rather than on the button that
+quits the program. Does that order feel safe to you, or would you put them
+somewhere else?
+ANSWER:
+
+Tab to "Open the log file" and press it. The log should open, since you turned
+logging on at the start. Did it?
+ANSWER:
+
+Come back to the settings and press F1. Does that open the help, the same as
+the Help button?
+ANSWER:
+
+Tab to Help and press it. Does that open the help too?
+ANSWER:
+
+Press Escape to close the settings without changing anything. Did it close?
+ANSWER:
+
+ANYTHING ODD:
+
+
+TEST 49 - EXIT FROM THE DIALOG
+
+Until now the only way to quit was the tray menu. There is now a button, since
+nothing is supposed to be reachable only through the tray.
+
+Switch keep-alive on with Ctrl+Win+F12, so the headphones are being held.
+
+Open the settings, tab to "Exit StableSound" and press it.
+
+Did StableSound quit?
+ANSWER:
+
+Did the settings window go as well, or was it left behind?
+ANSWER:
+
+Did the icon disappear from the notification area? Press Windows+B and arrow
+along to check there is no StableSound left there.
+ANSWER:
+
+Did the headphones get released - could your iPhone take them?
+ANSWER:
+
+Did you hear an off-tone on the way out, or was it silent?
+ANSWER:
+
+Now start StableSound again for the next test.
+ANSWER (did it start normally?):
+
+ANYTHING ODD:
+
+
+TEST 50 - RUNNING IT TWICE
+
+With StableSound already running, run stablesound.exe again.
+
+It should tell you it is already running rather than starting a second copy.
+
+What did you hear? Please give the words as closely as you can.
+ANSWER:
+
+Did it name the right hotkeys - the ones you actually have set?
+ANSWER:
+
+Can you read the message back with the arrow keys?
+ANSWER:
+
+Press Escape or Enter to dismiss it. Did it go away?
+ANSWER:
+
+Press Windows+B and arrow through the notification area. Is there exactly one
+StableSound icon, or two?
+ANSWER:
+
+Press Ctrl+Win+F12. Does the hotkey still work, and does it toggle only once?
+ANSWER:
+
+ANYTHING ODD:
+
+
+TEST 51 - LIVING WITH IT
+
+Use the machine normally for a while with StableSound running - long enough
+for it to let go of the headphones at least once, and for you to come back to
+it.
+
+Any speech clipped at the start?
+ANSWER:
+
+Any tones you did not ask for?
+ANSWER:
+
+Did the headphones go to your iPhone when you expected, and come back when you
+expected?
+ANSWER:
+
+Is there anything about not having the console window that you miss?
+ANSWER:
+
+Is this a version you would be happy for other people to download and use?
+ANSWER:
+
+Anything you would want changed before it goes out?
+ANSWER:
+
+ANYTHING ODD:
+
+
+OPTIONAL - STARTING WHEN YOU SIGN IN
+
+Only if you are willing to sign out and back in.
+
+For as long as StableSound was a console program, starting it at sign-in put a
+console window on your screen. That should no longer happen.
+
+Open the settings, tick "Start StableSound when I sign in", press Enter for
+OK, then sign out and sign back in.
+
+Did StableSound start on its own?
+ANSWER:
+
+Did any window appear when it did?
+ANSWER:
+
+Does Ctrl+Win+F12 work straight away?
+ANSWER:
+
+ANYTHING ODD:
+
+
+AT THE END
+
+Please send the log file back with this. It is stablesound.log, in the same
+folder as stablesound.exe. You can open it from the tray menu or from the
+"Open the log file" button in the settings.
+
+Once you have sent it, you may want to turn logging back off in the settings.
+
+Anything else at all?
+ANSWER:
