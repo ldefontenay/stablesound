@@ -85,6 +85,7 @@ const IDC_SET_HOTKEY: i32 = 1012;
 const IDC_STARTUP: i32 = 1013;
 const IDC_USE_SET_HOTKEY: i32 = 1014;
 const IDC_MESSAGE: i32 = 1015;
+const IDC_MESSAGE_LABEL: i32 = 1016;
 
 /// Combo box order. The template is the other half of this contract; changing
 /// one without the other silently mislabels a setting, so both are written out
@@ -437,7 +438,7 @@ fn read_hotkey(hwnd: HWND, id: i32) -> Option<Hotkey> {
 /// JAWS reads be the field to correct, rather than leaving the user to hunt
 /// for it.
 fn complain(hwnd: HWND, text: &str, focus_on: i32) {
-    show_message(hwnd, text, MB_ICONEXCLAMATION);
+    show_message(hwnd, text, MB_ICONEXCLAMATION, PROBLEM_HEADING);
     unsafe {
         if let Ok(control) = GetDlgItem(Some(hwnd), focus_on) {
             let _ = SetFocus(Some(control));
@@ -446,8 +447,24 @@ fn complain(hwnd: HWND, text: &str, focus_on: i32) {
 }
 
 fn notify(hwnd: HWND, text: &str) {
-    show_message(hwnd, text, MB_ICONINFORMATION);
+    show_message(hwnd, text, MB_ICONINFORMATION, NOTE_HEADING);
 }
+
+/// What the heading over the message says, which is how a screen reader user
+/// learns which kind of message this is.
+///
+/// The Milestone 5.1 round asked for this. The heading used to describe the
+/// control - "Message, which the arrow keys will read back" - and JAWS then
+/// said "read only edit" straight after it, so the words were spent twice on
+/// the same fact: "This already tells the user how to interact with the
+/// dialogue, so the message box label could rather be something like: 'error,
+/// and how to fix'."
+///
+/// Both start with "What" so the `W` mnemonic in the template holds whichever
+/// is showing. That mnemonic is the way back to the text once Tab has moved
+/// on to OK.
+const PROBLEM_HEADING: &str = "&What went wrong, and how to fix it:";
+const NOTE_HEADING: &str = "&What happened:";
 
 /// Say something, in a window whose text can be read back with the arrow keys.
 ///
@@ -460,19 +477,23 @@ fn notify(hwnd: HWND, text: &str) {
 ///
 /// `sound` keeps the one thing a message box gave that a plain dialog does
 /// not: the system's own exclamation or information ding, which arrives before
-/// any speech and says which kind of message this is.
+/// any speech and says which kind of message this is. `heading` says the same
+/// thing in words, for the announcement that follows the ding.
 ///
 /// Modal, like the message box it replaces, so the global hotkey is not
 /// serviced while it is up. Unchanged from before, and it is a window that
 /// exists to be dismissed.
-fn show_message(hwnd: HWND, text: &str, sound: MESSAGEBOX_STYLE) {
+fn show_message(hwnd: HWND, text: &str, sound: MESSAGEBOX_STYLE, heading: &str) {
     unsafe {
         let _ = MessageBeep(sound);
     }
     // Edit controls want CRLF. A bare newline reaches one as a stray control
     // character rather than a line break, which the screen reader then has to
     // read around.
-    let text = wide(&text.replace('\n', "\r\n"));
+    let shown = Message {
+        heading: wide(heading),
+        body: wide(&text.replace('\n', "\r\n")),
+    };
     unsafe {
         let Ok(instance) = GetModuleHandleW(None) else {
             return;
@@ -482,9 +503,17 @@ fn show_message(hwnd: HWND, text: &str, sound: MESSAGEBOX_STYLE) {
             PCWSTR(IDD_MESSAGE as usize as *const u16),
             Some(hwnd),
             Some(message_proc),
-            LPARAM(text.as_ptr() as isize),
+            LPARAM(&shown as *const Message as isize),
         );
     }
+}
+
+/// The two strings `IDD_MESSAGE` needs, through the one `LPARAM` a dialog
+/// template gets. Borrowed for the life of the modal call, which is entirely
+/// inside `show_message`.
+struct Message {
+    heading: Vec<u16>,
+    body: Vec<u16>,
 }
 
 unsafe extern "system" fn message_proc(
@@ -495,7 +524,9 @@ unsafe extern "system" fn message_proc(
 ) -> isize {
     match message {
         WM_INITDIALOG => {
-            SetDlgItemTextW(hwnd, IDC_MESSAGE, PCWSTR(lparam.0 as *const u16)).ok();
+            let shown = &*(lparam.0 as *const Message);
+            SetDlgItemTextW(hwnd, IDC_MESSAGE_LABEL, PCWSTR(shown.heading.as_ptr())).ok();
+            SetDlgItemTextW(hwnd, IDC_MESSAGE, PCWSTR(shown.body.as_ptr())).ok();
             // Non-zero: the first tab stop is the message itself, which is
             // where the focus belongs - it is the whole point of the window.
             1

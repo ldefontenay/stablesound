@@ -34,7 +34,7 @@
 //
 // Mnemonics in use: O S L A K P V H U T W D I. OK and Cancel deliberately
 // have none - they are the default and cancel buttons, reached with Enter and
-// Escape. IDD_MESSAGE has its own namespace and reuses M.
+// Escape. IDD_MESSAGE has its own namespace and reuses W.
 
 #include <windows.h>
 
@@ -62,6 +62,7 @@
 #define IDC_STARTUP      1013
 #define IDC_USE_SET_HOTKEY 1014
 #define IDC_MESSAGE      1015
+#define IDC_MESSAGE_LABEL 1016
 
 IDD_SETTINGS DIALOGEX 0, 0, 306, 394
 STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
@@ -142,13 +143,27 @@ END
 // character at a time, with no cursor mode to switch into. Nothing else in
 // the dialog competes for the focus - one button, reached by Tab, and Enter
 // or Escape dismisses it from wherever you are.
+//
+// The label is set at runtime, and says what kind of message this is rather
+// than how to read it. The round that tested this window reported the first
+// wording back: JAWS said "Message, which the arrow keys will read back",
+// then "read only edit" - so the label spent its words explaining something
+// the control type had already said. "This already tells the user how to
+// interact with the dialogue, so the message box label could rather be
+// something like: 'error, and how to fix'." The kind of message was
+// otherwise carried only by the ding.
+//
+// The text below is what a refused setting gets; `show_message` replaces it
+// for anything that is not a complaint. Both wordings start with "What" so
+// the W mnemonic holds whichever is showing - which is the way back to the
+// text after tabbing to OK.
 IDD_MESSAGE DIALOGEX 0, 0, 304, 244
 STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
 CAPTION "StableSound"
 FONT 9, "Segoe UI", 400, 0, 0x1
 BEGIN
-    LTEXT           "&Message, which the arrow keys will read back:",
-                    -1, 7, 7, 290, 8
+    LTEXT           "&What went wrong, and how to fix it:",
+                    IDC_MESSAGE_LABEL, 7, 7, 290, 8
     EDITTEXT        IDC_MESSAGE, 7, 19, 290, 198,
                     ES_MULTILINE | ES_READONLY | WS_VSCROLL | WS_GROUP |
                     WS_TABSTOP
