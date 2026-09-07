@@ -1,17 +1,24 @@
 # StableSound - research findings and build plan
 
-## 0. Where we are (updated 2026-09-06)
+## 0. Where we are (updated 2026-09-07)
 
 **Read this first when picking the project up.**
 
-Milestones 0 to 5 are complete, hardware rounds included. Milestone 3 took
-**three** rounds. Milestones 4 and 5 took one each and both passed.
+Milestones 0 to 5 are complete, hardware rounds included, and so is the small
+follow-up round 5.1. Milestone 3 took **three** rounds. Milestones 4, 5 and
+5.1 took one each and all three passed.
 
-**Milestone 5 passed, and its round asked for five more things, all now
-built.** They are small and none of them changes how the app behaves in the
-main: a tray icon that read its state twice, two defaults reversed, punctuation
-keys in hotkeys, and messages you can read back with the arrow keys. Section
-4.7 has the detail. They need a short round of their own before Milestone 6.
+**Milestone 5.1 passed cleanly - every test, first time.** The tray icon reads
+its state once however many times it changes, a hotkey works on a punctuation
+key, a refused setting is read back with the arrow keys, and the two reversed
+defaults are what a new user meets. The tester's verdict on the whole app:
+"all works really well and I'm very pleased", and on the plan for Milestone 6:
+"this will be a great first version." Raw results in
+`test-milestone-5-1.txt`, Tests 39-43.
+
+**One thing came back from it**, and it is built: the heading over the message
+window now says what kind of message it is rather than how to read it. See
+4.7.
 
 ### What exists and works
 
@@ -20,7 +27,7 @@ awake, releases them on a timer, wakes again when you touch the machine, has a
 tray icon, a global hotkey and a real settings dialog, and logs everything to
 `stablesound.log` next to the exe.
 
-Release binary is **296 KB**, against a ~1 MB budget.
+Release binary is **297 KB**, against a ~1 MB budget.
 
 ### What is proven on hardware
 
@@ -116,22 +123,23 @@ And two things were confirmed for later rather than acted on now:
   the desk rather than 30 seconds (question 6). Detailed logging now records
   what the meter saw, so a recurrence leaves evidence.
 - Behaviour across Windows sleep/resume, and on battery (question 7).
-- Whether the five changes from the Milestone 5 round behave under JAWS
-  (question 24). The tray name and the message window were both checked by
-  reading what the accessibility layer exposes, which is the string JAWS is
-  given - but not by listening to JAWS say it.
+- Whether the reworded message heading reads well under JAWS (question 26).
+  Checked the same way its predecessor was - by reading what UI Automation
+  hands a screen reader - but not heard spoken. It rides along with the
+  Milestone 6 round.
 
 ### What is next
 
-**A short round on the five changes the last one asked for.** `test.txt` is
-the script; Tests 39-43. It is the smallest round yet: the tray icon read
-once, a hotkey on a punctuation key, a refusal message reviewed with the arrow
-keys, and the two reversed defaults met as a new user would meet them.
+**Milestone 6, and shipping. Nothing else is outstanding.** Every hardware
+round is closed and every request from every round is either built or
+deliberately abandoned. Autostart is already built. What is left is dropping
+the console harness and switching to the windows subsystem, a help file with
+buttons that open it, a size-tuned release build, a README, and a plan for the
+antivirus and SmartScreen problem.
 
-**Then Milestone 6, and shipping.** Autostart is already built. What is left is
-dropping the console harness and switching to the windows subsystem, a help
-file with buttons that open it, a size-tuned release build, a README, and a
-plan for the antivirus and SmartScreen problem.
+The tester was asked whether anything should be added to that list and said
+no. The Milestone 6 round should also carry the one small thing built after
+5.1 - the reworded message heading (question 26).
 
 ### Things a fresh session should not re-litigate
 
@@ -634,6 +642,8 @@ because an app with a dialog should have one, not because it solved anything.
 ### 4.7 What the Milestone 5 round settled (Milestone 5.1)
 
 Five things, none of them large, and one of them a shell bug rather than ours.
+**All five passed their round on 2026-09-07**, first time and without
+qualification. What each one was, and what the round said back:
 
 **The tray icon read its own state twice.** "With keep-alive off, it correctly
 displays StableSound: headphones free. With keep-alive on, it displays
@@ -653,6 +663,10 @@ uses - "Volume Headphones (soundcore AeroClip): 44%" - and it is shorter than
 what it replaced. Confirmed against the live notification area, off and on and
 off again, by reading the name UI Automation exposes.
 
+Confirmed by ear in the round, including the part that mattered - that it
+holds across repeated changes of state, which is where the old fault only ever
+showed: "Yes, it stays one phrase, behaving perfectly."
+
 **Logging is off by default.** Asked for directly, against the steer given in
 4.6: "Please have logging off by default and it can then be turned on when
 needed for development or trouble-shooting." The argument for keeping it on is
@@ -660,6 +674,11 @@ unchanged and was put; the tester heard it and chose otherwise, having seen
 both. **The consequence has to be carried by the test scripts from now on: a
 round run without switching logging on first leaves nothing behind to read.**
 Every script from Test 39 onwards says so in its opening steps.
+
+Both defaults were met cold in the round, as a new user would meet them, and
+both read right. On whether the checkbox label now carries the weight the
+default used to - "is it clear enough that you would know to tick it before
+trying to reproduce a problem?" - the answer was yes.
 
 **The settings hotkey ships on.** The reverse of what Milestone 4 asked for,
 decided after living without it: "Actually, ship with the settings hotkey on.
@@ -685,6 +704,12 @@ they want Ctrl and Alt held down too and would fight the modifiers rather than
 join them. The plus key is written as the word `plus`, a plus sign being what
 joins the parts together.
 
+Confirmed, including the Shift folding, which was the part most likely to
+confuse: "that is exactly what it says. Happy with that." The tester settled
+back on `Ctrl+Win+F12` in the end, because `Ctrl+Win+;` turned out to clash
+with a Leasey keystroke - worth knowing when the README comes to recommend a
+default, and an argument for the field accepting anything rather than a list.
+
 **Messages are now read back with the arrow keys.** On the refusal advice: "Its
 long, but instructive. A Jaws user needs to use the Jaws cursor or to
 virtualise the control to absorb all the detail, which may not be within the
@@ -703,6 +728,32 @@ arrives ahead of any speech and says which kind of message this is.
 It is modal, as the message box was, so the global hotkey is not serviced while
 it is up. That is unchanged rather than a regression, and it is a window that
 exists to be dismissed.
+
+The round confirmed the whole of it - reviewable a line and a word at a time,
+"no cursor mode to switch into" borne out ("It just worked well from where the
+focus was"), and question 25 answered against keeping a message box for the
+short messages: "No, this is good as it is."
+
+**And it asked for the heading to change.** The heading used to describe the
+control - "Message, which the arrow keys will read back" - and JAWS said "read
+only edit" straight after it, so two announcements were spent on the same
+fact. "This already tells the user how to interact with the dialogue, so the
+message box label could rather be something like: 'error, and how to fix'."
+
+Which is right, and it also fills a real gap: which *kind* of message this was
+had been carried only by the ding. The heading is now set at runtime and says
+so in words - "What went wrong, and how to fix it:" for a refusal, "What
+happened:" for a note. Both start with "What", so the `W` mnemonic holds
+whichever is showing; that mnemonic is the way back to the text once Tab has
+moved on to OK.
+
+The static carrying it needed a control ID to be written to, where it had been
+`-1`. That does not disturb the labelling: a dialog's label association is the
+preceding static in tab order, not a particular ID, and the running window was
+checked to be sure - UI Automation gives the focused edit the name "What went
+wrong, and how to fix it:", with 817 characters of advice in it over 20 lines,
+multi-line and read-only, and the focus back on the offending field once it is
+dismissed.
 
 **On the group headings, nothing changed and nothing more will.** The tester
 checked the JAWS setting: "Its called 'show control group info' and it was
@@ -884,22 +935,40 @@ Raw results are in `test-milestone-5.txt`, Tests 33-38.
     Everything still worked the same. No issues while tabbing through."
     Mnemonics, combo boxes and per-control reading all unchanged.
 
-### Still open after the Milestone 5 round
+### Resolved by the Milestone 5.1 round (2026-09-07)
 
-24. **Do the five follow-ups behave under JAWS?** The tray icon now reading its
-    state once, a hotkey on a punctuation key, the refusal message in a
-    read-only edit, and the two reversed defaults. The tray name and the
-    message window were both checked by reading what the accessibility layer
-    exposes - the same string JAWS is handed - but nothing here has been heard
-    spoken. Tests 39-43.
+Raw results are in `test-milestone-5-1.txt`, Tests 39-43. Every one passed.
 
-25. **Is the message window better than the message box, or only different?**
-    It is a bigger window with an extra keystroke's worth of structure, and the
-    thing it buys is reviewability. If a short message now feels laborious
-    where a message box was quick, the answer may be to keep the box for one
-    line and the window for the advice. Test 41 asks directly.
+24. ~~Do the five follow-ups behave under JAWS?~~ **Yes, all five.** The tray
+    icon reads "StableSound Headphones free" and "StableSound Headphones
+    awake", one phrase however many times the state changes. `Ctrl+Win+;` is
+    accepted and read back, and `ctrl+win+:` reads back as `Ctrl+Win+Shift+;`
+    with the folding understood rather than merely tolerated. The refusal
+    message is reviewable with the arrow keys straight from where the focus
+    lands. Logging is off and the settings hotkey is on, and both read
+    correctly to someone meeting them for the first time.
+
+25. ~~Is the message window better than the message box, or only different?~~
+    **Better, for short messages too.** The offer to keep a message box for the
+    one-line complaints was declined: "No, this is good as it is." So there is
+    one path for every message, which is also the simpler thing to maintain.
+
+### Still open after the Milestone 5.1 round
+
+26. **Does the reworded message heading read well?** It now says what kind of
+    message this is - "What went wrong, and how to fix it:" or "What
+    happened:" - instead of describing the control, which is what the round
+    asked for. Verified through UI Automation, not heard. It should ride along
+    with the Milestone 6 round rather than earn a round of its own.
 
 ### Noted, not a defect
+
+**`Ctrl+Win+;` clashes with Leasey.** Found while testing that punctuation
+hotkeys work at all, which they do - the tester used `Ctrl+Win+Shift+;`
+instead and it worked, then went back to `Ctrl+Win+F12`. Nothing for the app to
+do: a combination Windows will register can still be taken by something that
+hooks the keyboard ahead of us. Worth a line in the README, and a reason the
+hotkey field is right to accept anything rather than offer a list.
 
 **JAWS announces the hotkey.** Pressing `Ctrl+Win+F12` makes JAWS say "control win f12" before the tone - "slightly annoying". This is JAWS echoing a command key, not anything StableSound does or can intercept; a global hotkey is delivered to us *after* the screen reader has already seen the keystroke. The only lever is JAWS' own "speak command keys" setting, which is global and probably not worth losing elsewhere. Worth re-checking against any hotkey the settings dialog offers, in case some combinations are echoed and others are not.
 
@@ -1147,8 +1216,9 @@ refusal named the mistake actually made, and losing the mouse handling costs
 nothing anyone can feel. The group headings could not be delivered and are now
 closed as not needed.
 
-**Milestone 5.1 - what that round asked for. BUILT (2026-09-06), round
-pending.** Design detail in 4.7.
+**Milestone 5.1 - what that round asked for. DONE (2026-09-07), round
+passed.** Design detail in 4.7. All five confirmed on the hardware, first
+time: "all works really well and I'm very pleased."
 
 1. **The tray icon reads its state once.** It is registered under the app's
    name and the tooltip carries the state alone, because Windows 11 composes a
@@ -1163,6 +1233,14 @@ pending.** Design detail in 4.7.
    layout rather than a table, with Shift folded in where a character needs it.
 5. **Messages moved into a read-only edit** the arrow keys can review, keeping
    the system ding that says which kind of message it is.
+
+And one thing built after the round, because the round asked for it:
+
+6. **The message heading says what kind of message this is**, rather than how
+   to read it - "What went wrong, and how to fix it:" or "What happened:".
+   The old heading explained the arrow keys, and JAWS then said "read only
+   edit", spending two announcements on one fact. Needs question 26 answering
+   in the Milestone 6 round.
 
 **Verified by driving the running app from another process:**
 
@@ -1179,8 +1257,15 @@ pending.** Design detail in 4.7.
 - 38 unit tests, `cargo clippy --all-targets -- -D warnings` clean. Release
   binary **297 KB**, up from 296 KB, against the ~1 MB budget.
 
-**Not verifiable from here:** whether any of it sounds right under JAWS.
-Round is `test.txt`, Tests 39-43.
+- The reworded heading is what UI Automation gives as the focused edit's name,
+  with the advice intact behind it - 817 characters over 20 lines, multi-line
+  and read-only - and the focus returns to the offending field on dismissal.
+  Adding a control ID to the static that carries it does not disturb the
+  labelling.
+
+**Round passed 2026-09-07.** Raw results in `test-milestone-5-1.txt`, Tests
+39-43. Questions 24 and 25 closed; question 26 opened by the heading built
+afterwards.
 
 **Hard release. DEFERRED, probably not needed.** Soft release was confirmed sufficient on the AeroClip (see 2.4), so this is no longer planned work. Revisit only if another headset needs it, or if the 3-second handover becomes annoying. Reference if it ever happens: `m2jean/ToothTray`.
 
@@ -1198,11 +1283,15 @@ Two things the Milestone 4 round confirmed belong here rather than earlier:
 
 Autostart is already built, in Milestone 4.
 
-**Current position (2026-09-06):** Milestones 0 to 5 complete and
-hardware-tested. The settings dialog passed its JAWS round and so did the
-polish that followed it. Five small follow-ups from that round are built and
-await a short round of their own. After that, Milestone 6: drop the console,
-add a help file, write the README, and face the antivirus problem.
+**Current position (2026-09-07):** Milestones 0 to 5.1 complete and
+hardware-tested, with nothing outstanding behind them. The settings dialog
+passed its JAWS round, so did the polish that followed it, and so did the five
+follow-ups after that. One small thing - the reworded message heading - is
+built and unheard, and rides along with the next round.
+
+Only Milestone 6 is left: drop the console, add a help file, write the README,
+and face the antivirus problem. The tester was asked whether anything should
+join that list and said no: "this will be a great first version."
 ---
 
 ## 8. Sources
