@@ -1483,6 +1483,65 @@ the path-to-URL conversion, including a space and a non-ASCII folder name.
 **Not verified, and cannot be from here:** how any of it reads under JAWS,
 and whether the help document is actually navigable by headings in practice.
 
+### 6.5 The antivirus and SmartScreen problem (researched 2026-09-08)
+
+A small unsigned binary that opens audio devices, registers global hotkeys and
+can start itself at sign-in fits the profile heuristics dislike. The README and
+the help now both say so plainly, describe the SmartScreen screen and how to
+get past it, and say to download only from the releases page. That is the part
+that is done and costs nothing.
+
+Whether to sign it is a decision with a gate in front of it, and two facts
+found while researching it change the shape of the answer.
+
+**Fact one: an EV certificate no longer buys an instant SmartScreen pass.**
+Microsoft removed that in March 2024. Reputation is now built by download
+volume whatever the certificate, so signing does *not* make the "Windows
+protected your PC" screen go away for the first users - which was the main
+thing it used to be worth paying for. It still helps: a signed binary
+accumulates reputation against the publisher identity rather than against each
+new file hash, so the warning stops recurring after every release rather than
+needing to be earned again. And a signature is what most antivirus heuristics
+weigh most heavily.
+
+**Fact two: the cheap option may not be available here.** Azure Trusted
+Signing, renamed **Azure Artifact Signing** in 2026, is by far the cheapest
+route at **$9.99/month** on the Basic tier - no hardware token, no key to look
+after, short-lived certificates issued on demand. But **individual** sign-up is
+limited to the USA and Canada. Organisations can use it from the USA, Canada,
+the EU and the UK. The three-year identity history that public preview asked
+for has been dropped.
+
+So the first question is not "is it worth $120 a year" but **which of those two
+categories this project falls into**, which depends on where the author is and
+whether they are willing to sign up as a business entity rather than an
+individual. That is a question for the author, not something to research
+further.
+
+**If Azure Artifact Signing is not available**, the fallback is an ordinary
+Organisation Validated certificate from Sectigo or Comodo, around **$219 a
+year** at the cheap end and $400 from DigiCert. Two costs beyond the money:
+since June 2023 the private key must live on FIPS 140-2 Level 2 hardware, so a
+USB token or a cloud HSM comes with it and has to be present at every build;
+and since March 2026 certificates last at most 460 days, so this is a renewal
+to diarise. Sole proprietors can be validated without a company, under the
+CA/Browser Forum's sole-proprietor procedure.
+
+**The free things, worth doing first either way**, and probably enough for an
+app with this many users:
+
+- Submit the binary to Microsoft as a false positive if Defender objects.
+- Do the same with any other vendor that flags it; each has a form.
+- Ship releases from one place, so what reputation does accumulate accumulates
+  in one place rather than being scattered across re-uploads.
+
+**Recommendation: ship 0.1.0 unsigned, with the README section, and revisit.**
+Signing is a subscription and an ongoing obligation, its headline benefit was
+withdrawn two years ago, and nothing about it is easier to do later than now.
+If SmartScreen or an antivirus actually turns out to be stopping people using
+it, that is the moment to spend the money - and by then it will be known which
+of the two routes is open.
+
 **Verified:** release binary **275 KB**, down from 297 KB. The PE subsystem
 field reads 2, `IMAGE_SUBSYSTEM_WINDOWS_GUI`. The exe starts, stays up with no
 console window and no visible window of its own, and no `conhost` is spawned.
