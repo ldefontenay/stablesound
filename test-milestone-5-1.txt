@@ -95,7 +95,7 @@ your settings from the last round, and Test 43 puts them back at the
 end.
 
 ANSWER - did you find it and rename it?
-
+Yes.
 
 Then build and run from the repo root:
 
@@ -115,29 +115,29 @@ Steps:
 1. Press Windows+B and arrow to StableSound. Listen to it.
 
 ANSWER - what does it say, word for word?
-
+StableSound Headphones free 
 
 2. Press Ctrl+Win+F12 to switch keep-alive on. Then Windows+B and arrow
    to StableSound again.
 
 ANSWER - what does it say now? It should have changed, and it should
 still be one phrase rather than two.
-
+StableSound Headphones awake 
 
 3. Switch keep-alive off with Ctrl+Win+F12, and read the icon once more.
 
 ANSWER - back to what it said the first time?
-
+Yes, "StableSound Headphones free "
 
 4. Now do it a few more times - on, read, off, read, on, read.
 
 ANSWER - does it stay one phrase however many times you switch it? This
 is the part I want to be sure of: what went wrong before only appeared
 after the state had changed.
-
+Yes, it stays one phrase, behaving perfectly.
 
 ANYTHING ODD:
-
+No.
 
 ===========================================================
 TEST 40 - A HOTKEY ON A PUNCTUATION KEY
@@ -155,17 +155,17 @@ Steps:
    and press OK.
 
 ANSWER - was it accepted?
-
+es. Actually that hotkey conflicts with a Leasey keystroke, so I used ctrl+win+shift+; and it worked perfectly.
 
 3. Press Ctrl+Win+; - control, Windows and semicolon together.
 
 ANSWER - did keep-alive toggle?
-
+Yes.
 
 4. Open the settings again and read the hotkey field back.
 
 ANSWER - what does it say? It should read Ctrl+Win+; back to you.
-
+Yes, it reads the hotkey I entered.
 
 5. While you are here, try one that needs Shift. Type:
 
@@ -177,17 +177,17 @@ ANSWER - what does it say? It should read Ctrl+Win+; back to you.
 ANSWER - what does it say? Ctrl+Win+Shift+; is the expected answer, and
 is the same three keys - I want to know whether being told that is
 clear or merely confusing.
-
+Yes, that is exactly what it says. Happy with that.
 
 6. Set it to whatever you actually want to keep. If you liked
    ctrl+win+; then that; otherwise back to ctrl+win+f12, or anything
    else. Press OK and try it.
 
 ANSWER - what did you settle on, and does it work?
-
+Ï went back to ctrl+win+f12. It works perfectly.
 
 ANYTHING ODD:
-
+No.
 
 ===========================================================
 TEST 41 - READING A MESSAGE BACK
@@ -201,27 +201,27 @@ Steps:
    OK.
 
 ANSWER - did you hear the warning ding before anything was spoken?
-
+Yes.
 
 ANSWER - what got read out when the window opened? I expect the whole
 message, the same as the old message box did.
-
+Jaws announces the message control's label: "Message, which the arrow keys will read back" then Jaws says the control type, i.e. "read only edit". This already tells the user how to interact with the dialogue, so the message box label could rather be something like: "error, and how to fix".
 
 2. Now use the arrow keys - up and down, and left and right - to go back
    over the text.
 
 ANSWER - can you review it a line at a time? A word at a time?
-
+Yes, perfectly.
 
 ANSWER - did you have to switch into the JAWS cursor or virtualise
 anything, or did it just work from where the focus was?
-
+It just worked well from where the focus was.
 
 3. Press Escape.
 
 ANSWER - did the window close, and did the focus go back to the hotkey
 field?
-
+Yes.
 
 4. Do it once more, with something wrong in a different way - type
    ctrl and press OK. This message is two lines rather than twenty.
@@ -231,15 +231,15 @@ the old message box, or is it more ceremony than a one-line complaint
 deserves? If the short ones would be better left as they were, say so -
 I can keep the box for short messages and the window for the long
 advice.
-
+No, this is good as it is.
 
 5. Press Enter this time.
 
 ANSWER - did that close it too?
-
+Yes.
 
 ANYTHING ODD:
-
+No.
 
 ===========================================================
 TEST 42 - THE TWO NEW DEFAULTS
@@ -254,36 +254,36 @@ Steps:
 
 ANSWER - did the settings dialog open? It should, without you having
 switched anything on.
-
+Yes.
 
 2. Tab to "Write a log file, so a problem can be looked into later".
 
 ANSWER - is it unticked?
-
+Yes.
 
 ANSWER - reading that label cold, is it clear enough that you would know
 to tick it before trying to reproduce a problem? This is the label doing
 the job the default used to do, so I would rather it were wrong now than
 later.
-
+Yes.
 
 3. Tab to "Also use a hotkey to open these settings".
 
 ANSWER - is it ticked, with Ctrl+Win+F11 in the field beside it?
-
+Yes.
 
 4. Untick it and press OK. Then press Ctrl+Win+F11.
 
 ANSWER - did it stop working?
-
+Yes.
 
 5. Open the settings from the tray, tick it again, press OK.
 
 ANSWER - does Ctrl+Win+F11 work again?
-
+Yes.
 
 ANYTHING ODD:
-
+No.
 
 ===========================================================
 TEST 43 - HALF AN HOUR, WITH THE LOG ON
@@ -299,18 +299,18 @@ Steps:
    on its own, hand the headset to your phone and take it back.
 
 ANSWER - did speech ever clip?
-
+No.
 
 ANSWER - did anything behave differently from the last round, in any
 way at all?
-
+No, still excellent.
 
 3. Open the log from the tray menu: Windows+B, StableSound, Applications
    key, "Open log file".
 
 ANSWER - is there a line for everything you did? Anything in it that
 does not read clearly?
-
+Yes, all reads clearly.
 
 4. Last thing. Quit StableSound, then in that same folder:
 
@@ -321,10 +321,10 @@ does not read clearly?
    round.
 
 ANSWER - done?
-
+Yes.
 
 ANYTHING ODD:
-
+No.
 
 ===========================================================
 ANYTHING ELSE
@@ -332,10 +332,10 @@ ANYTHING ELSE
 
 ANSWER - anything at all, in any of this, that felt wrong or that you
 would want done differently:
-
+No, all works really well and I'm very pleased.
 
 ANSWER - Milestone 6 is next and it is the last one: dropping the
 console window, a help file with a button that opens it, a README, and
 working out what to do about antivirus warnings on an unsigned
 executable. Anything you want added to that list before I start?
-
+No, this will be a great first version.
