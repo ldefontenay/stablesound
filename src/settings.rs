@@ -52,14 +52,15 @@ use windows::Win32::UI::Controls::{
 use windows::Win32::UI::Input::KeyboardAndMouse::SetFocus;
 use windows::Win32::UI::WindowsAndMessaging::{
     CreateDialogParamW, DestroyWindow, DialogBoxParamW, EndDialog, GetDlgItem, GetDlgItemInt,
-    GetDlgItemTextW, GetWindowLongPtrW, IsDialogMessageW, IsWindow, SendDlgItemMessageW,
-    SetDlgItemInt, SetDlgItemTextW, SetForegroundWindow, SetWindowLongPtrW, ShowWindow,
-    CB_ADDSTRING, CB_GETCURSEL, CB_SETCURSEL, GWLP_USERDATA, IDCANCEL, IDOK, MB_ICONEXCLAMATION,
-    MB_ICONINFORMATION, MESSAGEBOX_STYLE, MSG, SW_SHOW, WM_CLOSE, WM_COMMAND, WM_INITDIALOG,
-    WM_NCDESTROY,
+    GetDlgItemTextW, GetWindowLongPtrW, IsDialogMessageW, IsWindow, PostQuitMessage,
+    SendDlgItemMessageW, SetDlgItemInt, SetDlgItemTextW, SetForegroundWindow, SetWindowLongPtrW,
+    ShowWindow, CB_ADDSTRING, CB_GETCURSEL, CB_SETCURSEL, GWLP_USERDATA, IDCANCEL, IDOK,
+    MB_ICONEXCLAMATION, MB_ICONINFORMATION, MESSAGEBOX_STYLE, MSG, SW_SHOW, WM_CLOSE, WM_COMMAND,
+    WM_HELP, WM_INITDIALOG, WM_NCDESTROY,
 };
 
 use crate::config::{Config, DeviceSelector, Release, Signal};
+use crate::docs;
 use crate::hotkey::{self, Hotkey};
 use crate::startup;
 
@@ -81,6 +82,9 @@ const IDC_STARTUP: i32 = 1013;
 const IDC_USE_SET_HOTKEY: i32 = 1014;
 const IDC_MESSAGE: i32 = 1015;
 const IDC_MESSAGE_LABEL: i32 = 1016;
+const IDC_OPEN_HELP: i32 = 1017;
+const IDC_OPEN_LOG: i32 = 1018;
+const IDC_EXIT: i32 = 1019;
 
 /// Combo box order. The template is the other half of this contract; changing
 /// one without the other silently mislabels a setting, so both are written out
@@ -199,8 +203,43 @@ unsafe extern "system" fn dialog_proc(
                     let _ = DestroyWindow(hwnd);
                     1
                 }
+                // Both of these open something to read, and both are also in
+                // the tray menu. They are here because dropping the console
+                // in Milestone 6 would otherwise have left them tray-only,
+                // and CLAUDE.md constraint 3 does not allow that.
+                IDC_OPEN_HELP => {
+                    docs::open_help(Some(hwnd));
+                    1
+                }
+                IDC_OPEN_LOG => {
+                    docs::open_log(Some(hwnd));
+                    1
+                }
+                // The only way out of StableSound that is not the tray menu.
+                //
+                // The dialog goes first: the message loop is about to stop
+                // reading messages, and a window whose keyboard handling has
+                // stopped is worse than no window. `PostQuitMessage` is safe
+                // to call from here because a modeless dialog's procedure runs
+                // on the thread that owns the queue - which is the whole
+                // reason this dialog is modeless.
+                //
+                // Settings typed but not accepted with OK are discarded, as
+                // they are for Cancel. The help says so.
+                IDC_EXIT => {
+                    let _ = DestroyWindow(hwnd);
+                    PostQuitMessage(0);
+                    1
+                }
                 _ => 0,
             }
+        }
+
+        // F1, from wherever the focus happens to be. The conventional key for
+        // this, and free: nothing else in the dialog wants it.
+        WM_HELP => {
+            docs::open_help(Some(hwnd));
+            1
         }
 
         // Reached by the close button and by Escape once IDCANCEL has run.

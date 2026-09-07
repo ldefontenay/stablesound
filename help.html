@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>StableSound Help</title>
+<style>
+  /* Deliberately plain. This page is read with a screen reader far more often
+     than it is looked at, so nothing here changes the meaning of the markup:
+     no reordering, no hiding, no generated text that carries information. */
+  :root {
+    color-scheme: light dark;
+    --ink: #1a1a1a;
+    --paper: #fdfdfb;
+    --quiet: #4a4a4a;
+    --rule: #d6d3cc;
+    --panel: #f2f0ea;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ink: #e9e7e2;
+      --paper: #16181c;
+      --quiet: #b3b0a9;
+      --rule: #3a3d43;
+      --panel: #21242a;
+    }
+  }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font: 16px/1.6 "Segoe UI", system-ui, sans-serif;
+    margin: 0 auto;
+    max-width: 40rem;
+    padding: 2rem 1.25rem 5rem;
+  }
+  h1 { font-size: 1.9rem; line-height: 1.25; margin: 0 0 0.25rem; }
+  h2 { font-size: 1.35rem; margin: 2.5rem 0 0.5rem; padding-top: 1rem; border-top: 1px solid var(--rule); }
+  h3 { font-size: 1.08rem; margin: 1.75rem 0 0.35rem; }
+  p, li { margin: 0.65rem 0; }
+  ul, ol { padding-left: 1.5rem; }
+  code, kbd {
+    font-family: Consolas, "Cascadia Mono", monospace;
+    font-size: 0.95em;
+    background: var(--panel);
+    border-radius: 3px;
+    padding: 0.1em 0.35em;
+  }
+  .lede { font-size: 1.1rem; color: var(--quiet); margin-top: 0; }
+  .note {
+    background: var(--panel);
+    border-left: 4px solid var(--rule);
+    padding: 0.75rem 1rem;
+    margin: 1.25rem 0;
+  }
+  dt { font-weight: 600; margin-top: 1.1rem; }
+  dd { margin: 0.35rem 0 0 1.25rem; }
+  footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--rule); color: var(--quiet); font-size: 0.95rem; }
+  a { color: inherit; }
+</style>
+</head>
+<body>
+
+<h1>StableSound</h1>
+<p class="lede">Keeps Bluetooth headphones awake so screen reader speech is not
+cut off at the start, and lets go of them again so your phone can take over.</p>
+
+<h2 id="what">What it is for</h2>
+
+<p>Bluetooth headphones switch their receiver off after a few seconds with
+nothing playing, to save battery. The next time your screen reader speaks, the
+first fraction of a second is lost while the headset wakes up again. On a
+short announcement that can be the whole word.</p>
+
+<p>StableSound stops that by sending the headphones a stream of digital
+silence, so they never decide there is nothing to listen to. You hear nothing;
+the headset stays awake.</p>
+
+<p>The catch with holding a headset open is that nothing else can have it. If
+your headphones are paired to a phone as well, the phone cannot take them
+while a computer is streaming to them. So StableSound also lets go: after a
+set time with nothing playing it closes the stream, and the headphones become
+available again within a few seconds.</p>
+
+<h2 id="start">Getting started</h2>
+
+<p>There is nothing to install. Put <code>StableSound.exe</code> wherever you
+like and run it. It has no window of its own; it puts an icon in the
+notification area and waits.</p>
+
+<p>The one thing worth knowing straight away:</p>
+
+<ul>
+  <li><strong>Ctrl+Windows+F12</strong> switches keep-alive on and off.</li>
+  <li><strong>Ctrl+Windows+F11</strong> opens the settings.</li>
+</ul>
+
+<p>Both combinations can be changed, and the settings one can be turned off
+altogether if you would rather not spend a hotkey on it.</p>
+
+<div class="note">
+  <p>If you want StableSound every time you use the computer, open the
+  settings and tick <strong>Start StableSound when I sign in</strong>. Nothing
+  appears on screen when it starts that way.</p>
+</div>
+
+<h2 id="onoff">Switching it on and off</h2>
+
+<p>Press <strong>Ctrl+Windows+F12</strong>. You will hear a short two-note
+tone: rising when keep-alive comes on, falling when it goes off. The falling
+tone finishes before the headphones are released, so you always hear the whole
+of it.</p>
+
+<p>Those tones play only for a change <em>you</em> made. When StableSound lets
+go on its own, or wakes itself up again, it does so silently. This was a
+deliberate decision after testing: automatic tones turned out to be heard far
+too often to be tolerable.</p>
+
+<p>You can also switch it on and off from the notification area. Press
+<kbd>Windows+B</kbd>, use the arrow keys to reach StableSound, and press
+<kbd>Enter</kbd>. The icon reads either <em>StableSound Headphones
+awake</em> or <em>StableSound Headphones free</em>, so you can check the state
+without changing it.</p>
+
+<h2 id="letgo">Letting the headphones go</h2>
+
+<p>By default StableSound releases the headphones once <strong>nothing has
+played for 30 seconds</strong>. Speech counts as something playing, so a
+release never interrupts you mid-sentence; the countdown starts again every
+time it hears audio.</p>
+
+<p>You can change how long, and you can change the rule itself, in the
+settings:</p>
+
+<dl>
+  <dt>When nothing has played for a while</dt>
+  <dd>The default, and the one to want. StableSound listens to what is going
+  out of the device and releases only after the machine has been quiet for the
+  number of seconds you set.</dd>
+
+  <dt>A fixed time after switching on</dt>
+  <dd>Releases that many seconds after you switched keep-alive on, whatever is
+  playing. Worth having if you want a guaranteed handover time and do not mind
+  it cutting in.</dd>
+</dl>
+
+<p>Once released, the headphones are free within about three seconds, and a
+phone paired to them can claim them.</p>
+
+<h2 id="waking">Waking up again</h2>
+
+<p>By default, touching the keyboard or the mouse brings keep-alive back. The
+reasoning is that sitting down and touching the machine is a reliable sign
+that speech is about to be wanted, and the first thing to speak after a quiet
+spell is exactly what would otherwise be clipped.</p>
+
+<p>Waking never happens after you have switched keep-alive off by hand. That
+is the whole point of switching it off: your phone can then keep the
+headphones, and typing will not snatch them back.</p>
+
+<p>If you would rather nothing happened by itself, untick <strong>Start
+keep-alive again when I use the keyboard</strong> in the settings. The hotkey
+then becomes the only thing that starts it.</p>
+
+<h2 id="tray">The notification area icon</h2>
+
+<p>Press <kbd>Windows+B</kbd> and arrow to StableSound.</p>
+
+<ul>
+  <li><kbd>Enter</kbd> switches keep-alive on or off.</li>
+  <li>The <kbd>Applications</kbd> key, or <kbd>Shift+F10</kbd>, opens the
+  menu.</li>
+</ul>
+
+<p>The menu holds: keep the headphones awake or release them, Settings, Help,
+Open the log file, and Exit StableSound. Everything in it can also be reached
+another way, so you never have to go through the menu if you would rather
+not.</p>
+
+<h2 id="settings">The settings, one by one</h2>
+
+<p>Press <strong>Ctrl+Windows+F11</strong>, or choose Settings from the
+notification area menu. It is an ordinary Windows dialog: <kbd>Tab</kbd> moves
+between controls, <kbd>Enter</kbd> accepts, <kbd>Escape</kbd> cancels, and
+your usual hotkey goes on working while it is open.</p>
+
+<p>Nothing is saved until you press OK.</p>
+
+<h3>Keeping the headphones awake</h3>
+
+<dl>
+  <dt>Output device to keep awake</dt>
+  <dd>Which device to hold open. <em>Default output (follow Windows)</em>
+  keeps whatever Windows is currently using, and follows it if that changes,
+  which is what most people want. Naming a device explicitly is useful if you
+  switch between outputs and only one of them is the problem. If the named
+  device is not there when StableSound needs it, it falls back to the default
+  rather than doing nothing.</dd>
+
+  <dt>Keep-alive signal to send it</dt>
+  <dd><em>Digital silence</em> is the default and the recommendation, and it
+  is enough on every headset tested. <em>Silence with a tick each second</em>
+  adds an inaudible blip, for a headset that ignores pure silence.
+  <em>Inaudible tone</em> is a last resort for a headset that ignores both;
+  because it is genuinely playing sound, it forces the fixed-time release
+  rule, as the quiet-detection rule could never fire.</dd>
+
+  <dt>Let go of the headphones</dt>
+  <dd>The release rule, described under <a href="#letgo">Letting the
+  headphones go</a>.</dd>
+
+  <dt>Let go after this many seconds</dt>
+  <dd>How long. 30 is the default. Shorter hands the headphones over sooner;
+  longer means fewer wake-ups when you come back to the machine.</dd>
+</dl>
+
+<h3>Waking up again</h3>
+
+<dl>
+  <dt>Start keep-alive again when I use the keyboard</dt>
+  <dd>On by default. See <a href="#waking">Waking up again</a>.</dd>
+</dl>
+
+<h3>Tones</h3>
+
+<dl>
+  <dt>Play a tone when I switch keep-alive on or off</dt>
+  <dd>On by default. Only ever for something you did.</dd>
+
+  <dt>Tone volume (percent)</dt>
+  <dd>10 by default, which testing settled on as noticeable without being
+  intrusive. The tones play through the headphones being kept awake, not
+  through the computer's speakers, so they are as loud as the headset is.</dd>
+</dl>
+
+<h3>Hotkeys</h3>
+
+<dl>
+  <dt>Hotkey to switch keep-alive on and off</dt>
+  <dd><code>ctrl+win+f12</code> by default. Type it as one or more of
+  <code>ctrl</code>, <code>alt</code>, <code>shift</code> and <code>win</code>,
+  then one key, joined by plus signs. Order, spacing and capitals do not
+  matter, so <code>Win + Ctrl + F12</code> is the same thing. A key on its own
+  is refused, because a hotkey with no modifier would take that key away from
+  every other program on the machine.</dd>
+
+  <dt>Also use a hotkey to open these settings</dt>
+  <dd>On by default. Once your settings are the way you want them you may
+  prefer to untick this and hand the combination back to the rest of the
+  machine; the notification area menu still opens the settings.</dd>
+
+  <dt>Hotkey to open these settings</dt>
+  <dd><code>ctrl+win+f11</code> by default.</dd>
+</dl>
+
+<h3>Log file</h3>
+
+<dl>
+  <dt>Write a log file, so a problem can be looked into later</dt>
+  <dd>Off by default, so StableSound leaves nothing behind on a machine that
+  is working fine. See <a href="#log">The log file</a>.</dd>
+
+  <dt>Detailed logging, for troubleshooting</dt>
+  <dd>Adds what the sound level was when audio started and stopped, and how
+  long each device took to open. Worth turning on only when somebody is
+  helping you look into something.</dd>
+</dl>
+
+<h3>Starting up</h3>
+
+<dl>
+  <dt>Start StableSound when I sign in</dt>
+  <dd>Adds StableSound to the programs Windows starts for you. It writes one
+  entry under your own account only, and unticking it removes that entry
+  again.</dd>
+</dl>
+
+<h3>The buttons</h3>
+
+<dl>
+  <dt>OK</dt>
+  <dd>Saves and applies. A changed hotkey takes effect immediately, without a
+  restart.</dd>
+
+  <dt>Cancel</dt>
+  <dd>Changes nothing. <kbd>Escape</kbd> does the same.</dd>
+
+  <dt>Help</dt>
+  <dd>Opens this page. <kbd>F1</kbd> does the same.</dd>
+
+  <dt>Open the log file</dt>
+  <dd>Opens the log in whatever you read text files with.</dd>
+
+  <dt>Exit StableSound</dt>
+  <dd>Closes StableSound altogether, releasing the headphones and giving up
+  its hotkeys. Anything you have typed into the dialog but not yet accepted
+  with OK is discarded.</dd>
+</dl>
+
+<h2 id="log">The log file</h2>
+
+<p>StableSound can keep a plain text log of what it did and when: keep-alive
+on and off and why, devices opening and closing, hotkeys claimed, settings
+changed.</p>
+
+<p>It exists because this is a program whose behaviour cannot be watched while
+it happens. Reading its output aloud would itself make sound, and sound is the
+very thing being measured. A log read afterwards, while the headset is quiet,
+is the only way to see what actually went on.</p>
+
+<p>It is off by default. Turn it on in the settings when something needs
+looking into, and off again afterwards. The file is
+<code>stablesound.log</code>, in the folder described under <a
+href="#files">Where StableSound keeps its files</a>, and you can open it from
+the settings dialog or the notification area menu.</p>
+
+<h2 id="wrong">When something goes wrong</h2>
+
+<h3>The hotkey does nothing</h3>
+
+<p>Another program has claimed the same combination. Windows gives a hotkey to
+whoever asks first and tells everyone else no, so StableSound says so at
+startup when this happens.</p>
+
+<p>There is a second, harder case: a program that hooks the keyboard can
+intercept a combination before Windows ever offers it to us, and then nothing
+is reported because nothing was refused. This is known to happen with
+<strong>Ctrl+Windows+semicolon</strong> and Leasey. If a combination does
+nothing and no message appeared, try a different one — adding or removing
+Shift is usually enough.</p>
+
+<h3>My screen reader says the hotkey name before it works</h3>
+
+<p>That is the screen reader echoing a command key, and it happens before
+StableSound is told anything at all: a global hotkey reaches us only after the
+screen reader has already seen the keystroke. There is nothing StableSound can
+do about it. In JAWS the setting that governs it is "speak command keys",
+which is global — turning it off silences every other command key too, so it
+is usually not worth it.</p>
+
+<h3>Speech is still being clipped</h3>
+
+<p>Check that keep-alive is actually on: press <kbd>Windows+B</kbd> and arrow
+to the icon, which reads <em>Headphones awake</em> or <em>Headphones
+free</em>. If it is on and speech is still clipped, the headset may be
+ignoring pure silence. Try <em>Silence with a tick each second</em>, and then
+<em>Inaudible tone</em>, in the settings.</p>
+
+<p>Also check that the right device is being held. If the settings name a
+device that is not the one you are listening on, set it back to <em>Default
+output (follow Windows)</em>.</p>
+
+<h3>My phone will not take the headphones</h3>
+
+<p>Something has to release them first. Either wait for the release time to
+pass with nothing playing, or press <strong>Ctrl+Windows+F12</strong> to
+release them straight away — you will hear the falling tone, and the phone can
+claim them a couple of seconds later.</p>
+
+<p>If keep-alive keeps coming back on by itself while you are still using the
+computer, that is the waking feature. Switching off by hand always sticks;
+waking only ever follows an automatic release.</p>
+
+<h3>It says StableSound is already running</h3>
+
+<p>Because it is — most likely started for you when you signed in. Only one
+copy can run at a time; two would fight over the same hotkey and the same
+headphones. The message names the hotkeys the running copy is using.</p>
+
+<h2 id="antivirus">Antivirus and SmartScreen warnings</h2>
+
+<p>StableSound is not signed with a code-signing certificate, and Windows
+treats unsigned programs it has not seen before with suspicion. The first time
+you run it you may get a <strong>Windows protected your PC</strong> screen
+from SmartScreen. Choosing <em>More info</em> and then <em>Run anyway</em>
+gets past it, and you should not see it again on that machine.</p>
+
+<p>An antivirus program may also object. A small program that opens audio
+devices, registers global hotkeys and can start itself at sign-in matches the
+shape of things that are worth being suspicious of, and heuristics do not know
+why it is doing them. If yours quarantines StableSound, its own interface will
+have a way to report a false positive.</p>
+
+<p>Both are reasonable defences behaving as designed. Only download
+StableSound from its own releases page, and if a copy came from anywhere else,
+do not trust it.</p>
+
+<h2 id="files">Where StableSound keeps its files</h2>
+
+<p>Two files, both plain text, both alongside <code>StableSound.exe</code>:</p>
+
+<ul>
+  <li><code>stablesound.conf</code> — the settings.</li>
+  <li><code>stablesound.log</code> — the log, if you have turned it on.</li>
+</ul>
+
+<p>If the folder StableSound is in cannot be written to — Program Files, for
+instance, or a read-only drive — both move to
+<code>%APPDATA%\StableSound</code> instead.</p>
+
+<p>The settings file is safe to edit by hand if you would rather; StableSound
+reads it at startup. A setting it cannot make sense of is corrected rather
+than obeyed, and the correction is written to the log.</p>
+
+<p>StableSound writes nothing else and puts nothing in the registry, except
+the single entry for starting at sign-in when you ask for it. Removing the exe
+and those two files removes it completely.</p>
+
+<footer>
+<p>StableSound is free software under the MIT licence. It was built with and
+for a JAWS user, and every part of it is meant to work without sight; if some
+part of it does not, that is a bug worth reporting.</p>
+</footer>
+
+</body>
+</html>

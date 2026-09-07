@@ -112,6 +112,7 @@ pub const CMD_TOGGLE: i32 = 1;
 pub const CMD_OPEN_LOG: i32 = 2;
 pub const CMD_QUIT: i32 = 3;
 pub const CMD_SETTINGS: i32 = 4;
+pub const CMD_HELP: i32 = 5;
 
 /// Icon size. 16x16 is what the notification area asks for; Windows scales it
 /// where the display needs something larger.
@@ -379,6 +380,15 @@ impl Tray {
                 MF_STRING,
                 CMD_SETTINGS as usize,
                 PCWSTR(wide("&Settings...").as_ptr()),
+            );
+            // Both of these are in the settings dialog as well. The tray is
+            // never the only route to anything - CLAUDE.md constraint 3 - and
+            // with the console gone these two would otherwise have been.
+            let _ = AppendMenuW(
+                menu,
+                MF_STRING,
+                CMD_HELP as usize,
+                PCWSTR(wide("&Help").as_ptr()),
             );
             let _ = AppendMenuW(
                 menu,

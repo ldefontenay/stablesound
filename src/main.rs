@@ -42,6 +42,7 @@
 
 mod audio;
 mod config;
+mod docs;
 mod engine;
 mod hotkey;
 mod input;
@@ -55,13 +56,11 @@ use std::path::{Path, PathBuf};
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, Mutex};
 
-use windows::core::PCWSTR;
 use windows::Win32::Foundation::{HWND, POINT};
 use windows::Win32::System::Com::{CoInitializeEx, COINIT_APARTMENTTHREADED};
-use windows::Win32::UI::Shell::ShellExecuteW;
 use windows::Win32::UI::WindowsAndMessaging::{
-    DispatchMessageW, GetMessageW, KillTimer, SetTimer, TranslateMessage, MSG, SW_SHOWNORMAL,
-    WM_HOTKEY, WM_MOUSEMOVE, WM_TIMER,
+    DispatchMessageW, GetMessageW, KillTimer, SetTimer, TranslateMessage, MSG, WM_HOTKEY,
+    WM_MOUSEMOVE, WM_TIMER,
 };
 
 use crate::config::Config;
@@ -97,7 +96,6 @@ struct Surface {
     toggle_key: Option<Registration>,
     settings_key: Option<Registration>,
     config_path: PathBuf,
-    log_path: PathBuf,
     log: Log,
 }
 
@@ -121,7 +119,6 @@ fn main() {
     };
 
     let log = Log::new(config::log_path(), cfg.logging);
-    let log_path = config::log_path();
     // The engine takes ownership of the log; the message loop keeps a handle
     // of its own so tray callbacks can be recorded where they arrive.
     let loop_log = log.clone();
@@ -199,7 +196,6 @@ fn main() {
         toggle_key,
         settings_key,
         config_path,
-        log_path,
         log: loop_log,
     };
 
@@ -396,7 +392,11 @@ fn menu(surface: &mut Surface, handle: &engine::Handle, at: POINT) -> bool {
             false
         }
         Some(tray::CMD_OPEN_LOG) => {
-            open_log(surface);
+            docs::open_log(Some(surface.tray.hwnd()));
+            false
+        }
+        Some(tray::CMD_HELP) => {
+            docs::open_help(Some(surface.tray.hwnd()));
             false
         }
         Some(tray::CMD_QUIT) => true,
@@ -584,57 +584,6 @@ fn rebind(
                 ),
             );
         }
-    }
-}
-
-/// Hand the log to whatever the user reads text files with.
-///
-/// Worth a menu item of its own: the log is how this project's behaviour gets
-/// checked, because idle behaviour cannot be watched live - reading the output
-/// with a screen reader makes the very sound being measured.
-fn open_log(surface: &Surface) {
-    if !surface.log_path.exists() {
-        // Almost always because logging is off, which is the default. Saying
-        // so is more use than a bare "file not found".
-        settings::note(
-            Some(surface.tray.hwnd()),
-            &format!(
-                "There is no log file yet.\n\
-                 \n\
-                 StableSound does not write one unless you ask it to, so that it leaves nothing \
-                 behind on a machine that is working fine.\n\
-                 \n\
-                 To start one, open the settings and tick \"Write a log file, so a problem can \
-                 be looked into later\". If somebody is helping you look into a problem, tick \
-                 \"Detailed logging\" as well. The file will then appear at:\n\
-                 \n\
-                 {}",
-                surface.log_path.display()
-            ),
-        );
-        return;
-    }
-    open_with_shell(&surface.log_path);
-}
-
-/// Open a file with whatever the user has associated with it.
-fn open_with_shell(path: &Path) {
-    let wide: Vec<u16> = path
-        .as_os_str()
-        .to_string_lossy()
-        .encode_utf16()
-        .chain(std::iter::once(0))
-        .collect();
-    let verb: Vec<u16> = "open".encode_utf16().chain(std::iter::once(0)).collect();
-    unsafe {
-        ShellExecuteW(
-            None,
-            PCWSTR(verb.as_ptr()),
-            PCWSTR(wide.as_ptr()),
-            PCWSTR::null(),
-            PCWSTR::null(),
-            SW_SHOWNORMAL,
-        );
     }
 }
 

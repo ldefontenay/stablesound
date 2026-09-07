@@ -32,9 +32,14 @@
 // is JAWS' own verbosity setting, not ours. So the headings are kept for the
 // sighted reader and for structure, and nothing is allowed to depend on them.
 //
-// Mnemonics in use: O S L A K P V H U T W D I. OK and Cancel deliberately
-// have none - they are the default and cancel buttons, reached with Enter and
-// Escape. IDD_MESSAGE has its own namespace and reuses W.
+// Mnemonics in use: O S L A K P V H U T W D I E F X. OK and Cancel
+// deliberately have none - they are the default and cancel buttons, reached
+// with Enter and Escape. IDD_MESSAGE has its own namespace and reuses W.
+//
+// The three added in Milestone 6 had to work around the letters already
+// taken: Help is H&elp because H is the toggle hotkey's, Open the log &file
+// because L is "Let go of the headphones", and E&xit because X was free and
+// matches the tray menu's wording.
 
 #include <windows.h>
 
@@ -63,8 +68,12 @@
 #define IDC_USE_SET_HOTKEY 1014
 #define IDC_MESSAGE      1015
 #define IDC_MESSAGE_LABEL 1016
+// Not IDC_HELP: windows.h already has that, as the standard help cursor.
+#define IDC_OPEN_HELP    1017
+#define IDC_OPEN_LOG     1018
+#define IDC_EXIT         1019
 
-IDD_SETTINGS DIALOGEX 0, 0, 306, 394
+IDD_SETTINGS DIALOGEX 0, 0, 306, 412
 STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
 CAPTION "StableSound Settings"
 FONT 9, "Segoe UI", 400, 0, 0x1
@@ -111,20 +120,32 @@ BEGIN
     LTEXT           "Type one or more of ctrl, alt, shift and win, then one key, joined by plus signs. For example: ctrl+win+f12",
                     -1, 14, 256, 278, 16
 
-    GROUPBOX        "Log file", -1, 7, 281, 292, 48
+    GROUPBOX        "Log file", -1, 7, 281, 292, 66
     CONTROL         "&Write a log file, so a problem can be looked into later",
                     IDC_LOGGING, "Button",
                     BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP, 14, 296, 278, 10
     CONTROL         "&Detailed logging, for troubleshooting",
                     IDC_DIAGNOSTICS, "Button",
                     BS_AUTOCHECKBOX | WS_TABSTOP, 14, 312, 278, 10
+    // Inside the group, immediately after the two settings it belongs to, so
+    // that it is met in the place where the log is being thought about.
+    PUSHBUTTON      "Open the log &file", IDC_OPEN_LOG, 14, 327, 90, 14
 
-    GROUPBOX        "Starting up", -1, 7, 333, 292, 32
+    GROUPBOX        "Starting up", -1, 7, 353, 292, 32
     CONTROL         "Start StableSound when I sign &in", IDC_STARTUP, "Button",
-                    BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP, 14, 348, 278, 10
+                    BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP, 14, 368, 278, 10
 
-    DEFPUSHBUTTON   "OK", IDOK, 191, 373, 50, 14, WS_GROUP
-    PUSHBUTTON      "Cancel", IDCANCEL, 249, 373, 50, 14
+    // Tab order is template order, and these four are deliberately not in
+    // left-to-right order.
+    //
+    // OK and Cancel come first because they are what the dialog is normally
+    // left by. Exit comes **last**, three buttons past the settings, because
+    // it quits StableSound outright: tabbing one stop too far should never be
+    // able to reach it. It is also placed away from OK on screen.
+    DEFPUSHBUTTON   "OK", IDOK, 191, 391, 50, 14, WS_GROUP
+    PUSHBUTTON      "Cancel", IDCANCEL, 249, 391, 50, 14
+    PUSHBUTTON      "H&elp", IDC_OPEN_HELP, 7, 391, 50, 14
+    PUSHBUTTON      "E&xit StableSound", IDC_EXIT, 63, 391, 80, 14
 END
 
 // What StableSound says when it cannot accept something, in place of a

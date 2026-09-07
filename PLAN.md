@@ -1417,6 +1417,72 @@ four. Testing a program's own source text from inside it is an odd thing to
 do; six occurrences of an invisible defect in a program for a blind user earn
 it.
 
+### 6.4 The help, and the three buttons that reach it (2026-09-08)
+
+`help.html` is compiled into the exe with `include_str!` and written out only
+when somebody asks to read it. That keeps constraint 5 - one self-contained
+file, nothing to copy alongside - and rewriting it on every request, rather
+than only when missing, means the help can never be older than the program it
+describes. It costs 19 KB in the binary and nothing at runtime.
+
+**HTML rather than a text file or a read-only edit**, because a browser is the
+only one of the three that gives JAWS real heading navigation: `H` moves
+heading to heading, `Insert+F6` lists them all. The message window built in
+Milestone 5.1 is right for twenty lines and wrong for a manual with a dozen
+sections.
+
+**A finding worth keeping: open the help as a `file:///` URL, never as a
+path.** Handing `ShellExecuteW` the path itself put an **"Open with"
+chooser** on screen instead of a browser. The machine's `.html` entry still
+resolves through `htmlfile` to Internet Explorer, which Windows 11 does not
+have; the modern default browser is recorded under `UserChoice` and is only
+consulted for the *protocol*. Passing `file:///C:/.../stablesound-help.html`
+goes through the protocol handler and opened Chrome correctly, titled
+"StableSound Help".
+
+The chooser is the more dangerous of the two failures, because `ShellExecuteW`
+reports it as **success** - 42, comfortably above the 32 that separates its
+error codes from its meaningless positive ones. It did launch something. So no
+amount of checking the return value would have caught this; only running it
+did. The return value is now checked as well, for the ordinary failures, and
+both openers say where the file is if they cannot open it.
+
+`docs.rs` holds the help and the log together, because they are the same
+gesture from the user's side and Milestone 6 gave both of them two callers
+instead of one. The log still opens by path - a log is a text file and belongs
+in a text editor, not a browser.
+
+**The dialog gained three buttons**, so that dropping the console did not
+leave `Exit` and `Open the log file` reachable only from the tray menu, which
+CLAUDE.md constraint 3 forbids:
+
+- `Open the log &file`, inside the *Log file* group immediately after the two
+  logging checkboxes, so it is met where the log is being thought about.
+- `H&elp` and `E&xit StableSound` on the bottom row. `F1` opens the help too.
+- Mnemonics had to work around the letters already taken: `E` for Help,
+  `F` for the log, `X` for Exit. O S L A K P V H U T W D I were spoken for.
+
+**Exit is last in template order**, after OK and Cancel, and placed away from
+them on screen. Tab order is template order, so tabbing one stop too far past
+the settings reaches OK, not the button that quits StableSound. It discards
+anything typed but not accepted, exactly as Cancel does; the help says so. It
+destroys the dialog and then calls `PostQuitMessage`, which is sound only
+because a modeless dialog's procedure runs on the thread that owns the queue -
+one more thing that would not work had the dialog been modal.
+
+**Verified by driving the running dialog from another process:** 32 controls,
+still in template order with every label immediately before the control it
+names; the three new ones are real `Button` windows carrying `WS_TABSTOP` and
+their mnemonics, with Exit enumerating last. The Help button and `F1` each
+opened the written file in the default browser, with no "Open with" chooser.
+The written file is byte-identical to `help.html`. `Open the log file` with no
+log present says so, naming the checkbox to tick and the path the file will
+appear at. Exit quit the process cleanly. 43 unit tests, three of them over
+the path-to-URL conversion, including a space and a non-ASCII folder name.
+
+**Not verified, and cannot be from here:** how any of it reads under JAWS,
+and whether the help document is actually navigable by headings in practice.
+
 **Verified:** release binary **275 KB**, down from 297 KB. The PE subsystem
 field reads 2, `IMAGE_SUBSYSTEM_WINDOWS_GUI`. The exe starts, stays up with no
 console window and no visible window of its own, and no `conhost` is spawned.
