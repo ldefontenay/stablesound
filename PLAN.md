@@ -1354,6 +1354,69 @@ weight the console had been holding up:
   `on` and `off`. The hotkey, the tray icon and the tray menu have only ever
   toggled.
 
+### 6.2 One StableSound at a time (2026-09-07)
+
+A problem the console used to hide. A second copy started while the first is
+running puts a second icon in the notification area - which a screen reader
+reads out exactly like the live one - fails to register the global hotkey
+because the first copy holds it, opens a second keep-alive stream on the same
+device, and competes to write the same log and settings files. While there was
+a console, all of that announced itself in the window that had just appeared.
+Now nothing would.
+
+Nor is it far-fetched. "Start StableSound when I sign in" has been built since
+Milestone 4, so the app is normally *already running* by the time the user
+goes looking for it - and with no window of its own, the obvious way to check
+is to run the exe again.
+
+A named mutex, not `FindWindow` on the tray window class: two copies started
+together can both look, both find nothing and both carry on, whereas a mutex
+is decided by the kernel at creation. The name is `Local\`-prefixed, so it
+scopes to the signed-in session rather than the machine - global hotkeys are
+per-session, so two signed-in users are not in competition and should each get
+their own StableSound.
+
+The second copy says so and stops, in the message window, naming the
+combinations **this machine** is set up with rather than the defaults - which
+is the one reason the settings file is read before the mutex is claimed. A
+silent exit was rejected: it cannot be told apart from the app failing to
+start, and running the exe again is exactly what somebody does when they are
+not sure whether it is running.
+
+**Verified by running two copies:** the second opens a real `#32770` whose
+focused control carries the whole message as its accessible name, naming
+`Ctrl+Win+F12` and `Ctrl+Win+F11` from the live settings; dismissing it leaves
+exactly one process; and killing the first outright - no unwinding, no `Drop` -
+still releases the mutex, so a fresh copy starts normally.
+
+### 6.3 The flattened line continuation, caught by a test this time
+
+Milestone 5 found five message strings whose line continuations had been
+flattened into runs of literal spaces, "four of them long before this branch".
+Writing 6.2 produced a sixth, and this time the cause is known and written
+down.
+
+It happens when the backslash ending a line inside a string literal is lost.
+Rust then keeps the newline *and* the next line's indentation, so a message
+reading `one can run \` + newline + fourteen spaces + `at a time` becomes `one
+can run              at a time`. It compiles. It reads correctly in the source.
+Nothing but running the program shows it - and the person this program is for
+cannot see runs of spaces, only hear whatever the screen reader makes of them.
+
+`rustfmt` was suspected and cleared by experiment: it leaves continuations
+alone. The culprit here was the editing tool, which treated the backslash as
+its own line continuation and ate it.
+
+So there is now a test that reads the source of the six files carrying
+user-facing prose and fails on any interior run of six or more spaces outside
+a comment. Six is the threshold because a flattened continuation carries a
+whole line's indentation - thirteen or fourteen spaces in this codebase -
+while the deliberate alignment that does exist, the columns in
+`Config::summary` and the key names in `hotkey::HOW_TO_WRITE`, never exceeds
+four. Testing a program's own source text from inside it is an odd thing to
+do; six occurrences of an invisible defect in a program for a blind user earn
+it.
+
 **Verified:** release binary **275 KB**, down from 297 KB. The PE subsystem
 field reads 2, `IMAGE_SUBSYSTEM_WINDOWS_GUI`. The exe starts, stays up with no
 console window and no visible window of its own, and no `conhost` is spawned.

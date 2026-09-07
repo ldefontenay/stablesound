@@ -45,6 +45,7 @@ mod config;
 mod engine;
 mod hotkey;
 mod input;
+mod instance;
 mod log;
 mod settings;
 mod startup;
@@ -110,6 +111,14 @@ fn main() {
 
     let config_path = config::config_path();
     let (cfg, adjustments) = Config::load(&config_path);
+
+    // Before anything is opened, claimed or written. The settings are read
+    // first only so that the message below can name the hotkey this machine
+    // is actually set up with, rather than the default.
+    let Some(_only_copy) = instance::claim() else {
+        already_running(&cfg);
+        return;
+    };
 
     let log = Log::new(config::log_path(), cfg.logging);
     let log_path = config::log_path();
@@ -209,6 +218,41 @@ fn main() {
     let _ = handle.thread.join();
     surface.log.write("stopped");
     drop(surface);
+}
+
+/// Say that this is the second copy, and where the first one is.
+///
+/// A window rather than a silent exit, because a silent exit is
+/// indistinguishable from the app failing to start - and running the exe again
+/// is exactly what somebody does when they are not sure whether it is running,
+/// which with no console and no window of its own is most of the time.
+///
+/// It names the combination in force rather than the default, which is why
+/// this is worth reading the settings file for.
+fn already_running(cfg: &Config) {
+    let settings_route = if cfg.settings_hotkey_enabled {
+        format!("Press {} to open its settings.", cfg.settings_hotkey)
+    } else {
+        "To open its settings, press Windows+B to reach the notification area, use the arrow \
+         keys to find StableSound, then press the Applications key and choose Settings."
+            .to_string()
+    };
+    settings::note(
+        None,
+        &format!(
+            "StableSound is already running, so this second copy has stopped. Only one can run \
+             at a time: two would fight over the same hotkey and the same headphones.\n\
+             \n\
+             The copy that is running is working normally. Press {} to switch keep-alive on \
+             and off.\n\
+             \n\
+             {settings_route}\n\
+             \n\
+             If StableSound starts by itself when you sign in, it will usually be running \
+             already. You can turn that off in its settings.",
+            cfg.hotkey
+        ),
+    );
 }
 
 /// Register one global hotkey, reporting either way.
@@ -653,5 +697,98 @@ fn record_startup(cfg: &Config, config_path: &Path, log: &Log, adjustments: &[co
         }
         Ok(_) => log.write("no active output devices found"),
         Err(e) => log.write(&format!("could not list output devices: {e}")),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    /// Catch a message string whose line continuations have been flattened.
+    ///
+    /// This defect has now reached this project six times. Milestone 5 found
+    /// five at once - "five message strings had had their line continuations
+    /// flattened into runs of literal spaces, four of them long before this
+    /// branch" - and Milestone 6 added a sixth while writing the second-copy
+    /// message.
+    ///
+    /// It happens when the `\` at the end of a line inside a string literal is
+    /// lost. Rust then keeps the newline and the next line's indentation, so
+    /// "one can run \" + newline + fourteen spaces + "at a time" becomes "one
+    /// can run              at a time". It compiles, it reads fine in the
+    /// source, and nothing but running the program shows it - and the person
+    /// this program is for cannot see the runs of spaces, only hear whatever
+    /// the screen reader makes of them.
+    ///
+    /// So it is worth a test, even though testing the source text of a program
+    /// from inside that program is an odd thing to do. Six spaces is the
+    /// threshold: a flattened continuation carries a whole line's indentation,
+    /// thirteen or fourteen spaces here, while the deliberate alignment this
+    /// codebase does use - the columns in `Config::summary` and the key names
+    /// in `hotkey::HOW_TO_WRITE` - never exceeds four.
+    #[test]
+    fn no_message_has_a_flattened_line_continuation() {
+        let sources = [
+            ("main.rs", include_str!("main.rs")),
+            ("settings.rs", include_str!("settings.rs")),
+            ("hotkey.rs", include_str!("hotkey.rs")),
+            ("config.rs", include_str!("config.rs")),
+            ("tray.rs", include_str!("tray.rs")),
+            ("instance.rs", include_str!("instance.rs")),
+        ];
+        let mut found = Vec::new();
+        for (name, text) in sources {
+            for (n, line) in text.lines().enumerate() {
+                let body = line.trim_start();
+                // Comments wrap prose too, and a wrapped comment is just a
+                // comment. Only string content can be flattened.
+                if body.starts_with("//") || body.starts_with('*') {
+                    continue;
+                }
+                if has_run_of_spaces(body) {
+                    found.push(format!("{name}:{} {body}", n + 1));
+                }
+            }
+        }
+        assert!(
+            found.is_empty(),
+            "a line continuation looks flattened - the backslash at the end of \
+             the previous line has been lost:\n{}",
+            found.join("\n")
+        );
+    }
+
+    /// A flattened continuation carries a whole line's indentation, so the
+    /// giveaway is a long run of spaces. Six, against the four that the
+    /// deliberate alignment in this codebase reaches.
+    const RUN: usize = 6;
+
+    /// True if `RUN` or more spaces sit between two non-space characters.
+    ///
+    /// Trimming first is what makes the run an *interior* one: indentation and
+    /// trailing whitespace are neither a mistake nor readable text.
+    fn has_run_of_spaces(line: &str) -> bool {
+        let mut run = 0;
+        for c in line.trim().chars() {
+            run = if c == ' ' { run + 1 } else { 0 };
+            if run >= RUN {
+                return true;
+            }
+        }
+        false
+    }
+
+    #[test]
+    fn the_flattening_check_knows_what_it_is_looking_for() {
+        // Built rather than written out, because a literal run of spaces here
+        // would be found by the test above - which reads this very file.
+        let spaces = " ".repeat(14);
+        assert!(has_run_of_spaces(&format!(
+            "\"one can run{spaces}at a time\""
+        )));
+        // Deliberate alignment, which this codebase does use.
+        assert!(!has_run_of_spaces("\"wake:    {}\""));
+        assert!(!has_run_of_spaces("  ctrl   (or control)"));
+        assert!(!has_run_of_spaces("let x = 1;"));
+        // Indentation alone is not a run between two characters.
+        assert!(!has_run_of_spaces(&spaces));
     }
 }
