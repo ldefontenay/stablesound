@@ -5,10 +5,15 @@
 //! screen reader produces speech, which trips the audio detector, which changes
 //! the very thing being measured. A log read afterwards, while the headset is
 //! quiet, is the only way to see what actually happened.
+//!
+//! Since Milestone 6 it is also the *only* record. The console harness that
+//! used to mirror these lines to a window is gone, so anything not written
+//! here is not written anywhere - which is why `main` sends failures to a
+//! dialog instead of trusting a log the user has probably left switched off.
 
 use std::fs::OpenOptions;
 use std::io::Write;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
@@ -25,16 +30,13 @@ use windows::Win32::System::SystemInformation::GetLocalTime;
 #[derive(Clone)]
 pub struct Log {
     path: PathBuf,
-    /// Mirror to the console too. Off once there is a tray icon instead.
-    echo: bool,
     enabled: Arc<AtomicBool>,
 }
 
 impl Log {
-    pub fn new(path: PathBuf, echo: bool, enabled: bool) -> Self {
+    pub fn new(path: PathBuf, enabled: bool) -> Self {
         Log {
             path,
-            echo,
             enabled: Arc::new(AtomicBool::new(enabled)),
         }
     }
@@ -44,22 +46,11 @@ impl Log {
         self.enabled.store(on, Ordering::Relaxed);
     }
 
-    /// Where lines are going, or `None` while logging is off.
-    pub fn path(&self) -> Option<&Path> {
-        self.enabled
-            .load(Ordering::Relaxed)
-            .then_some(self.path.as_path())
-    }
-
     pub fn write(&self, message: &str) {
         if !self.enabled.load(Ordering::Relaxed) {
             return;
         }
         let line = format!("{} {}", timestamp(), message);
-
-        if self.echo {
-            println!("{line}");
-        }
 
         // Logging is a convenience, never a reason to fail. If the file
         // cannot be written, carry on silently rather than interrupting.

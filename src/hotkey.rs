@@ -109,8 +109,8 @@ impl ParseError {
     }
 }
 
-/// How to write a combination. One string, used by the dialog, the console and
-/// the config loader, so the three cannot drift apart.
+/// How to write a combination. One string, used by the dialog and the config
+/// loader, so the two cannot drift apart.
 pub const HOW_TO_WRITE: &str = "\
 Write a hotkey as modifiers and one key, joined by plus signs.
 

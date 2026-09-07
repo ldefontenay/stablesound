@@ -63,11 +63,6 @@ use crate::config::{Config, DeviceSelector, Release, Signal};
 use crate::hotkey::{self, Hotkey};
 use crate::startup;
 
-/// Posted to the message loop to ask for the dialog. The console reads
-/// `settings` on its own thread, and only the thread that owns the queue may
-/// put a window on it.
-pub const WM_OPEN_SETTINGS: u32 = windows::Win32::UI::WindowsAndMessaging::WM_APP + 4;
-
 /// Must match `stablesound.rc`.
 const IDD_SETTINGS: u16 = 100;
 const IDD_MESSAGE: u16 = 101;
@@ -438,7 +433,7 @@ fn read_hotkey(hwnd: HWND, id: i32) -> Option<Hotkey> {
 /// JAWS reads be the field to correct, rather than leaving the user to hunt
 /// for it.
 fn complain(hwnd: HWND, text: &str, focus_on: i32) {
-    show_message(hwnd, text, MB_ICONEXCLAMATION, PROBLEM_HEADING);
+    problem(Some(hwnd), text);
     unsafe {
         if let Ok(control) = GetDlgItem(Some(hwnd), focus_on) {
             let _ = SetFocus(Some(control));
@@ -447,7 +442,26 @@ fn complain(hwnd: HWND, text: &str, focus_on: i32) {
 }
 
 fn notify(hwnd: HWND, text: &str) {
-    show_message(hwnd, text, MB_ICONINFORMATION, NOTE_HEADING);
+    note(Some(hwnd), text);
+}
+
+/// Say that something went wrong, with the exclamation ding in front of it.
+///
+/// Public because Milestone 6 took the console away. Everything that used to
+/// be a `println!` the user could scroll back to now goes to the log - except
+/// the failures, which have nowhere else to be seen: logging is off by
+/// default, so a hotkey that could not be claimed would otherwise be silent,
+/// and a silent primary interface is the worst failure this app has.
+///
+/// The owner is optional because the earliest of those failures happens before
+/// there is a window to own it.
+pub fn problem(owner: Option<HWND>, text: &str) {
+    show_message(owner, text, MB_ICONEXCLAMATION, PROBLEM_HEADING);
+}
+
+/// Say that something happened, with the information ding in front of it.
+pub fn note(owner: Option<HWND>, text: &str) {
+    show_message(owner, text, MB_ICONINFORMATION, NOTE_HEADING);
 }
 
 /// What the heading over the message says, which is how a screen reader user
@@ -483,7 +497,7 @@ const NOTE_HEADING: &str = "&What happened:";
 /// Modal, like the message box it replaces, so the global hotkey is not
 /// serviced while it is up. Unchanged from before, and it is a window that
 /// exists to be dismissed.
-fn show_message(hwnd: HWND, text: &str, sound: MESSAGEBOX_STYLE, heading: &str) {
+fn show_message(owner: Option<HWND>, text: &str, sound: MESSAGEBOX_STYLE, heading: &str) {
     unsafe {
         let _ = MessageBeep(sound);
     }
@@ -501,7 +515,7 @@ fn show_message(hwnd: HWND, text: &str, sound: MESSAGEBOX_STYLE, heading: &str) 
         DialogBoxParamW(
             Some(instance.into()),
             PCWSTR(IDD_MESSAGE as usize as *const u16),
-            Some(hwnd),
+            owner,
             Some(message_proc),
             LPARAM(&shown as *const Message as isize),
         );

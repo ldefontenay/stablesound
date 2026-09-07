@@ -1269,7 +1269,11 @@ afterwards.
 
 **Hard release. DEFERRED, probably not needed.** Soft release was confirmed sufficient on the AeroClip (see 2.4), so this is no longer planned work. Revisit only if another headset needs it, or if the 3-second handover becomes annoying. Reference if it ever happens: `m2jean/ToothTray`.
 
-**Milestone 6 - ship.** Size-tuned release build, README, and a plan for the antivirus/SmartScreen problem - a small unsigned binary that opens audio devices and registers global hotkeys fits the profile AV heuristics dislike. Options: submit false-positive reports to the major vendors, or look at code signing.
+**Milestone 6 - ship. IN PROGRESS**, branch `m6-ship`. Size-tuned release
+build, README, and a plan for the antivirus/SmartScreen problem - a small
+unsigned binary that opens audio devices and registers global hotkeys fits the
+profile AV heuristics dislike. Options: submit false-positive reports to the
+major vendors, or look at code signing.
 
 Two things the Milestone 4 round confirmed belong here rather than earlier:
 
@@ -1282,6 +1286,82 @@ Two things the Milestone 4 round confirmed belong here rather than earlier:
   exist first, which is the README above.
 
 Autostart is already built, in Milestone 4.
+
+**Decisions taken at the start of the milestone**, answering the questions the
+work raised before any of it was written:
+
+1. **The help is HTML, opened in the browser.** Embedded in the exe and
+   written out on demand, so the single-file constraint holds. A browser is
+   the one place a JAWS user gets real heading navigation - `H` to move
+   heading to heading, `Insert+F6` for a list of them - which a `.txt` in
+   Notepad cannot offer and a read-only edit control cannot either. The
+   message window built in Milestone 5.1 is right for twenty lines and wrong
+   for a manual.
+2. **The settings dialog gains Help, Open the log file, and Exit.** Dropping
+   the console left `Exit` and `Open the log file` reachable only from the
+   tray menu, and CLAUDE.md constraint 3 says the tray is never the only route
+   to a feature.
+3. **Antivirus: document it now, research signing and write it up.**
+4. **Public repo, version stays 0.1.0.** A first public cut, not a 1.0 claim.
+
+### 6.1 The console is gone (2026-09-07)
+
+`#![windows_subsystem = "windows"]`, `console.rs` deleted, and with it the
+stdin thread, `WM_CONSOLE_QUIT`, the `Win32_System_Console` feature, `Log`'s
+console echo, and the `SetConsoleCtrlHandler` that removed the tray icon when
+the console window was closed - a route that no longer exists.
+
+**Where the output went.** Two ways, not one:
+
+- **Routine things go to the log**: the settings in force at startup, the
+  hotkeys claimed, the output devices available. The engine already wrote
+  every state change to the log from its own thread - which is why the log was
+  complete during Milestone 2's testing when the console was not - so the
+  message loop no longer repeats it.
+- **Failures open the message window**, the read-only edit built in Milestone
+  5.1. Logging is off by default, so a log nobody switched on is not a report.
+  Three cases: the tray icon failing to be created, a hotkey that could not be
+  claimed, and settings that could not be saved. Each says what Windows said
+  and what to do about it.
+
+**One deliberate exception, and one deliberate silence.**
+
+The exception is that a *device* that will not open stays in the log and never
+opens a window. The engine raises it on every disconnection, retries on its
+own and recovers - proven on hardware in Milestone 2's Test 8 - so a dialog
+there would be precisely the message spam that round was checking for.
+
+The silence is `config adjusted:`. The console said it out loud; now only the
+log does. Adjustments happen when the settings file has been hand-edited out
+of range, and interrupting every sign-in with a dialog is a poor trade for a
+rare case whose corrected values the settings dialog already shows.
+
+**Two things fell out of it that are worth recording**, because both were dead
+weight the console had been holding up:
+
+- **`Event` went from seven variants to two.** `Started`, `WokenByInput`,
+  `Moved`, `Stopped`, `Interrupted`, `Substituted` and `Error` carried device
+  names, signal names, stop reasons and error text - every one of them for the
+  console to print, and every one of them already written to the log by the
+  engine at the same moment it was sent. So the strings were being cloned
+  across a channel to be dropped unread. It is now `KeepAliveOn` and
+  `KeepAliveOff`, which is all the tray icon can act on, and the three
+  non-transitions send nothing at all. The one payload worth keeping - that a
+  stream reopened on a *different* device, which is the shape of both
+  device-loss recovery and a default-output change - moved into the log line
+  as `(moved)`.
+- **`Command::On` and `Command::Off` went.** They existed for the console's
+  `on` and `off`. The hotkey, the tray icon and the tray menu have only ever
+  toggled.
+
+**Verified:** release binary **275 KB**, down from 297 KB. The PE subsystem
+field reads 2, `IMAGE_SUBSYSTEM_WINDOWS_GUI`. The exe starts, stays up with no
+console window and no visible window of its own, and no `conhost` is spawned.
+38 unit tests, `cargo clippy --all-targets -- -D warnings` clean.
+
+**Not verified, and cannot be from here:** everything audible, everything JAWS
+reads, and the three failure windows, which need a combination to be taken by
+another program to provoke.
 
 **Current position (2026-09-07):** Milestones 0 to 5.1 complete and
 hardware-tested, with nothing outstanding behind them. The settings dialog

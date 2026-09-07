@@ -82,8 +82,7 @@ pub struct Config {
     /// something goes wrong, in an app whose behaviour cannot be watched as it
     /// happens. Having seen both, they chose: "Please have logging off by
     /// default and it can then be turned on when needed for development or
-    /// trouble-shooting." It is one checkbox in the dialog and one command in
-    /// the console.
+    /// trouble-shooting." It is one checkbox in the dialog.
     ///
     /// The cost is real and worth stating: a hardware round run without
     /// turning it on first leaves nothing behind to read. Every test script
@@ -380,6 +379,69 @@ impl Config {
             fs::create_dir_all(dir)?;
         }
         fs::write(path, self.serialise())
+    }
+
+    /// The settings in force, one line each, for the log.
+    ///
+    /// This was the console's `status` command, which printed the same eight
+    /// lines. Milestone 6 took the console away and the log inherited them:
+    /// they go down at startup and again whenever the dialog changes
+    /// something, so a log read afterwards says what the app was actually
+    /// configured to do at the time - which the console could only ever tell
+    /// somebody sitting in front of it.
+    pub fn summary(&self) -> Vec<String> {
+        let device = match &self.device {
+            DeviceSelector::Default => "default output".to_string(),
+            DeviceSelector::Named(n) => n.clone(),
+        };
+        let release = match self.release {
+            Release::Idle { secs } => format!("idle - release after {secs}s with no audio"),
+            Release::Fixed { secs } => format!("fixed - release {secs}s after switching on"),
+        };
+        vec![
+            format!("device:  {device}"),
+            format!("signal:  {}", self.signal),
+            format!("release: {release}"),
+            format!("hotkey:  {} toggles keep-alive", self.hotkey),
+            format!(
+                "dialog:  {}",
+                if self.settings_hotkey_enabled {
+                    format!(
+                        "{} opens the settings, as does the tray",
+                        self.settings_hotkey
+                    )
+                } else {
+                    "tray menu (Win+B) only - no hotkey".to_string()
+                }
+            ),
+            format!(
+                "wake:    {}",
+                if self.wake_on_input {
+                    "on - any input brings keep-alive back"
+                } else {
+                    "off - only the hotkey starts it"
+                }
+            ),
+            format!(
+                "earcons: {}",
+                if self.earcons {
+                    format!(
+                        "on at {:.0}% - when switched on or off by hand; automatic releases are silent",
+                        self.earcon_volume * 100.0
+                    )
+                } else {
+                    "off".to_string()
+                }
+            ),
+            format!(
+                "logging: {}",
+                match (self.logging, self.diagnostics) {
+                    (false, _) => "off",
+                    (true, false) => "on - state changes",
+                    (true, true) => "on - state changes, plus detailed troubleshooting lines",
+                }
+            ),
+        ]
     }
 
     fn serialise(&self) -> String {

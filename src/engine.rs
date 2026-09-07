@@ -84,16 +84,19 @@ const EARCON_TIMEOUT: Duration = Duration::from_secs(1);
 /// bool at the call sites.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Source {
-    /// The hotkey, the tray, or a console command.
+    /// The hotkey or the tray.
     User,
     /// The user touched the keyboard and keep-alive re-armed itself.
     Input,
 }
 
+/// What the message loop asks the engine for.
+///
+/// There is no `On` or `Off`. There was, for as long as the console harness
+/// let the tester type them; the hotkey, the tray icon and the tray menu have
+/// only ever toggled, and Milestone 6 removed the console.
 pub enum Command {
     Toggle,
-    On,
-    Off,
     /// Apply new settings. Restarts the stream if currently running.
     Reload(Box<Config>),
     Quit,
@@ -116,35 +119,23 @@ impl StopReason {
     }
 }
 
-#[derive(Clone, Debug)]
+/// What the engine tells the message loop.
+///
+/// Two variants, because two is all the message loop can act on: the tray
+/// icon reads either "Headphones awake" or "Headphones free".
+///
+/// It used to have seven, carrying device names, signal names, stop reasons
+/// and error text. Every one of those payloads existed for the console
+/// harness to print, and every one of them is written to the log by the
+/// engine at the same moment it is sent - so when Milestone 6 removed the
+/// console, the strings were being cloned across a channel to be dropped
+/// unread. What is *not* a state change no longer sends anything at all: a
+/// lost stream, a substituted device and a device that will not open are all
+/// logged and retried, and none of them moves the icon.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Event {
-    Started {
-        device: String,
-        signal: String,
-    },
-    /// Started because the user touched the machine.
-    WokenByInput {
-        device: String,
-    },
-    Stopped {
-        reason: StopReason,
-    },
-    /// The stream was lost but intent stands, so we are retrying.
-    Interrupted {
-        message: String,
-    },
-    /// Reopened on a different device than before.
-    Moved {
-        device: String,
-    },
-    /// A named device was not found, so the default was used instead.
-    Substituted {
-        wanted: String,
-        used: String,
-    },
-    Error {
-        message: String,
-    },
+    KeepAliveOn,
+    KeepAliveOff,
 }
 
 /// Everything that exists only while a stream is actually open.
@@ -251,10 +242,6 @@ fn run(mut config: Config, log: Log, commands: Receiver<Command>, events: Sender
                     set_intent_on(&mut rt, Source::User);
                 }
             }
-            Ok(Command::On) => set_intent_on(&mut rt, Source::User),
-            Ok(Command::Off) => {
-                set_intent_off(&mut rt, &config, StopReason::Requested, &log, &events)
-            }
             Ok(Command::Reload(new_config)) => {
                 config = *new_config;
                 log.write("settings reloaded");
@@ -299,9 +286,7 @@ fn run(mut config: Config, log: Log, commands: Receiver<Command>, events: Sender
                     // Almost always the device going away. Keep intent, drop
                     // the stream, and let the retry path pick up whatever
                     // Windows switches to. This is the Test 5 fix.
-                    let message = format!("audio stream lost: {e}");
-                    log.write(&format!("{message} - will retry"));
-                    let _ = events.send(Event::Interrupted { message });
+                    log.write(&format!("audio stream lost: {e} - will retry"));
                     rt.stream = None;
                     rt.next_retry = now + RETRY_DELAY;
                     rt.retry_reported = false;
@@ -443,7 +428,7 @@ fn set_intent_off(
         held,
         if had_stream { " - device released" } else { "" }
     ));
-    let _ = events.send(Event::Stopped { reason });
+    let _ = events.send(Event::KeepAliveOff);
 }
 
 fn try_open(rt: &mut Runtime, config: &Config, log: &Log, events: &Sender<Event>, now: Instant) {
@@ -454,12 +439,10 @@ fn try_open(rt: &mut Runtime, config: &Config, log: &Log, events: &Sender<Event>
             retry_later(rt, now);
             if !rt.retry_reported {
                 rt.retry_reported = true;
-                let message = format!("could not open an output device: {e}");
                 log.write(&format!(
-                    "{message} - retrying every {}s",
+                    "could not open an output device: {e} - retrying every {}s",
                     RETRY_DELAY.as_secs()
                 ));
-                let _ = events.send(Event::Error { message });
             }
             return;
         }
@@ -471,10 +454,6 @@ fn try_open(rt: &mut Runtime, config: &Config, log: &Log, events: &Sender<Event>
                 "device '{wanted}' not found, using default '{}' instead",
                 open.name
             ));
-            let _ = events.send(Event::Substituted {
-                wanted: wanted.clone(),
-                used: open.name.clone(),
-            });
         }
     }
 
@@ -484,9 +463,7 @@ fn try_open(rt: &mut Runtime, config: &Config, log: &Log, events: &Sender<Event>
             retry_later(rt, now);
             if !rt.retry_reported {
                 rt.retry_reported = true;
-                let message = format!("could not open the audio meter: {e}");
-                log.write(&message);
-                let _ = events.send(Event::Error { message });
+                log.write(&format!("could not open the audio meter: {e}"));
             }
             return;
         }
@@ -498,9 +475,7 @@ fn try_open(rt: &mut Runtime, config: &Config, log: &Log, events: &Sender<Event>
             retry_later(rt, now);
             if !rt.retry_reported {
                 rt.retry_reported = true;
-                let message = format!("could not start keep-alive: {e}");
-                log.write(&message);
-                let _ = events.send(Event::Error { message });
+                log.write(&format!("could not start keep-alive: {e}"));
             }
             return;
         }
@@ -515,10 +490,15 @@ fn try_open(rt: &mut Runtime, config: &Config, log: &Log, events: &Sender<Event>
         rt.announce = false;
     }
 
+    // Reopening somewhere else is the shape of both device-loss recovery and
+    // a default-output change, and both have cost this project a hardware
+    // round. It used to travel as `Event::Moved` for the console to print;
+    // with the console gone it belongs on the line that is kept.
     let moved = matches!(&rt.last_device_name, Some(previous) if *previous != open.name);
     log.write(&format!(
-        "keep-alive ON  device='{}' signal={} release={}",
+        "keep-alive ON  device='{}'{} signal={} release={}",
         open.name,
+        if moved { " (moved)" } else { "" },
         config.signal,
         describe_release(config.release)
     ));
@@ -535,20 +515,7 @@ fn try_open(rt: &mut Runtime, config: &Config, log: &Log, events: &Sender<Event>
     // A fresh stream has heard nothing yet, so the next thing that plays is a
     // transition worth recording.
     rt.audio_present = false;
-    let _ = events.send(if moved {
-        Event::Moved {
-            device: open.name.clone(),
-        }
-    } else if rt.started_by_input {
-        Event::WokenByInput {
-            device: open.name.clone(),
-        }
-    } else {
-        Event::Started {
-            device: open.name.clone(),
-            signal: config.signal.to_string(),
-        }
-    });
+    let _ = events.send(Event::KeepAliveOn);
 
     rt.last_device_name = Some(open.name.clone());
     rt.retry_reported = false;

@@ -52,14 +52,11 @@
 //! removes a whole class of question from the next hardware round: it no longer
 //! matters which protocol is actually in force.
 
-use std::ffi::c_void;
 use std::mem::size_of;
-use std::sync::atomic::{AtomicIsize, Ordering};
 use std::time::{Duration, Instant};
 
-use windows::core::{Result as WinResult, BOOL, PCWSTR};
+use windows::core::{Result as WinResult, PCWSTR};
 use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, POINT, WPARAM};
-use windows::Win32::System::Console::SetConsoleCtrlHandler;
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::Shell::{
     Shell_NotifyIconW, NIF_ICON, NIF_MESSAGE, NIF_SHOWTIP, NIF_TIP, NIM_ADD, NIM_DELETE,
@@ -99,10 +96,6 @@ pub const WM_TRAY: u32 = WM_APP + 1;
 /// The same callback, re-posted by `wndproc` so the message loop can see it.
 /// See the module note on sent versus posted messages.
 pub const WM_TRAY_QUEUED: u32 = WM_APP + 3;
-
-/// The window owning the tray icon, for the console control handler, which runs
-/// on a thread of the system's choosing and can reach nothing else.
-static ICON_OWNER: AtomicIsize = AtomicIsize::new(0);
 
 /// What the user asked the icon for.
 pub enum TrayEvent {
@@ -198,14 +191,6 @@ impl Tray {
             last_menu: None,
         };
         tray.add()?;
-
-        // Closing the console window or pressing Ctrl+C does not run `Drop`.
-        // See `on_console_close`.
-        ICON_OWNER.store(hwnd.0 as isize, Ordering::Relaxed);
-        unsafe {
-            let _ = SetConsoleCtrlHandler(Some(on_console_close), true);
-        }
-
         Ok(tray)
     }
 
@@ -435,7 +420,6 @@ impl Tray {
 
 impl Drop for Tray {
     fn drop(&mut self) {
-        ICON_OWNER.store(0, Ordering::Relaxed);
         remove_icon(self.hwnd);
         unsafe {
             let _ = DestroyIcon(self.on_icon);
@@ -450,6 +434,12 @@ impl Drop for Tray {
 /// Without this the icon stays there as a ghost pointing at a dead window: it
 /// does nothing when activated, and a screen reader still reads it out, so the
 /// next run is easy to mistake for the corpse of the last one.
+///
+/// Milestone 3 also hung this off a console control handler, for the case
+/// where closing the console window killed the process without unwinding.
+/// Milestone 6 removed the console, and with it that route: the only ways out
+/// now are `Exit`, which unwinds, and being terminated outright, which no
+/// handler of ours would survive either.
 fn remove_icon(hwnd: HWND) {
     let data = NOTIFYICONDATAW {
         cbSize: size_of::<NOTIFYICONDATAW>() as u32,
@@ -460,22 +450,6 @@ fn remove_icon(hwnd: HWND) {
     unsafe {
         let _ = Shell_NotifyIconW(NIM_DELETE, &data);
     }
-}
-
-/// Clean up when the process is being killed rather than quitting.
-///
-/// Closing the console window, or Ctrl+C, does not unwind and does not run
-/// `Drop`. While the console harness exists that is an easy way to leave a
-/// ghost behind, and ghosts are worse than untidy here: they are indexed and
-/// read out exactly like the live icon.
-unsafe extern "system" fn on_console_close(_event: u32) -> BOOL {
-    let hwnd = ICON_OWNER.swap(0, Ordering::Relaxed);
-    if hwnd != 0 {
-        remove_icon(HWND(hwnd as *mut c_void));
-    }
-    // False: cleaning up was all we wanted. Let the default handler end the
-    // process the way it normally would.
-    BOOL(0)
 }
 
 /// The notification event, in the low word of `lParam` under both protocols.
