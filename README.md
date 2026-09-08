@@ -23,8 +23,8 @@ the headset becomes available to your phone again within a few seconds.
 
 ## Using it
 
-Run `StableSound.exe`. It has no window; it puts an icon in the notification
-area and waits.
+Run `StableSound.exe`. It has no window; it puts an icon in the system tray
+and waits.
 
 | | |
 |---|---|
@@ -39,7 +39,11 @@ By default it releases the headphones after 30 seconds with nothing playing,
 and starts again when you touch the keyboard. Switching off by hand always
 sticks, so your phone keeps the headset until you ask for it back.
 
-Press `F1` in the settings, or choose Help from the notification area menu, for
+It also starts the way you left it: switched on when you last shut down means
+switched on at your next sign-in, silently. With "start when I sign in" ticked
+there is nothing left to press.
+
+Press `F1` in the settings, or choose Help from the system tray menu, for
 the full guide — every setting, and what to do when something goes wrong.
 
 ## Accessibility
@@ -93,15 +97,19 @@ keep-alive signals before you give up on it.
 
 ## Files
 
-Two, both plain text, both beside the executable — or in `%APPDATA%\StableSound`
-if that folder cannot be written to:
+Only `StableSound.exe` is distributed. Everything else it needs — the help, the
+dialog template, the icon — is compiled into it. What appears beside it appears
+because the program wrote it, in that folder or in `%APPDATA%\StableSound` if
+that one cannot be written to:
 
 - `stablesound.conf` — the settings. Safe to edit by hand.
 - `stablesound.log` — only if you turn logging on, which is off by default.
+- `stablesound-help.html` — written out each time you open the help, so it can
+  never be out of date with the program that wrote it.
 
-Deleting the executable and those two files removes StableSound completely. The
-one exception is "start when I sign in", which writes a single entry under your
-own account and removes it again when you untick the box.
+Deleting the executable and those three files removes StableSound completely.
+The one exception is "start when I sign in", which writes a single entry under
+your own account and removes it again when you untick the box.
 
 ## Building
 
