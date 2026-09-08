@@ -36,7 +36,7 @@ there will be nothing to read afterwards:
 
 Did that work, and did the dialog close?
 ANSWER:
-
+Yes, it worked and the dialogue closed.
 
 TEST 44 - THE CONSOLE IS GONE
 
@@ -45,24 +45,25 @@ with text in it. It should not any more.
 
 Start StableSound. Did any window appear at all?
 ANSWER:
-
+No.
 Did anything appear briefly and then vanish - a flash, or a moment of your
 screen reader reading something?
 ANSWER:
-
+No.
 Press Ctrl+Win+F12. Did keep-alive switch on, with its tone, exactly as
 before?
 ANSWER:
-
+Yes.
 Press it again to switch off. Same as before?
 ANSWER:
-
+Yes.
 Alt+Tab through your open windows. Is there a StableSound window in the list
 that should not be there?
 ANSWER:
+No.
 
 ANYTHING ODD:
-
+No.
 
 TEST 45 - THE TRAY MENU
 
@@ -70,16 +71,18 @@ Press Windows+B and arrow to StableSound, then press the Applications key.
 
 Read down the whole menu with the arrow keys and list the items in order:
 ANSWER:
+Keep the headphones awake, settings, help, open log file, exit StableSound.
 
 There should now be a Help item that was not there before. Is it there, and
 does it read clearly?
 ANSWER:
-
+Yes.
 Close the menu with Escape. Did it close without doing anything?
 ANSWER:
+Yes.
 
 ANYTHING ODD:
-
+No.
 
 TEST 46 - THE HELP DOCUMENT
 
@@ -88,29 +91,33 @@ browser called "StableSound Help".
 
 Did a browser open, and did it have the right page in it?
 ANSWER:
-
+Yes.
 Did anything else appear first - in particular a window asking how you want to
 open the file? That would be a bug, and please say so if you see it.
 ANSWER:
+No.
 
 This is the part that decided the format. Press H a few times to move from
 heading to heading. Does that work, and do the headings make sense as a list
 of what the document covers?
 ANSWER:
+Yes.
 
 Try Insert+F6 for the list of headings. Is the list useful - could you find
 what you wanted from it?
 ANSWER:
-
+Yes.
 Read a section or two properly - "The settings, one by one" is the longest.
 Is the writing clear, and is anything explained wrongly or missing?
 ANSWER:
+The writing makes sense to me, but is maybe a bit dense for a new user. Also, make sure to refer to the system tray instead of the notification area.
 
 Is there anything you expected to find in the help that is not there?
 ANSWER:
+No.
 
 ANYTHING ODD:
-
+No.
 
 TEST 47 - THE MESSAGE HEADING (the one riding along)
 
@@ -127,22 +134,27 @@ Press Enter for OK. A message window should appear.
 What did your screen reader say when the message window opened? Please give
 the words in the order you heard them, as closely as you can.
 ANSWER:
+What went wrong and how to fix it.
 
 Is the heading better than the old one - does it tell you what you need to
 know without wasting words?
 ANSWER:
+Yes, perfect.
 
 Can you still read the message back with the arrow keys, a line at a time?
 ANSWER:
-
+Yes.
 Press Escape. Did the focus go back to the hotkey field that was wrong?
 ANSWER:
+Yes.
 
 Put the hotkey back to  ctrl+win+f12  and press Enter for OK.
 Did that work?
 ANSWER:
+Yes.
 
 ANYTHING ODD:
+No.
 
 
 TEST 48 - THE THREE NEW BUTTONS IN THE SETTINGS
@@ -155,6 +167,7 @@ and "Help" and "Exit StableSound" along the bottom.
 Tab all the way through the dialog from the top. Write down what you hear for
 each of the three new buttons:
 ANSWER:
+They are all there and clearly say what they do.
 
 The buttons at the bottom come in this order when tabbing: OK, then Cancel,
 then Help, then Exit StableSound. Exit is deliberately last, so that tabbing
@@ -162,22 +175,28 @@ one stop too far from the settings lands on OK rather than on the button that
 quits the program. Does that order feel safe to you, or would you put them
 somewhere else?
 ANSWER:
+Its perfect.
 
 Tab to "Open the log file" and press it. The log should open, since you turned
 logging on at the start. Did it?
 ANSWER:
+Yes.
 
 Come back to the settings and press F1. Does that open the help, the same as
 the Help button?
 ANSWER:
+Yes.
 
 Tab to Help and press it. Does that open the help too?
 ANSWER:
+Yes.
 
 Press Escape to close the settings without changing anything. Did it close?
 ANSWER:
+Yes.
 
 ANYTHING ODD:
+No.
 
 
 TEST 49 - EXIT FROM THE DIALOG
@@ -191,24 +210,31 @@ Open the settings, tab to "Exit StableSound" and press it.
 
 Did StableSound quit?
 ANSWER:
+Yes.
 
 Did the settings window go as well, or was it left behind?
 ANSWER:
+It went.
 
 Did the icon disappear from the notification area? Press Windows+B and arrow
 along to check there is no StableSound left there.
 ANSWER:
+Yes, the icon disappeared.
 
 Did the headphones get released - could your iPhone take them?
 ANSWER:
+Yes.
 
 Did you hear an off-tone on the way out, or was it silent?
 ANSWER:
+I heard an off tone, which is good.
 
 Now start StableSound again for the next test.
 ANSWER (did it start normally?):
+Yes.
 
 ANYTHING ODD:
+No.
 
 
 TEST 50 - RUNNING IT TWICE
@@ -219,24 +245,37 @@ It should tell you it is already running rather than starting a second copy.
 
 What did you hear? Please give the words as closely as you can.
 ANSWER:
+The following message appeared: "StableSound is already running, so this second copy has stopped. Only one can run at a time: two would fight over the same hotkey and the same headphones.
+
+The copy that is running is working normally. Press Ctrl+Win+F12 to switch keep-alive on and off.
+
+Press Ctrl+Win+F11 to open its settings.
+
+If StableSound starts by itself when you sign in, it will usually be running already. You can turn that off in its settings."
 
 Did it name the right hotkeys - the ones you actually have set?
 ANSWER:
+Yes.
 
 Can you read the message back with the arrow keys?
 ANSWER:
+Yes.
 
 Press Escape or Enter to dismiss it. Did it go away?
 ANSWER:
+Yes.
 
 Press Windows+B and arrow through the notification area. Is there exactly one
 StableSound icon, or two?
 ANSWER:
+Only one icon.
 
 Press Ctrl+Win+F12. Does the hotkey still work, and does it toggle only once?
 ANSWER:
+Yes, works and toggles only once.
 
 ANYTHING ODD:
+No.
 
 
 TEST 51 - LIVING WITH IT
@@ -247,25 +286,33 @@ it.
 
 Any speech clipped at the start?
 ANSWER:
-
+No.
 Any tones you did not ask for?
 ANSWER:
+No.
 
 Did the headphones go to your iPhone when you expected, and come back when you
 expected?
 ANSWER:
+Yes.
 
 Is there anything about not having the console window that you miss?
 ANSWER:
+No.
 
 Is this a version you would be happy for other people to download and use?
 ANSWER:
+Yes.
 
 Anything you would want changed before it goes out?
 ANSWER:
+Yes. Modifications to the help file as discussed above.
+Also, I would like the keep-alive state to persist between runs. This could just be saved in the settings file, so one could basically start the machine and have keep-alive kick in automatically so that it all becomes "set it and forget it", with no tone playing if the app starts with keep-alive already active.
+
+Also, please confirm that only the .exe file needs to be distributed -- I see there's a whole lot in the release folder.
 
 ANYTHING ODD:
-
+No.
 
 OPTIONAL - STARTING WHEN YOU SIGN IN
 
@@ -279,15 +326,15 @@ OK, then sign out and sign back in.
 
 Did StableSound start on its own?
 ANSWER:
-
+Yes.
 Did any window appear when it did?
 ANSWER:
-
+No.
 Does Ctrl+Win+F12 work straight away?
 ANSWER:
-
+Yes.
 ANYTHING ODD:
-
+Nothing odd, but would it be possible to have the app start up earlier in the startup sequence? Currently, other apps like Discord, which take time to get going, are first in the queue. As sound is my only means of reading the screen, I'd like that to be right as early as possible.
 
 AT THE END
 
@@ -297,5 +344,8 @@ folder as stablesound.exe. You can open it from the tray menu or from the
 
 Once you have sent it, you may want to turn logging back off in the settings.
 
+Can you find it yourself?
+
 Anything else at all?
 ANSWER:
+No.
