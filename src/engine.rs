@@ -88,6 +88,13 @@ enum Source {
     User,
     /// The user touched the keyboard and keep-alive re-armed itself.
     Input,
+    /// It was on when StableSound last ran, and this is StableSound starting.
+    ///
+    /// Silent, like `Input` and unlike `User`. The tester asked for it that
+    /// way - "with no tone playing if the app starts with keep-alive already
+    /// active" - and it is the rule the earcons have followed since Milestone
+    /// 3 anyway: a tone means something you just did.
+    Restored,
 }
 
 /// What the message loop asks the engine for.
@@ -105,6 +112,15 @@ pub enum Command {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum StopReason {
     Requested,
+    /// StableSound is closing.
+    ///
+    /// Separate from `Requested` since keep-alive started being remembered
+    /// between runs. It sounds the same - the off-tone plays and the headset
+    /// is let go, both of which the user asked for by quitting - but it must
+    /// not be *recorded* the same, or every exit would write "off" over the
+    /// state we are trying to carry to the next run, and the setting could
+    /// never be on when the app next started.
+    Quit,
     IdleTimeout,
     FixedTimeout,
 }
@@ -113,16 +129,30 @@ impl StopReason {
     fn describe(&self) -> &'static str {
         match self {
             StopReason::Requested => "asked to stop",
+            StopReason::Quit => "StableSound closing",
             StopReason::IdleTimeout => "idle timeout reached",
             StopReason::FixedTimeout => "fixed timer expired",
         }
+    }
+
+    /// Whether this is the user letting go, rather than a timer or a shutdown.
+    ///
+    /// The off-tone follows this: an automatic release is silent, and both of
+    /// the deliberate ones are not.
+    fn is_deliberate(&self) -> bool {
+        matches!(self, StopReason::Requested | StopReason::Quit)
     }
 }
 
 /// What the engine tells the message loop.
 ///
-/// Two variants, because two is all the message loop can act on: the tray
-/// icon reads either "Headphones awake" or "Headphones free".
+/// Two variants moved the tray icon, which reads either "Headphones awake" or
+/// "Headphones free". The third carries the one piece of state that outlives
+/// the process, and it is separate from the other two on purpose: the icon
+/// changes many times an hour as the idle timer releases and user input wakes
+/// it, while what gets written to the settings file changes only when the user
+/// switches keep-alive on or off by hand. Sending one event for both would
+/// mean either rewriting the file all afternoon or an icon that lags the sound.
 ///
 /// It used to have seven, carrying device names, signal names, stop reasons
 /// and error text. Every one of those payloads existed for the console
@@ -136,6 +166,10 @@ impl StopReason {
 pub enum Event {
     KeepAliveOn,
     KeepAliveOff,
+    /// Remember this for next time: the user has switched keep-alive on, or
+    /// switched it off by hand. Sent only when the answer has actually
+    /// changed, so the settings file is written once per decision.
+    Remember(bool),
 }
 
 /// Everything that exists only while a stream is actually open.
@@ -228,18 +262,31 @@ fn run(mut config: Config, log: Log, commands: Receiver<Command>, events: Sender
     };
     let mut input = InputWatcher::new();
 
+    // Come back the way we were left. This is the whole of the "set it and
+    // forget it" the Milestone 6 round asked for: sign in, and the headphones
+    // are already being held, with nothing to press and nothing to hear.
+    //
+    // It goes through the ordinary path rather than setting the flags here, so
+    // that a headset that is not connected yet is retried exactly as it would
+    // be at any other time - which at sign-in is the normal case, since
+    // Bluetooth is often still connecting.
+    if config.keep_alive_on {
+        log.write("keep-alive was left on - restoring it");
+        set_intent_on(&mut rt, Source::Restored, &events);
+    }
+
     loop {
         // --- commands -----------------------------------------------------
         match commands.try_recv() {
             Ok(Command::Quit) | Err(TryRecvError::Disconnected) => {
-                set_intent_off(&mut rt, &config, StopReason::Requested, &log, &events);
+                set_intent_off(&mut rt, &config, StopReason::Quit, &log, &events);
                 break;
             }
             Ok(Command::Toggle) => {
                 if rt.intent {
                     set_intent_off(&mut rt, &config, StopReason::Requested, &log, &events);
                 } else {
-                    set_intent_on(&mut rt, Source::User);
+                    set_intent_on(&mut rt, Source::User, &events);
                 }
             }
             Ok(Command::Reload(new_config)) => {
@@ -270,7 +317,7 @@ fn run(mut config: Config, log: Log, commands: Receiver<Command>, events: Sender
                 rt.last_audio = now;
             } else if rt.armed {
                 log.write("woken by user input");
-                set_intent_on(&mut rt, Source::Input);
+                set_intent_on(&mut rt, Source::Input, &events);
             }
         }
 
@@ -366,12 +413,18 @@ fn run(mut config: Config, log: Log, commands: Receiver<Command>, events: Sender
     log.write("engine stopped");
 }
 
-fn set_intent_on(rt: &mut Runtime, source: Source) {
+fn set_intent_on(rt: &mut Runtime, source: Source, events: &Sender<Event>) {
     if rt.intent {
         return;
     }
     let now = Instant::now();
     rt.intent = true;
+    // Only a hand on the hotkey can arm this from cold. Waking on input
+    // happens *because* it was already armed, and restoring at startup is
+    // replaying a decision that is already written down - so neither is news.
+    if !rt.armed && source == Source::User {
+        let _ = events.send(Event::Remember(true));
+    }
     rt.armed = true;
     rt.since_intent = now;
     rt.last_audio = now;
@@ -393,9 +446,12 @@ fn set_intent_off(
     }
     rt.intent = false;
     // Switching off by hand also disarms input waking, so releasing the headset
-    // for the phone actually sticks.
-    if reason == StopReason::Requested {
+    // for the phone actually sticks - and that is the decision worth carrying
+    // to the next run. Quitting deliberately does neither: the app is closing,
+    // not being told to leave the headphones alone in future.
+    if reason == StopReason::Requested && rt.armed {
         rt.armed = false;
+        let _ = events.send(Event::Remember(false));
     }
 
     let held = rt.since_intent.elapsed().as_secs();
@@ -410,7 +466,7 @@ fn set_intent_off(
     // happens several times an hour, and draining the tone is also the only
     // thing that makes a release slow, so staying quiet makes the automatic
     // path both quieter and quicker.
-    if config.earcons && reason == StopReason::Requested {
+    if config.earcons && reason.is_deliberate() {
         if let Some(active) = rt.stream.as_mut() {
             active.keepalive.play(earcon::OFF, config.earcon_volume);
             active.keepalive.drain(EARCON_TIMEOUT);

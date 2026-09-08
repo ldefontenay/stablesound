@@ -158,6 +158,33 @@ pub struct Config {
     /// PLAN.md - whether digital silence still works after a long gap, and
     /// what a sleep or resume does to the headset.
     pub diagnostics: bool,
+    /// Whether keep-alive was switched on when StableSound last ran.
+    ///
+    /// Asked for after the Milestone 6 round: "I would like the keep-alive
+    /// state to persist between runs... so one could basically start the
+    /// machine and have keep-alive kick in automatically so that it all
+    /// becomes 'set it and forget it'."
+    ///
+    /// This is the one line in the file that is a *memory* rather than a
+    /// preference, which is why it has no control in the settings dialog:
+    /// there is already a control for it, and it is the hotkey. The dialog
+    /// leaves this line alone and the engine writes it.
+    ///
+    /// What gets remembered is the standing intent - the state the *user* last
+    /// chose - and not whether a stream happened to be open at the moment the
+    /// app closed. Those are different almost all the time: with the default
+    /// 30-second idle release, keep-alive is switched on all afternoon and yet
+    /// physically streaming for only a fraction of it. Remembering the stream
+    /// would mean the answer depended on whether you happened to have been
+    /// speaking in the last half minute, which is not something anybody could
+    /// predict. So an idle release does not change this; only switching off by
+    /// hand does. It tracks `armed` in the engine, for exactly the same reason
+    /// that flag exists.
+    ///
+    /// Restoring it is silent. There is no tone at sign-in, at the tester's
+    /// request - a tone would fire before they had asked for anything, which
+    /// is the rule the earcons have followed since Milestone 3.
+    pub keep_alive_on: bool,
 }
 
 impl Default for Config {
@@ -182,6 +209,10 @@ impl Default for Config {
             // twice as loud as wanted.
             earcon_volume: 0.1,
             diagnostics: false,
+            // A first run has nothing to remember, and starting held before
+            // the user has ever asked for anything would take the headset off
+            // their phone uninvited.
+            keep_alive_on: false,
         }
     }
 }
@@ -352,6 +383,9 @@ impl Config {
                 "diagnostics" => {
                     cfg.diagnostics = parse_bool(value).unwrap_or(cfg.diagnostics)
                 }
+                "keep_alive" => {
+                    cfg.keep_alive_on = parse_bool(value).unwrap_or(cfg.keep_alive_on)
+                }
                 "earcon_volume" => {
                     cfg.earcon_volume = value.parse().unwrap_or(cfg.earcon_volume)
                 }
@@ -431,6 +465,14 @@ impl Config {
                     )
                 } else {
                     "off".to_string()
+                }
+            ),
+            format!(
+                "resume:  {}",
+                if self.keep_alive_on {
+                    "keep-alive was left on - restoring it, silently"
+                } else {
+                    "keep-alive was left off - starting with the headphones free"
                 }
             ),
             format!(
@@ -532,6 +574,17 @@ earcon_volume = {earcon_volume}
 # adds the moments when audio starts and stops, with the level measured,
 # and how long each device took to open.
 diagnostics = {diagnostics}
+
+# Not a setting - a memory. Whether keep-alive was switched on when
+# StableSound last ran, so that it comes back the way you left it and
+# starting the machine is enough. StableSound rewrites this line itself
+# whenever you switch keep-alive on or off, so an edit here only lasts
+# until the next time you press the hotkey.
+# Letting go on the idle timer does not count as switching off: what is
+# remembered is what you last chose, not whether anything happened to be
+# playing at the moment you shut down.
+# Restoring it is silent - no tone at sign-in.
+keep_alive = {keep_alive}
 ",
             threshold = self.audio_threshold,
             logging = self.logging,
@@ -542,6 +595,7 @@ diagnostics = {diagnostics}
             earcons = self.earcons,
             earcon_volume = self.earcon_volume,
             diagnostics = self.diagnostics,
+            keep_alive = self.keep_alive_on,
         )
     }
 }
@@ -620,6 +674,33 @@ mod tests {
         assert_eq!(cfg.release, Release::Idle { secs: 45 });
         assert!(!cfg.earcons);
         assert!(adjustments.is_empty());
+    }
+
+    /// The remembered keep-alive state has to survive a write and a read, or
+    /// "set it and forget it" quietly becomes "starts off every time" - a
+    /// failure with nothing to see and nothing to hear, which is the kind this
+    /// project can least afford.
+    #[test]
+    fn the_remembered_keep_alive_state_survives_a_round_trip() {
+        let on = Config {
+            keep_alive_on: true,
+            ..Config::default()
+        };
+        let (parsed, adjustments) = Config::parse(&on.serialise());
+        assert!(parsed.keep_alive_on);
+        assert!(adjustments.is_empty());
+
+        let off = Config::default();
+        let (parsed, _) = Config::parse(&off.serialise());
+        assert!(!parsed.keep_alive_on);
+    }
+
+    /// A first run has no settings file, and must not start holding the
+    /// headset before the user has asked for anything.
+    #[test]
+    fn a_missing_setting_starts_with_the_headphones_free() {
+        let (cfg, _) = Config::parse("timeout = 45\n");
+        assert!(!cfg.keep_alive_on);
     }
 
     #[test]

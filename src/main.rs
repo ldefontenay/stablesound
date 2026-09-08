@@ -229,7 +229,7 @@ fn already_running(cfg: &Config) {
     let settings_route = if cfg.settings_hotkey_enabled {
         format!("Press {} to open its settings.", cfg.settings_hotkey)
     } else {
-        "To open its settings, press Windows+B to reach the notification area, use the arrow \
+        "To open its settings, press Windows+B to reach the system tray, use the arrow \
          keys to find StableSound, then press the Applications key and choose Settings."
             .to_string()
     };
@@ -279,7 +279,7 @@ fn claim(
                      Windows said: {e}\n\
                      \n\
                      To pick a different combination, open the settings from the StableSound \
-                     icon in the notification area. Press Windows+B, then the arrow keys to \
+                     icon in the system tray. Press Windows+B, then the arrow keys to \
                      reach it, then the Applications key for its menu, and choose Settings."
                 ),
             );
@@ -340,7 +340,7 @@ fn pump(surface: &mut Surface, handle: &engine::Handle) {
             }
 
             WM_TIMER if message.wParam.0 == EVENT_TIMER => {
-                drain(&mut surface.tray, &handle.events);
+                drain(surface, &handle.events);
                 // Settings the dialog accepted, read on the same tick as the
                 // engine's events so there is one place where the loop takes
                 // in news from elsewhere.
@@ -427,13 +427,20 @@ fn open_settings(surface: &mut Surface) {
 
 /// Take settings the user accepted: write them down, tell the engine, and
 /// re-claim any hotkey that changed.
-fn apply_settings(surface: &mut Surface, handle: &engine::Handle, cfg: Config) {
+fn apply_settings(surface: &mut Surface, handle: &engine::Handle, mut cfg: Config) {
     // The dialog destroys itself on OK, so the handle we were holding is
     // already stale.
     surface.dialog = None;
 
     let Ok(previous) = surface.shared.lock().map(|mut live| {
         let previous = live.clone();
+        // The remembered keep-alive state is not the dialog's to change. It
+        // has no control for it, so what comes back is whatever was true when
+        // the dialog opened - and the hotkey goes on working while it is open,
+        // which is a tested behaviour, so that snapshot can be minutes stale.
+        // Taking the live value here is what stops pressing OK from undoing a
+        // toggle made while the dialog was up.
+        cfg.keep_alive_on = live.keep_alive_on;
         *live = cfg.clone();
         previous
     }) else {
@@ -589,15 +596,50 @@ fn rebind(
 
 /// Take whatever the engine has said since the last tick and reflect it.
 ///
-/// Only the tray icon is updated here, and that is now all the channel
-/// carries - see [`Event`]. The engine writes its own log lines from its own
+/// Two things happen here and nothing else. The tray icon follows the sound,
+/// and a change the user made by hand is written to the settings file so it
+/// survives to the next run. The engine writes its own log lines from its own
 /// thread, which is why the log stayed complete through Milestone 2's testing
 /// while the console did not; and the *audible* feedback is the engine's job
 /// too, played through the device being kept awake, because an off-tone has
 /// to be heard before the stream closes.
-fn drain(tray: &mut Tray, events: &std::sync::mpsc::Receiver<Event>) {
+///
+/// Saving belongs on this thread rather than in the engine because this thread
+/// owns the settings file: the dialog writes it from here too, and one writer
+/// means the two can never race to produce a half-written file.
+fn drain(surface: &mut Surface, events: &std::sync::mpsc::Receiver<Event>) {
     while let Ok(event) = events.try_recv() {
-        tray.set_active(event == Event::KeepAliveOn);
+        match event {
+            Event::KeepAliveOn => surface.tray.set_active(true),
+            Event::KeepAliveOff => surface.tray.set_active(false),
+            Event::Remember(on) => remember(surface, on),
+        }
+    }
+}
+
+/// Write down that keep-alive was switched on, or off by hand.
+///
+/// A failure here only reaches the log, unlike the same failure from the
+/// settings dialog, which opens a window. The difference is what the user was
+/// doing: pressing OK is a request to save, and it failing is news, whereas
+/// this happens on a hotkey press whose whole point is that it needs no
+/// attention. A window every time the headphones were switched on, because a
+/// folder is read-only, would be worse than quietly forgetting between runs.
+fn remember(surface: &mut Surface, on: bool) {
+    let Ok(cfg) = surface.shared.lock().map(|mut live| {
+        live.keep_alive_on = on;
+        live.clone()
+    }) else {
+        return;
+    };
+    match cfg.save(&surface.config_path) {
+        Ok(()) => surface.log.write(&format!(
+            "remembered for next time: keep-alive {}",
+            if on { "on" } else { "off" }
+        )),
+        Err(e) => surface.log.write(&format!(
+            "could not remember the keep-alive state ({e}) - it will start off next time"
+        )),
     }
 }
 
