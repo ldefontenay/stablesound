@@ -1,20 +1,34 @@
 # StableSound - research findings and build plan
 
-## 0. Where we are (updated 2026-09-08)
+## 0. Where we are (updated 2026-09-08, after the Milestone 6 round)
 
 **Read this first when picking the project up.**
 
-Milestones 0 to 5 are complete, hardware rounds included, and so is the small
-follow-up round 5.1. Milestone 3 took **three** rounds. Milestones 4, 5 and
-5.1 took one each and all three passed.
+Milestones 0 to 6 are complete, hardware rounds included, plus the small
+follow-up round 5.1. Milestone 3 took **three** rounds. Milestones 4, 5, 5.1
+and 6 took one each and all four passed.
 
-**Milestone 5.1 passed cleanly - every test, first time.** The tray icon reads
-its state once however many times it changes, a hotkey works on a punctuation
-key, a refused setting is read back with the arrow keys, and the two reversed
-defaults are what a new user meets. The tester's verdict on the whole app:
-"all works really well and I'm very pleased", and on the plan for Milestone 6:
-"this will be a great first version." Raw results in
-`test-milestone-5-1.txt`, Tests 39-43.
+**Milestone 6 passed cleanly - every test, first time, and it is the round
+that decides shipping.** No console window and no flash of one, the help
+document works as a document under `H` and `Insert+F6`, the three new buttons
+read correctly, `Exit StableSound` is in a safe place, a second copy stops
+itself and says so, and the reworded message heading reads as intended. The
+tester's verdict on whether this is a version other people should download:
+"Yes." Raw results in `test-milestone-6.txt`, Tests 44-51.
+
+**Four things came back from it**, and the first three are built (see 6.6 and
+6.7):
+
+1. **Remember the keep-alive state between runs**, restoring it silently at
+   startup. Asked for as "set it and forget it". Built - 6.6.
+2. **Say "system tray", not "notification area"**, in everything the user
+   reads. Done, across the help, the README and the app's own messages.
+3. **The help is a bit dense for a new user.** Reworked so the first section
+   is three bullets and a promise that the rest is optional - 6.7.
+4. **Start earlier at sign-in than Discord and the like.** Researched, not
+   built: it means leaving the `Run` key for a Task Scheduler logon task, and
+   the answer turns on whether that can be registered without elevation.
+   Question 31, and it needs the tester's decision before any code.
 
 **One thing came back from it**, and it is built: the heading over the message
 window now says what kind of message it is rather than how to read it. See
@@ -133,17 +147,20 @@ And two things were confirmed for later rather than acted on now:
 
 ### What is next
 
-**The Milestone 6 hardware round, and then shipping.** Milestone 6 is built:
-the console is gone and the binary is a windows subsystem one, there is a help
-document in HTML with buttons in both the dialog and the tray menu, a second
-copy of the app is prevented and says so, the README and LICENSE are written,
-and the antivirus question has been researched and answered (6.5).
+**One short round, then shipping.** Milestone 6 passed and everything it asked
+for except the sign-in ordering is built. What is left is Milestone 7: a round
+that checks the three follow-ups, and a decision on the fourth.
 
-The script is `test-milestone-6.txt`, Tests 44-51. It carries question 26 - the
-reworded message heading, built after the 5.1 round and still unheard - along
-with everything Milestone 6 added.
+The script is `test-milestone-7.txt`, Tests 52-57. It is deliberately small -
+the remembered keep-alive state is the only new behaviour in it, and it is the
+kind that fails invisibly, so most of the round is spent on the four ways it
+can be left and picked up again.
 
-**Nothing else is outstanding.** After that round it ships.
+**Question 31 - starting earlier at sign-in - needs an answer before it can be
+built**, not after. See 6.7: the change means giving up the `Run` key for a
+Task Scheduler logon task, and it can make StableSound fail to start at all if
+the registration is refused. That is a worse failure than starting late, for
+somebody whose only route to the screen is sound.
 
 ### Things a fresh session should not re-litigate
 
@@ -965,23 +982,34 @@ Raw results are in `test-milestone-5-1.txt`, Tests 39-43. Every one passed.
     asked for. Verified through UI Automation, not heard. Riding along with
     the Milestone 6 round as Test 47.
 
-### Opened by Milestone 6, for its round
+### Resolved by the Milestone 6 round (2026-09-08)
 
-27. **Does the help document work as a document?** The whole reason it is HTML
-    in a browser rather than a text file or a read-only edit is heading
-    navigation - `H` between headings, `Insert+F6` for the list. That has been
-    reasoned about and never heard. If it turns out not to help, the format
-    was the wrong choice and a plain text file would have been simpler. Test
-    46.
+Raw results in `test-milestone-6.txt`, Tests 44-51. Every one passed.
 
-28. **Is `Exit StableSound` in a safe place?** It is last in tab order, after
-    OK and Cancel, so tabbing one stop too far past the settings reaches OK
-    rather than the button that quits. That is a judgement made without being
-    able to feel it. Test 48 asks directly.
+26. ~~Does the reworded message heading read well?~~ **Yes.** JAWS reads "What
+    went wrong and how to fix it", and the tester's verdict was "perfect". The
+    message is still reviewable with the arrow keys and the focus still
+    returns to the field that was wrong. The Milestone 5.1 complaint - the
+    same fact said twice, once by the heading and once by "read only edit" -
+    is closed.
 
-29. **Is anything about the console actually missed?** It was the diagnostic
-    interface for four milestones and the tester was fluent in it. The
-    settings dialog and the log are meant to cover everything it did. Test 51.
+27. ~~Does the help document work as a document?~~ **Yes, and the format was
+    the right call.** `H` moves between headings, `Insert+F6` lists them, and
+    the list was usable: "could you find what you wanted from it?" - "Yes."
+    Nothing was missing. One thing was wrong with it and one was thin, both
+    now fixed: it said "notification area" where the tester says system tray,
+    and it was "maybe a bit dense for a new user". See 6.7.
+
+28. ~~Is `Exit StableSound` in a safe place?~~ **Yes.** "Its perfect." Last in
+    tab order after OK and Cancel, so overshooting the settings by one stop
+    reaches OK rather than the button that quits, is the order to keep.
+
+29. ~~Is anything about the console actually missed?~~ **No.** Asked directly
+    after living with the app for a while: "Is there anything about not having
+    the console window that you miss?" - "No." Four milestones of diagnostic
+    interface replaced by the settings dialog and the log, with nothing owed.
+
+### Still open after the Milestone 6 round
 
 30. **Do the failure windows read well?** Three of them - a tray icon that
     cannot be created, a hotkey another program holds, settings that cannot be
@@ -989,6 +1017,25 @@ Raw results are in `test-milestone-5-1.txt`, Tests 39-43. Every one passed.
     hotkey one is the likeliest to be met in real use. Not scripted; it will
     have to be caught when it happens, which is the reason each one names the
     path or the combination involved rather than merely saying it failed.
+
+### Opened by the Milestone 6 round, for Milestone 7
+
+31. **Can StableSound start earlier at sign-in, and is it worth what it
+    costs?** Asked because sound is the tester's only route to the screen:
+    "other apps like Discord, which take time to get going, are first in the
+    queue... I'd like that to be right as early as possible." The mechanism
+    and the trade are written up in 6.7. This is a decision, not a test: the
+    change swaps a registry value that has worked in every round since
+    Milestone 4 for a scheduled task that may be refused without elevation,
+    and a StableSound that does not start at all is a far worse failure than
+    one that starts ten seconds late.
+
+32. **Does the remembered keep-alive state survive the ways a machine actually
+    ends?** Built in 6.6 and round-tripped in a unit test, but the file is
+    written at the moment of the toggle, which is the part that cannot be
+    tested from here: a sign-out, a shutdown, and the app being closed while
+    holding the headset. Tests 52-55, and Test 56 for the sign-in case that
+    was the point of asking.
 
 ### Noted, not a defect
 
@@ -1298,8 +1345,10 @@ afterwards.
 
 **Hard release. DEFERRED, probably not needed.** Soft release was confirmed sufficient on the AeroClip (see 2.4), so this is no longer planned work. Revisit only if another headset needs it, or if the 3-second handover becomes annoying. Reference if it ever happens: `m2jean/ToothTray`.
 
-**Milestone 6 - ship. BUILT (2026-09-08), hardware round outstanding.**
-Branch `m6-ship`, script `test-milestone-6.txt`, Tests 44-51.
+**Milestone 6 - ship. DONE (2026-09-08), round passed.**
+Branch `m6-ship`, script `test-milestone-6.txt`, Tests 44-51. Every test
+passed first time. Questions 26 to 29 closed; questions 31 and 32 opened, and
+Milestone 7 exists to answer them.
 
 Everything the milestone asked for is built: the console dropped and the
 subsystem switched (6.1), a guard against a second copy (6.2), a test for the
@@ -1344,6 +1393,26 @@ work raised before any of it was written:
    to a feature.
 3. **Antivirus: document it now, research signing and write it up.**
 4. **Public repo, version stays 0.1.0.** A first public cut, not a 1.0 claim.
+
+**Milestone 7 - what the shipping round asked for. BUILT (2026-09-08), round
+outstanding.** Branch `m7-follow-ups`, script `test-milestone-7.txt`, Tests
+52-57.
+
+Four things came back from the Milestone 6 round. Three are built and one is a
+question:
+
+1. **Remember the keep-alive state between runs.** 6.6.
+2. **"System tray", not "notification area".** Everything the user reads now
+   says system tray: the help, the README, and the two message strings in
+   `main.rs` that name the route to the icon. The one exception is a
+   parenthesis in the help's own tray section, which says Windows calls it the
+   notification area - because Windows' own settings do, and somebody looking
+   for it there should not be stranded by our vocabulary. Code comments still
+   use the Win32 term, which is what `Shell_NotifyIcon` is documented as.
+3. **The help was too dense to start with.** 6.7.
+4. **Start earlier at sign-in.** Question 31, researched in 6.7 and not built.
+
+Nothing else is outstanding. After this round it ships.
 
 ### 6.1 The console is gone (2026-09-07)
 
@@ -1592,13 +1661,160 @@ console window and no visible window of its own, and no `conhost` is spawned.
 reads, and the three failure windows, which need a combination to be taken by
 another program to provoke.
 
-**Current position (2026-09-08):** Milestones 0 to 5.1 complete and
-hardware-tested, with nothing outstanding behind them, and Milestone 6 built
-and waiting on the round that closes it.
+**Current position (2026-09-08, after the Milestone 6 round):** Milestones 0
+to 6 complete and hardware-tested, with nothing outstanding behind them. The
+shipping round passed every test first time and asked for four more things;
+three are built as Milestone 7 and the fourth is question 31, which needs a
+decision rather than a test.
 
-That round is the last one. It carries question 26 from 5.1 and questions 27
-to 30 from Milestone 6, and if it passes there is nothing between here and a
-first release: "this will be a great first version."
+45 unit tests, `cargo clippy -- -D warnings` clean, release binary 298 KB.
+
+### 6.6 Keep-alive that outlives the run (2026-09-08)
+
+Asked for by the Milestone 6 round, in the tester's words: "I would like the
+keep-alive state to persist between runs. This could just be saved in the
+settings file, so one could basically start the machine and have keep-alive
+kick in automatically so that it all becomes 'set it and forget it', with no
+tone playing if the app starts with keep-alive already active."
+
+Built as one line in `stablesound.conf`, `keep_alive`, and about thirty lines
+of code. Three decisions were needed and none of them is obvious.
+
+**What is remembered is the standing intent, not the stream.** These come
+apart almost all of the time. With the default 30-second idle release,
+keep-alive is *switched on* all afternoon while the stream is actually open
+for a fraction of it - so remembering "was a stream open when the process
+ended" would give an answer that depended on whether the machine happened to
+have spoken in the last half minute before shutdown. Nobody could predict
+that, and the same afternoon would restore differently on different days. What
+is written down is `armed` in the engine: on when the user switched it on, off
+when the user switched it off by hand, unmoved by every automatic release and
+every wake in between. That flag already existed for a closely related reason
+- so that letting the phone have the headset is not undone by the next
+keypress - and this is the same question asked across a restart.
+
+**Quitting is not switching off.** This one nearly shipped as a bug. The exit
+path called `set_intent_off` with `StopReason::Requested`, which is what plays
+the off-tone on the way out that Test 49 confirmed. It also clears `armed` -
+so with the state now being written down, every exit would have overwritten
+the file with "off", and the setting could never once have been on at the next
+start. The feature would have failed silently and completely, with an off-tone
+still playing on exit to suggest everything was normal. Hence
+`StopReason::Quit`: it sounds identical, and is recorded differently.
+`is_deliberate()` is what the earcon now asks, so the tone follows "the user
+asked for this" and the memory follows "the user asked to be left alone".
+
+**The dialog must not write this line.** There is no control for it - the
+hotkey *is* the control - so what comes back from the dialog on OK is whatever
+was true when it opened, and the toggle hotkey deliberately goes on working
+while the dialog is up. Pressing OK five minutes later would otherwise undo a
+toggle made in between. `apply_settings` takes the live value over the
+dialog's before saving.
+
+Restoring goes through `set_intent_on` with a third `Source`, `Restored`,
+rather than setting the flags directly: at sign-in the headset is usually
+still connecting, and the ordinary path already retries an open that fails and
+recovers when the device turns up. `Restored` announces nothing, which is what
+was asked for and also the rule the earcons have followed since Milestone 3 -
+a tone means something you just did.
+
+The save happens on the message-loop thread, not in the engine. That thread
+already owns the settings file, because the dialog writes it from there, and
+one writer means the two cannot race to produce a half-written file. A failed
+save only reaches the log, unlike the same failure from the dialog, which
+opens a window: pressing OK is a request to save and its failing is news,
+whereas this rides on a hotkey press whose whole point is that it needs no
+attention.
+
+**Needs hardware.** The unit tests cover the round trip through the file and
+the missing-key default. What they cannot cover is the part that matters - a
+sign-out, a shutdown and a restart, with the state written at the moment of
+the toggle. Tests 52-55, with Test 56 the sign-in case it was asked for.
+
+### 6.7 The three answers, and the one question (2026-09-08)
+
+**"System tray", not "notification area".** Done everywhere the user reads:
+the help, the README, and the two message strings in `main.rs` that describe
+how to reach the icon. The help's tray section keeps one parenthesis saying
+Windows itself calls it the notification area, because Windows' own settings
+do and somebody hunting for it there should not be stranded by our
+vocabulary. Code comments keep the Win32 term - it is what `Shell_NotifyIcon`
+is documented as, and that audience has the API docs open beside them.
+
+**The help was too dense to start with.** The verdict was "the writing makes
+sense to me, but is maybe a bit dense for a new user", which is a complaint
+about the first two minutes rather than about the whole document - nothing was
+missing, the headings worked, and `Insert+F6` found what was wanted. So the
+fix is at the front, not throughout:
+
+- **Getting started is now the first section**, ahead of "What it is for", and
+  it is three bullets: the toggle hotkey, that it lets go on its own and comes
+  back when you type, and the settings hotkey. It ends with a sentence saying
+  the rest of the page is detail. A new user can stop reading there.
+- **The longest entries in "The settings, one by one" now lead with what to
+  do** - "Leave it on Digital silence" - and put the reasoning in a second
+  sentence after a break, rather than opening with a paragraph of comparison.
+- **Three new pieces of documentation**: the remembered keep-alive state, in
+  Getting started and again under its own heading; a troubleshooting entry for
+  meeting it unexpectedly ("It was already holding the headphones when I
+  signed in"); and a correct file list.
+
+**The file list was wrong**, in both the help and the README: both said two
+files, and there are three. `stablesound-help.html` is written out beside the
+exe every time the help is opened. Worth fixing on its own, and it also
+answers the tester's third question directly - "please confirm that only the
+.exe file needs to be distributed" - which it does. `target\release` looks
+alarming because it is a build directory: the `.pdb` is debug symbols, the
+`.d` is a dependency list for `cargo`, and `deps/`, `build/`, `incremental/`
+and `.fingerprint/` are the build cache. `stablesound.conf`,
+`stablesound.log` and `stablesound-help.html` are in there because the app
+itself wrote them while being tested from that folder. A release is
+`stablesound.exe` and nothing else. The help now says so in its own words.
+
+**Starting earlier at sign-in - question 31, researched and not built.** The
+request: "would it be possible to have the app start up earlier in the startup
+sequence? Currently, other apps like Discord, which take time to get going,
+are first in the queue. As sound is my only means of reading the screen, I'd
+like that to be right as early as possible."
+
+The reason it is late is not StableSound. Autostart is an `HKCU\...\Run`
+value (see `startup.rs`), and Explorer processes `Run` and the Startup folder
+*after* the desktop is ready, with a delay before it begins and throttling
+between the items it finds. Order within `Run` is not something an
+application can choose. So no amount of making StableSound faster helps: it
+is not slow, it is queued.
+
+The lever that exists is **Task Scheduler**. A logon-triggered task is not
+Explorer's to delay, and fires around the logon event rather than after the
+shell has settled - which is the improvement being asked for, and it should be
+seconds rather than a fraction of one.
+
+Three things stop this being an obvious yes:
+
+1. **Registering the task may need elevation.** Tasks live in
+   `%WINDIR%\System32\Tasks`, which a standard user cannot write to; whether a
+   per-user logon task can be registered without a prompt is exactly the sort
+   of thing that must be *tried* rather than reasoned about, and it could not
+   be tried from the session that wrote this. If it needs elevation, the
+   tickbox either raises a UAC prompt at an odd moment or quietly fails.
+2. **The checkbox must not lie.** `startup.rs` reads the registry directly and
+   deliberately keeps no copy in the config, so the box always reports the
+   truth. Two mechanisms means two places to read and a fallback path, and a
+   half-registered task would be a box that says yes while nothing starts.
+3. **The failure is asymmetric.** Starting ten seconds late costs the first
+   few announcements of a session. Not starting at all costs the whole
+   session, silently, for somebody whose only route to the screen is sound.
+   The `Run` key has worked in every round since Milestone 4.
+
+**Recommendation: try it, but as its own change with its own round**, keeping
+the `Run` key as the fallback whenever a task cannot be registered, and with
+the settings checkbox reporting whichever of the two is actually in force.
+Not folded into a shipping round. If the delay turns out to be the ordinary
+Explorer startup delay rather than Discord specifically, there is also a
+one-value user setting that removes it for every startup app at once -
+mentioned for completeness, not recommended: it is a machine-wide change made
+on one program's behalf, and this project does not get to make that call for
+somebody's whole sign-in.
 ---
 
 ## 8. Sources
