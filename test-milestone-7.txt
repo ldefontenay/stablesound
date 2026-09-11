@@ -99,7 +99,7 @@ afterwards:
 
 Did that work, and did the dialog close?
 ANSWER:
-
+Yes.
 The log now has a new line in it near the top, starting with "resume:", which
 says what state StableSound started in. It is there so that if any of the
 tests below go oddly, the log says what it thought it was doing.
@@ -109,12 +109,13 @@ TEST 52 - IT COMES BACK ON
 
 Press Ctrl+Win+F12 to switch keep-alive ON. You should hear the rising tone.
 ANSWER (did it come on?):
-
+Yes.
 Now exit StableSound - the tray menu, or the Exit button in the settings,
 whichever you prefer.
 
 Did you hear the off-tone on the way out, the same as last round?
 ANSWER:
+Yes.
 
 Start StableSound again.
 
@@ -122,29 +123,35 @@ The important part. Did keep-alive come on by itself, without you pressing
 anything? Check with Windows+B and arrow to the icon - it should read
 "StableSound Headphones awake".
 ANSWER:
+Yes.
 
 Was it silent? There should be NO tone at all when it starts this way.
 ANSWER:
+Yes.
 
 ANYTHING ODD:
-
+No, works perfectly.
 
 TEST 53 - AND IT STAYS OFF
 
 The other half. With keep-alive currently on from the last test, press
 Ctrl+Win+F12 to switch it OFF by hand. You should hear the falling tone.
 ANSWER (did it go off?):
+Yes.
 
 Exit StableSound, then start it again.
 
 Did it stay off - icon reading "StableSound Headphones free", headphones still
 available to your iPhone?
 ANSWER:
+Yes.
 
 Does Ctrl+Win+F12 still switch it on normally from there?
 ANSWER:
+Yes.
 
 ANYTHING ODD:
+No, works perfectly.
 
 
 TEST 54 - LETTING GO ON THE TIMER IS NOT SWITCHING OFF
@@ -159,19 +166,23 @@ timer to let the headphones go on its own. You will hear nothing - automatic
 releases are silent. Check with Windows+B if you want to be sure it has gone
 to "Headphones free".
 ANSWER (did it release on its own?):
+Yes, it released on its own.
 
 Without pressing the hotkey, exit StableSound and start it again.
 
 Keep-alive should come back ON, because the last thing YOU did was switch it
 on - the timer letting go in the meantime does not count. Did it?
 ANSWER:
+Yes, all good as expected.
 
 Is that the behaviour you want? The alternative would be that a quiet spell
 before you shut down means it starts off next time. I think that would be
 unpredictable, but you are the one who has to live with it.
 ANSWER:
+This is exactly the behavior I want.
 
 ANYTHING ODD:
+No, perfect.
 
 
 TEST 55 - THE SETTINGS DIALOG DOES NOT UNDO IT
@@ -188,16 +199,20 @@ Open the settings with Ctrl+Win+F11 and leave the dialog open.
 With the dialog still open, press Ctrl+Win+F12 to switch keep-alive ON. It
 should come on with its tone, as it always has while the dialog is open.
 ANSWER (did it?):
+Yes.
 
 Now press Enter for OK on the dialog.
 
 Is keep-alive still on? It should not have been switched off by pressing OK.
 ANSWER:
+Yes, still on.
 
 Exit StableSound and start it again. Does it come back on?
 ANSWER:
+Yes.
 
 ANYTHING ODD:
+No.
 
 
 TEST 56 - SET IT AND FORGET IT
@@ -210,20 +225,24 @@ that keep-alive is switched ON. Then sign out and sign back in.
 Did StableSound start on its own, and were the headphones already being held
 when you got to the desktop? Windows+B and arrow to the icon to check.
 ANSWER:
+Stablesound did start up with keep-alive awake, just the behaviour I want. However, I did need to wait a bit for it to happen. I can live with that, but if it could be made to start earlier, that would be ideal.
 
 Was it silent? No tone at sign-in is the intended behaviour.
 ANSWER:
+Yes.
 
 Here is the question underneath all of it: was the first thing JAWS said after
 signing in clipped, or did it come through whole?
 ANSWER:
+The first thing Jaws said was clipped.
 
 How long after signing in did it take before things felt right? A rough
 impression is fine - immediately, a few seconds, longer.
 ANSWER:
+30 seconds. Slowish computer here.
 
 ANYTHING ODD:
-
+No.
 
 TEST 57 - THE HELP, READ AGAIN
 
@@ -236,26 +255,31 @@ user needs before they stop reading.
 If you were meeting StableSound for the first time, would that section be
 enough to use it?
 ANSWER:
+Yes, very nice.
 
 Is anything in it wrong, or missing, or still too dense?
 ANSWER:
+No, good for now. This is a vibecoded app and I don't mind the documentation being written in AI-identifiable language. Its clear and accurate and readable.
 
 Press H a few times through the whole document. Does the order still make
 sense with Getting started first?
 ANSWER:
+Yes.
 
 The document now says "system tray" throughout. Did you find any place that
 still says notification area, other than the one in brackets in the tray
 section that says Windows calls it that?
 ANSWER:
-
+No.
 There are two new pieces of writing about the remembered state - one under
 "Switching it on and off" called "It starts the way you left it", and one in
 the troubleshooting section called "It was already holding the headphones when
 I signed in". Do they explain it properly?
 ANSWER:
+Yes.
 
 ANYTHING ODD:
+No.
 
 
 THE ONE I COULD NOT ANSWER - STARTING EARLIER AT SIGN-IN
@@ -305,6 +329,7 @@ Which would you rather?
   (b) Do the startup change first, and ship after it has been tested.
   (c) Leave it alone - ten seconds is not worth the risk.
 ANSWER:
+b
 
 One more thing worth knowing, in case it changes your answer: if the delay
 turns out to be Windows' general startup pause rather than Discord in
@@ -325,3 +350,4 @@ Once you have sent it, you may want to turn logging back off.
 
 Is there anything else that needs doing before this goes out?
 ANSWER:
+You should have access to the log, please check it out as needed.
