@@ -3,8 +3,8 @@
 Keeps Bluetooth headphones awake so screen reader speech is not cut off at the
 start, and lets go of them again so your phone can take over.
 
-A single Windows executable, about 300 KB. No installer, no runtime to install,
-nothing in the registry unless you ask it to start when you sign in.
+A single Windows executable, about 310 KB. No installer, no runtime to install,
+and nothing outside its own folder unless you ask it to start when you sign in.
 
 ## The problem
 
@@ -108,8 +108,16 @@ that one cannot be written to:
   never be out of date with the program that wrote it.
 
 Deleting the executable and those three files removes StableSound completely.
-The one exception is "start when I sign in", which writes a single entry under
-your own account and removes it again when you untick the box.
+The one exception is "start when I sign in", which asks Windows for a scheduled
+task named `StableSound` that runs at logon — or, if Windows refuses it, for an
+entry under `HKCU\...\CurrentVersion\Run` instead. It removes whichever it made
+when you untick the box.
+
+The task is preferred because it runs at the sign-in itself, while `Run` is not
+reached until the desktop is ready and every other startup program has had its
+turn — about half a minute on a slow machine, which is half a minute of clipped
+speech. Registering it needs no administrator rights, and the tickbox reports
+whichever of the two is actually in force rather than what it last tried to do.
 
 ## Building
 

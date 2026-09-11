@@ -89,6 +89,16 @@ const ICON_ID: u32 = 1;
 /// second press.
 const ECHO: Duration = Duration::from_millis(250);
 
+/// How the pending-icon retry is paced, in ticks of the message loop's 100ms
+/// timer and then in seconds of trying.
+///
+/// A minute is far longer than Explorer needs, and it costs nothing: the retry
+/// only runs while the icon is actually missing. What it buys is the race
+/// where a shell is up but broadcast `TaskbarCreated` before our window
+/// existed to hear it, which is exactly the order a logon task can arrive in.
+const ICON_RETRY_TICKS: u32 = 10;
+const ICON_RETRY_SECONDS: u32 = 60;
+
 /// Message the shell uses for the tray callback. Anything from `WM_APP` up is
 /// ours to define.
 pub const WM_TRAY: u32 = WM_APP + 1;
@@ -141,6 +151,21 @@ pub struct Tray {
     /// See `ECHO`.
     last_select: Option<Instant>,
     last_menu: Option<Instant>,
+    /// Set when the shell would not take the icon, which at sign-in means
+    /// Explorer is not up yet rather than anything being wrong.
+    pending: bool,
+    /// Ticks of the message loop's timer since the icon went pending, so the
+    /// retry can be paced and eventually given up on.
+    tries: u32,
+}
+
+/// News about a pending icon, for the one place that reports it.
+pub enum IconOutcome {
+    /// A shell took the icon. Nothing more to do.
+    Added,
+    /// It never did. The app carries on - the hotkey is the primary
+    /// interface - but this is worth telling somebody about.
+    GaveUp,
 }
 
 impl Tray {
@@ -190,9 +215,44 @@ impl Tray {
             version4: false,
             last_select: None,
             last_menu: None,
+            pending: false,
+            tries: 0,
         };
-        tray.add()?;
+        // Deliberately not fatal. See the module note on signing in before
+        // Explorer: the window above is what the hotkey needs, and it exists
+        // by now whatever the shell is doing.
+        tray.pending = tray.add().is_err();
         Ok(tray)
+    }
+
+    /// Whether the icon is still waiting for a shell to put it in.
+    pub fn is_icon_pending(&self) -> bool {
+        self.pending
+    }
+
+    /// Try again for a pending icon, and say so once there is news.
+    ///
+    /// Called from the message loop's existing tick rather than from a timer
+    /// of its own. Cheap: one `Shell_NotifyIcon` a second at most, and only
+    /// while the icon is actually missing.
+    pub fn poll_icon(&mut self) -> Option<IconOutcome> {
+        if !self.pending {
+            return None;
+        }
+        self.tries += 1;
+        // The tick is 100ms, so this is one attempt a second.
+        if !self.tries.is_multiple_of(ICON_RETRY_TICKS) {
+            return None;
+        }
+        if self.add().is_ok() {
+            self.pending = false;
+            return Some(IconOutcome::Added);
+        }
+        if self.tries >= ICON_RETRY_TICKS * ICON_RETRY_SECONDS {
+            self.pending = false;
+            return Some(IconOutcome::GaveUp);
+        }
+        None
     }
 
     pub fn hwnd(&self) -> HWND {
@@ -208,7 +268,8 @@ impl Tray {
     }
 
     pub fn readd(&mut self) {
-        let _ = self.add();
+        self.pending = self.add().is_err();
+        self.tries = 0;
     }
 
     /// Reflect the current state in the icon and its tooltip.

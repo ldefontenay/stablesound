@@ -293,9 +293,20 @@ your usual hotkey goes on working while it is open.</p>
 
 <dl>
   <dt>Start StableSound when I sign in</dt>
-  <dd>Adds StableSound to the programs Windows starts for you. It writes one
-  entry under your own account only, and unticking it removes that entry
-  again.</dd>
+  <dd>Adds StableSound to the programs Windows starts for you, under your own
+  account only. Unticking it removes it again.
+
+  <p>StableSound asks Windows for a <strong>scheduled task</strong> that runs
+  when you sign in. That matters for one reason: a task runs at the sign-in
+  itself, while the other way of starting programs — the list Windows keeps in
+  the registry — is not reached until the desktop is ready, after every other
+  program set to start with you. On a slowish machine that has meant about
+  half a minute, which is half a minute of your screen reader being clipped.</p>
+
+  <p>If Windows refuses the task, StableSound falls back to the registry list
+  so that it still starts, and tells you it has done so. Either way this
+  tickbox is read from Windows rather than remembered, so it can never claim
+  StableSound will start when it will not.</p></dd>
 </dl>
 
 <h3>The buttons</h3>
@@ -391,6 +402,25 @@ and it was on. If you would rather start free, switch it off by hand with
 <strong>Ctrl+Windows+F12</strong> before you finish for the day, and it will
 start off from then on.</p>
 
+<h3>It takes too long to start when I sign in</h3>
+
+<p>Check that StableSound got the scheduled task rather than the fallback. The
+quickest way is the log: turn logging on, sign out and back in, and read the
+line beginning <code>autostart:</code> near the top. It says which of the two
+is in force.</p>
+
+<p>If it says the registry Run key, StableSound will keep trying to move up to
+a task each time it starts, so it is worth signing out once more before
+concluding anything. If it stays on the Run key, Windows is refusing the task
+on this machine and the line says what it said.</p>
+
+<p>If it says the scheduled task and you are still waiting, the remaining
+delay is not StableSound's to remove. Windows itself pauses at the start of a
+sign-in before it lets startup programs run, and there is a single Windows
+setting that removes that pause for all of them at once. StableSound will not
+change it for you — it is a change to your whole sign-in, made on one
+program's behalf — but it exists, and you can look for it yourself.</p>
+
 <h3>It says StableSound is already running</h3>
 
 <p>Because it is — most likely started for you when you signed in. Only one
@@ -442,9 +472,12 @@ than obeyed, and the correction is written to the log.</p>
 it is how StableSound knows what state to come back in, and it rewrites that
 line itself every time you switch keep-alive on or off.</p>
 
-<p>StableSound writes nothing else and puts nothing in the registry, except
-the single entry for starting at sign-in when you ask for it. Removing the exe
-and those two files removes it completely.</p>
+<p>StableSound writes nothing else. The one thing it puts outside its own
+folder is what makes it start when you sign in, and only if you ask for it: a
+scheduled task called <code>StableSound</code>, or an entry in the registry's
+startup list if Windows will not give it the task. Unticking <strong>Start
+StableSound when I sign in</strong> removes whichever it made. Delete the exe
+and the three files above and nothing of it is left.</p>
 
 <footer>
 <p>StableSound is free software under the MIT licence. It was built with and
