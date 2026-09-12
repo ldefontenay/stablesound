@@ -126,9 +126,13 @@ fn main() {
     let tray = match Tray::create() {
         Ok(t) => t,
         Err(e) => {
-            // No tray means no window, and no window means no hotkey. That is
-            // not something to limp along with silently - and with no console
-            // to print to, this window is the only way to say so.
+            // No window means no hotkey, which is not something to limp along
+            // with silently - and with no console to print to, this window is
+            // the only way to say so.
+            //
+            // A missing *icon* no longer comes through here. That is handled
+            // further down, because at sign-in it means Explorer has not
+            // started yet and the right answer is to wait, not to give up.
             settings::problem(
                 None,
                 &format!(
@@ -146,16 +150,41 @@ fn main() {
 
     record_startup(&cfg, &config_path, &log, &adjustments);
 
+    // Which of the two autostart routes is in force, and an attempt to move an
+    // older Run entry up to a scheduled task. Done here rather than in the
+    // dialog because the dialog only acts when the checkbox *changes*, and for
+    // anybody who ticked it before Milestone 7 it is already ticked. See
+    // `startup`.
+    match startup::current() {
+        Some(method) => log.write(&format!("autostart: on, by {}", method.describe())),
+        None => log.write("autostart: off"),
+    }
+    if let Some(line) = startup::upgrade_run_to_task() {
+        log.write(&line);
+    }
+
     // This has been wrong on hardware before, so it says so rather than
     // failing quietly.
-    log.write(&format!(
-        "tray icon added, shell notification version 4 {}",
-        if tray.is_version4() {
-            "accepted"
-        } else {
-            "REFUSED, falling back to version 3 messages"
-        }
-    ));
+    if tray.is_icon_pending() {
+        // The expected state when a logon task beats Explorer to it. Recorded
+        // either way, because "there was no tray icon" is a report that cannot
+        // be told apart from "the icon was added and then vanished" without
+        // this line.
+        log.write(
+            "tray icon refused for now - no shell to put it in yet, which is \
+             normal this early at sign-in. Retrying for a minute; the hotkey \
+             works regardless.",
+        );
+    } else {
+        log.write(&format!(
+            "tray icon added, shell notification version 4 {}",
+            if tray.is_version4() {
+                "accepted"
+            } else {
+                "REFUSED, falling back to version 3 messages"
+            }
+        ));
+    }
     // Claim the hotkeys before anything else can want them, and say plainly
     // if somebody already has one. A hotkey that silently does nothing is the
     // worst possible failure for the app's primary interface.
@@ -216,6 +245,45 @@ fn main() {
     drop(surface);
 }
 
+/// Say that the tray icon never turned up, once, after a minute of trying.
+///
+/// Not fatal, and deliberately not shown at once. Until Milestone 7 a refused
+/// icon ended the run with a message window, which was defensible while the
+/// only way to start was Explorer's `Run` key - if Explorer had put us there,
+/// Explorer was up. A logon task can beat the shell by seconds, so the same
+/// refusal is now the ordinary case and waiting is the right answer.
+///
+/// But silence would be worse than either. Everything except the icon and its
+/// menu still works, and a user who goes looking for the icon should find out
+/// from StableSound why it is not there rather than concluding the app is
+/// broken. By the time this can fire the desktop has long been up, so a window
+/// is readable.
+fn icon_never_arrived(surface: &mut Surface) {
+    surface
+        .log
+        .write("tray icon never accepted after a minute of retrying - carrying on without it");
+    let settings_route = if surface.settings_key.is_some() {
+        "its settings hotkey"
+    } else {
+        "the Settings button, if you can reach it"
+    };
+    settings::problem(
+        None,
+        &format!(
+            "StableSound is running, but Windows would not give it a tray icon.\n\
+             \n\
+             Everything else works. Your hotkey still switches keep-alive on and off, \
+             {settings_route} still opens the settings, and the headphones are being held \
+             awake exactly as usual. What you have lost is the icon in the system tray and \
+             the menu on it.\n\
+             \n\
+             This usually means Windows Explorer is not running. Signing out and back in \
+             normally fixes it. StableSound does not need restarting for the icon to come \
+             back - it puts the icon back by itself the moment Explorer returns."
+        ),
+    );
+}
+
 /// Say that this is the second copy, and where the first one is.
 ///
 /// A window rather than a silent exit, because a silent exit is
@@ -229,7 +297,7 @@ fn already_running(cfg: &Config) {
     let settings_route = if cfg.settings_hotkey_enabled {
         format!("Press {} to open its settings.", cfg.settings_hotkey)
     } else {
-        "To open its settings, press Windows+B to reach the notification area, use the arrow \
+        "To open its settings, press Windows+B to reach the system tray, use the arrow \
          keys to find StableSound, then press the Applications key and choose Settings."
             .to_string()
     };
@@ -279,7 +347,7 @@ fn claim(
                      Windows said: {e}\n\
                      \n\
                      To pick a different combination, open the settings from the StableSound \
-                     icon in the notification area. Press Windows+B, then the arrow keys to \
+                     icon in the system tray. Press Windows+B, then the arrow keys to \
                      reach it, then the Applications key for its menu, and choose Settings."
                 ),
             );
@@ -340,7 +408,12 @@ fn pump(surface: &mut Surface, handle: &engine::Handle) {
             }
 
             WM_TIMER if message.wParam.0 == EVENT_TIMER => {
-                drain(&mut surface.tray, &handle.events);
+                drain(surface, &handle.events);
+                match surface.tray.poll_icon() {
+                    Some(tray::IconOutcome::Added) => surface.log.write("tray icon added late"),
+                    Some(tray::IconOutcome::GaveUp) => icon_never_arrived(surface),
+                    None => {}
+                }
                 // Settings the dialog accepted, read on the same tick as the
                 // engine's events so there is one place where the loop takes
                 // in news from elsewhere.
@@ -427,13 +500,20 @@ fn open_settings(surface: &mut Surface) {
 
 /// Take settings the user accepted: write them down, tell the engine, and
 /// re-claim any hotkey that changed.
-fn apply_settings(surface: &mut Surface, handle: &engine::Handle, cfg: Config) {
+fn apply_settings(surface: &mut Surface, handle: &engine::Handle, mut cfg: Config) {
     // The dialog destroys itself on OK, so the handle we were holding is
     // already stale.
     surface.dialog = None;
 
     let Ok(previous) = surface.shared.lock().map(|mut live| {
         let previous = live.clone();
+        // The remembered keep-alive state is not the dialog's to change. It
+        // has no control for it, so what comes back is whatever was true when
+        // the dialog opened - and the hotkey goes on working while it is open,
+        // which is a tested behaviour, so that snapshot can be minutes stale.
+        // Taking the live value here is what stops pressing OK from undoing a
+        // toggle made while the dialog was up.
+        cfg.keep_alive_on = live.keep_alive_on;
         *live = cfg.clone();
         previous
     }) else {
@@ -589,15 +669,50 @@ fn rebind(
 
 /// Take whatever the engine has said since the last tick and reflect it.
 ///
-/// Only the tray icon is updated here, and that is now all the channel
-/// carries - see [`Event`]. The engine writes its own log lines from its own
+/// Two things happen here and nothing else. The tray icon follows the sound,
+/// and a change the user made by hand is written to the settings file so it
+/// survives to the next run. The engine writes its own log lines from its own
 /// thread, which is why the log stayed complete through Milestone 2's testing
 /// while the console did not; and the *audible* feedback is the engine's job
 /// too, played through the device being kept awake, because an off-tone has
 /// to be heard before the stream closes.
-fn drain(tray: &mut Tray, events: &std::sync::mpsc::Receiver<Event>) {
+///
+/// Saving belongs on this thread rather than in the engine because this thread
+/// owns the settings file: the dialog writes it from here too, and one writer
+/// means the two can never race to produce a half-written file.
+fn drain(surface: &mut Surface, events: &std::sync::mpsc::Receiver<Event>) {
     while let Ok(event) = events.try_recv() {
-        tray.set_active(event == Event::KeepAliveOn);
+        match event {
+            Event::KeepAliveOn => surface.tray.set_active(true),
+            Event::KeepAliveOff => surface.tray.set_active(false),
+            Event::Remember(on) => remember(surface, on),
+        }
+    }
+}
+
+/// Write down that keep-alive was switched on, or off by hand.
+///
+/// A failure here only reaches the log, unlike the same failure from the
+/// settings dialog, which opens a window. The difference is what the user was
+/// doing: pressing OK is a request to save, and it failing is news, whereas
+/// this happens on a hotkey press whose whole point is that it needs no
+/// attention. A window every time the headphones were switched on, because a
+/// folder is read-only, would be worse than quietly forgetting between runs.
+fn remember(surface: &mut Surface, on: bool) {
+    let Ok(cfg) = surface.shared.lock().map(|mut live| {
+        live.keep_alive_on = on;
+        live.clone()
+    }) else {
+        return;
+    };
+    match cfg.save(&surface.config_path) {
+        Ok(()) => surface.log.write(&format!(
+            "remembered for next time: keep-alive {}",
+            if on { "on" } else { "off" }
+        )),
+        Err(e) => surface.log.write(&format!(
+            "could not remember the keep-alive state ({e}) - it will start off next time"
+        )),
     }
 }
 

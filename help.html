@@ -64,6 +64,38 @@
 <p class="lede">Keeps Bluetooth headphones awake so screen reader speech is not
 cut off at the start, and lets go of them again so your phone can take over.</p>
 
+<h2 id="start">Getting started</h2>
+
+<p>There is nothing to install. Put <code>StableSound.exe</code> wherever you
+like and run it. Nothing appears on screen: it puts an icon in the system tray
+and waits.</p>
+
+<p>Then there are three things to know, and they are enough to use it:</p>
+
+<ul>
+  <li><strong>Ctrl+Windows+F12</strong> switches it on and off. A rising tone
+  means the headphones are being held awake; a falling tone means they have
+  been let go.</li>
+
+  <li><strong>It lets go on its own</strong> after half a minute of quiet, so
+  your phone can take the headphones. Touching the keyboard brings it
+  back.</li>
+
+  <li><strong>Ctrl+Windows+F11</strong> opens the settings, where everything
+  above can be changed. <kbd>F1</kbd> there opens this help.</li>
+</ul>
+
+<p>StableSound starts the way you left it. If it was switched on when you last
+shut down, it is switched on again when you next start, without a tone.</p>
+
+<div class="note">
+  <p>To have it there every time, open the settings and tick <strong>Start
+  StableSound when I sign in</strong>. With that and the line above, there is
+  nothing left to press: sign in and your headphones are already awake.</p>
+</div>
+
+<p>The rest of this page is detail. You do not need it to get going.</p>
+
 <h2 id="what">What it is for</h2>
 
 <p>Bluetooth headphones switch their receiver off after a few seconds with
@@ -75,33 +107,10 @@ short announcement that can be the whole word.</p>
 silence, so they never decide there is nothing to listen to. You hear nothing;
 the headset stays awake.</p>
 
-<p>The catch with holding a headset open is that nothing else can have it. If
-your headphones are paired to a phone as well, the phone cannot take them
-while a computer is streaming to them. So StableSound also lets go: after a
-set time with nothing playing it closes the stream, and the headphones become
-available again within a few seconds.</p>
-
-<h2 id="start">Getting started</h2>
-
-<p>There is nothing to install. Put <code>StableSound.exe</code> wherever you
-like and run it. It has no window of its own; it puts an icon in the
-notification area and waits.</p>
-
-<p>The one thing worth knowing straight away:</p>
-
-<ul>
-  <li><strong>Ctrl+Windows+F12</strong> switches keep-alive on and off.</li>
-  <li><strong>Ctrl+Windows+F11</strong> opens the settings.</li>
-</ul>
-
-<p>Both combinations can be changed, and the settings one can be turned off
-altogether if you would rather not spend a hotkey on it.</p>
-
-<div class="note">
-  <p>If you want StableSound every time you use the computer, open the
-  settings and tick <strong>Start StableSound when I sign in</strong>. Nothing
-  appears on screen when it starts that way.</p>
-</div>
+<p>The catch is that while one machine holds a headset open, nothing else can
+have it — including a phone paired to the same headphones. So StableSound also
+lets go: after a set time with nothing playing it closes the stream, and the
+headphones are free again within a few seconds.</p>
 
 <h2 id="onoff">Switching it on and off</h2>
 
@@ -111,15 +120,27 @@ tone finishes before the headphones are released, so you always hear the whole
 of it.</p>
 
 <p>Those tones play only for a change <em>you</em> made. When StableSound lets
-go on its own, or wakes itself up again, it does so silently. This was a
-deliberate decision after testing: automatic tones turned out to be heard far
-too often to be tolerable.</p>
+go on its own, wakes itself up again, or starts up in the state you left it
+in, it does so silently. Automatic tones were tried, and they turned out to be
+heard far too often to live with.</p>
 
-<p>You can also switch it on and off from the notification area. Press
+<p>You can also switch it on and off from the system tray. Press
 <kbd>Windows+B</kbd>, use the arrow keys to reach StableSound, and press
 <kbd>Enter</kbd>. The icon reads either <em>StableSound Headphones
 awake</em> or <em>StableSound Headphones free</em>, so you can check the state
 without changing it.</p>
+
+<h3>It starts the way you left it</h3>
+
+<p>Whichever way you last switched it, that is how StableSound comes back the
+next time it runs. Leave it on and it is on again at your next sign-in, before
+anything has spoken. Switch it off by hand — to let your phone keep the
+headphones — and it stays off until you ask for it.</p>
+
+<p>Only the switch counts. Letting go on the timer is not switching off, so a
+quiet spell before you shut down does not change what you get next time.</p>
+
+<p>There is no setting for this, because the hotkey already is the setting.</p>
 
 <h2 id="letgo">Letting the headphones go</h2>
 
@@ -161,9 +182,11 @@ headphones, and typing will not snatch them back.</p>
 keep-alive again when I use the keyboard</strong> in the settings. The hotkey
 then becomes the only thing that starts it.</p>
 
-<h2 id="tray">The notification area icon</h2>
+<h2 id="tray">The system tray icon</h2>
 
-<p>Press <kbd>Windows+B</kbd> and arrow to StableSound.</p>
+<p>Press <kbd>Windows+B</kbd> and arrow to StableSound. (Windows itself calls
+the tray the notification area, if you go looking for it in its own
+settings.)</p>
 
 <ul>
   <li><kbd>Enter</kbd> switches keep-alive on or off.</li>
@@ -179,7 +202,7 @@ not.</p>
 <h2 id="settings">The settings, one by one</h2>
 
 <p>Press <strong>Ctrl+Windows+F11</strong>, or choose Settings from the
-notification area menu. It is an ordinary Windows dialog: <kbd>Tab</kbd> moves
+system tray menu. It is an ordinary Windows dialog: <kbd>Tab</kbd> moves
 between controls, <kbd>Enter</kbd> accepts, <kbd>Escape</kbd> cancels, and
 your usual hotkey goes on working while it is open.</p>
 
@@ -189,20 +212,21 @@ your usual hotkey goes on working while it is open.</p>
 
 <dl>
   <dt>Output device to keep awake</dt>
-  <dd>Which device to hold open. <em>Default output (follow Windows)</em>
-  keeps whatever Windows is currently using, and follows it if that changes,
-  which is what most people want. Naming a device explicitly is useful if you
-  switch between outputs and only one of them is the problem. If the named
-  device is not there when StableSound needs it, it falls back to the default
-  rather than doing nothing.</dd>
+  <dd>Leave it on <em>Default output (follow Windows)</em> unless you have a
+  reason not to. That holds whatever Windows is currently playing through, and
+  follows it when that changes.
+  <br>Naming a device instead is for when you switch between outputs and only
+  one of them is the problem. If the named device is not there when
+  StableSound needs it, it falls back to the default rather than doing
+  nothing.</dd>
 
   <dt>Keep-alive signal to send it</dt>
-  <dd><em>Digital silence</em> is the default and the recommendation, and it
-  is enough on every headset tested. <em>Silence with a tick each second</em>
-  adds an inaudible blip, for a headset that ignores pure silence.
-  <em>Inaudible tone</em> is a last resort for a headset that ignores both;
-  because it is genuinely playing sound, it forces the fixed-time release
-  rule, as the quiet-detection rule could never fire.</dd>
+  <dd>Leave it on <em>Digital silence</em>. It was enough on every headset
+  tested, and it is the quietest thing that works.
+  <br>The other two are for a headset that ignores silence. <em>Silence with a
+  tick each second</em> adds an inaudible blip. <em>Inaudible tone</em> is a
+  last resort: it is genuinely playing sound, so it forces the fixed-time
+  release rule — the quiet-detection rule could never fire.</dd>
 
   <dt>Let go of the headphones</dt>
   <dd>The release rule, described under <a href="#letgo">Letting the
@@ -236,17 +260,17 @@ your usual hotkey goes on working while it is open.</p>
 
 <dl>
   <dt>Hotkey to switch keep-alive on and off</dt>
-  <dd><code>ctrl+win+f12</code> by default. Type it as one or more of
-  <code>ctrl</code>, <code>alt</code>, <code>shift</code> and <code>win</code>,
-  then one key, joined by plus signs. Order, spacing and capitals do not
-  matter, so <code>Win + Ctrl + F12</code> is the same thing. A key on its own
-  is refused, because a hotkey with no modifier would take that key away from
-  every other program on the machine.</dd>
+  <dd><code>ctrl+win+f12</code> by default.
+  <br>To change it, type one or more of <code>ctrl</code>, <code>alt</code>,
+  <code>shift</code> and <code>win</code>, then one key, joined by plus signs.
+  Order, spacing and capitals do not matter, so <code>Win + Ctrl + F12</code>
+  is the same thing. A key on its own is refused: with no modifier it would be
+  taken away from every other program on the machine.</dd>
 
   <dt>Also use a hotkey to open these settings</dt>
   <dd>On by default. Once your settings are the way you want them you may
   prefer to untick this and hand the combination back to the rest of the
-  machine; the notification area menu still opens the settings.</dd>
+  machine; the system tray menu still opens the settings.</dd>
 
   <dt>Hotkey to open these settings</dt>
   <dd><code>ctrl+win+f11</code> by default.</dd>
@@ -269,9 +293,20 @@ your usual hotkey goes on working while it is open.</p>
 
 <dl>
   <dt>Start StableSound when I sign in</dt>
-  <dd>Adds StableSound to the programs Windows starts for you. It writes one
-  entry under your own account only, and unticking it removes that entry
-  again.</dd>
+  <dd>Adds StableSound to the programs Windows starts for you, under your own
+  account only. Unticking it removes it again.
+
+  <p>StableSound asks Windows for a <strong>scheduled task</strong> that runs
+  when you sign in. That matters for one reason: a task runs at the sign-in
+  itself, while the other way of starting programs — the list Windows keeps in
+  the registry — is not reached until the desktop is ready, after every other
+  program set to start with you. On a slowish machine that has meant about
+  half a minute, which is half a minute of your screen reader being clipped.</p>
+
+  <p>If Windows refuses the task, StableSound falls back to the registry list
+  so that it still starts, and tells you it has done so. Either way this
+  tickbox is read from Windows rather than remembered, so it can never claim
+  StableSound will start when it will not.</p></dd>
 </dl>
 
 <h3>The buttons</h3>
@@ -311,7 +346,7 @@ is the only way to see what actually went on.</p>
 looking into, and off again afterwards. The file is
 <code>stablesound.log</code>, in the folder described under <a
 href="#files">Where StableSound keeps its files</a>, and you can open it from
-the settings dialog or the notification area menu.</p>
+the settings dialog or the system tray menu.</p>
 
 <h2 id="wrong">When something goes wrong</h2>
 
@@ -360,6 +395,32 @@ claim them a couple of seconds later.</p>
 computer, that is the waking feature. Switching off by hand always sticks;
 waking only ever follows an automatic release.</p>
 
+<h3>It was already holding the headphones when I signed in</h3>
+
+<p>That is deliberate: StableSound comes back in whatever state you left it,
+and it was on. If you would rather start free, switch it off by hand with
+<strong>Ctrl+Windows+F12</strong> before you finish for the day, and it will
+start off from then on.</p>
+
+<h3>It takes too long to start when I sign in</h3>
+
+<p>Check that StableSound got the scheduled task rather than the fallback. The
+quickest way is the log: turn logging on, sign out and back in, and read the
+line beginning <code>autostart:</code> near the top. It says which of the two
+is in force.</p>
+
+<p>If it says the registry Run key, StableSound will keep trying to move up to
+a task each time it starts, so it is worth signing out once more before
+concluding anything. If it stays on the Run key, Windows is refusing the task
+on this machine and the line says what it said.</p>
+
+<p>If it says the scheduled task and you are still waiting, the remaining
+delay is not StableSound's to remove. Windows itself pauses at the start of a
+sign-in before it lets startup programs run, and there is a single Windows
+setting that removes that pause for all of them at once. StableSound will not
+change it for you — it is a change to your whole sign-in, made on one
+program's behalf — but it exists, and you can look for it yourself.</p>
+
 <h3>It says StableSound is already running</h3>
 
 <p>Because it is — most likely started for you when you signed in. Only one
@@ -386,11 +447,17 @@ do not trust it.</p>
 
 <h2 id="files">Where StableSound keeps its files</h2>
 
-<p>Two files, both plain text, both alongside <code>StableSound.exe</code>:</p>
+<p>StableSound is one file, <code>StableSound.exe</code>, and that is the only
+one you ever have to copy or keep. This help, the settings dialog and the icon
+are all inside it.</p>
+
+<p>What it writes for itself goes alongside the program:</p>
 
 <ul>
   <li><code>stablesound.conf</code> — the settings.</li>
   <li><code>stablesound.log</code> — the log, if you have turned it on.</li>
+  <li><code>stablesound-help.html</code> — this page, written out fresh each
+  time you open the help.</li>
 </ul>
 
 <p>If the folder StableSound is in cannot be written to — Program Files, for
@@ -401,9 +468,16 @@ instance, or a read-only drive — both move to
 reads it at startup. A setting it cannot make sense of is corrected rather
 than obeyed, and the correction is written to the log.</p>
 
-<p>StableSound writes nothing else and puts nothing in the registry, except
-the single entry for starting at sign-in when you ask for it. Removing the exe
-and those two files removes it completely.</p>
+<p>One line in it, <code>keep_alive</code>, is a memory rather than a setting:
+it is how StableSound knows what state to come back in, and it rewrites that
+line itself every time you switch keep-alive on or off.</p>
+
+<p>StableSound writes nothing else. The one thing it puts outside its own
+folder is what makes it start when you sign in, and only if you ask for it: a
+scheduled task called <code>StableSound</code>, or an entry in the registry's
+startup list if Windows will not give it the task. Unticking <strong>Start
+StableSound when I sign in</strong> removes whichever it made. Delete the exe
+and the three files above and nothing of it is left.</p>
 
 <footer>
 <p>StableSound is free software under the MIT licence. It was built with and

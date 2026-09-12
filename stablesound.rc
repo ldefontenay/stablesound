@@ -50,6 +50,43 @@
 // stablesound.manifest.
 1 RT_MANIFEST "stablesound.manifest"
 
+// The version resource. Windows shows this on the Properties page of the exe,
+// and it is the only place a downloaded copy can say what it is: there is no
+// installer and no About box. Keep the four numbers in step with the version
+// in Cargo.toml - nothing checks that they agree.
+//
+// The strings are the ones Explorer actually reads. CompanyName is left as
+// the author rather than invented, and OriginalFilename matters if the file
+// is ever renamed: it is what the exe says it was built as.
+VS_VERSION_INFO VERSIONINFO
+FILEVERSION    1,0,0,0
+PRODUCTVERSION 1,0,0,0
+FILEFLAGSMASK  VS_FFI_FILEFLAGSMASK
+FILEFLAGS      0
+FILEOS         VOS_NT_WINDOWS32
+FILETYPE       VFT_APP
+FILESUBTYPE    VFT2_UNKNOWN
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904B0"   // US English, Unicode
+        BEGIN
+            VALUE "CompanyName",      "Laurent de Fontenay"
+            VALUE "FileDescription",  "Keeps Bluetooth headphones awake for screen reader speech"
+            VALUE "FileVersion",      "1.0.0.0"
+            VALUE "InternalName",     "stablesound"
+            VALUE "LegalCopyright",   "MIT licensed"
+            VALUE "OriginalFilename", "stablesound.exe"
+            VALUE "ProductName",      "StableSound"
+            VALUE "ProductVersion",   "1.0.0"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x409, 1200
+    END
+END
+
 #define IDD_SETTINGS      100
 #define IDD_MESSAGE       101
 

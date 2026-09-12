@@ -427,17 +427,46 @@ fn read(hwnd: HWND, state: &State) -> Option<Config> {
     // to the registry rather than into the config we are about to return, so
     // it must not happen on a path that then bails out.
     if checked(hwnd, IDC_STARTUP) != startup::is_enabled() {
-        if let Err(e) = startup::set(checked(hwnd, IDC_STARTUP)) {
-            // Not worth refusing the whole dialog over. Everything else the
-            // user changed is good, and saying so beats silently doing
-            // nothing.
-            notify(
-                hwnd,
-                &format!(
-                    "Your other settings were saved, but StableSound could not \
-                     change whether it starts when you sign in.\n\n{e}"
-                ),
-            );
+        match startup::set(checked(hwnd, IDC_STARTUP)) {
+            // Switched off, or switched on by the route we wanted. Nothing to
+            // say - the checkbox is the feedback.
+            Ok(None) => {}
+            Ok(Some(enabled)) if enabled.fell_back.is_none() => {}
+            // Switched on, but only by the slower of the two routes. Worth
+            // saying, because the difference is whether the first thing the
+            // screen reader says is clipped - but said as a note rather than a
+            // failure, because StableSound will still start.
+            Ok(Some(enabled)) => {
+                let route = enabled.method.describe();
+                let why = enabled.fell_back.unwrap_or_default();
+                notify(
+                    hwnd,
+                    &format!(
+                        "Your settings were saved, and StableSound will start when you sign in.\n\
+                         \n\
+                         It will start later than it could, though. StableSound asked Windows \
+                         for a scheduled task, which runs at sign-in itself, and Windows refused \
+                         - so it has used {} instead. Windows runs those only once the desktop \
+                         is ready, after every other program set to start with you, which on \
+                         this machine has meant about half a minute.\n\
+                         \n\
+                         Nothing is broken and there is nothing you need to do. Windows said: {}",
+                        route, why
+                    ),
+                );
+            }
+            Err(e) => {
+                // Not worth refusing the whole dialog over. Everything else
+                // the user changed is good, and saying so beats silently doing
+                // nothing.
+                notify(
+                    hwnd,
+                    &format!(
+                        "Your other settings were saved, but StableSound could not change \
+                         whether it starts when you sign in.\n\n{e}"
+                    ),
+                );
+            }
         }
     }
 

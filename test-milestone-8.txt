@@ -1,0 +1,968 @@
+STABLESOUND - MILESTONE 8 HARDWARE ROUND
+Tests 58 to 63.
+
+You chose (b): do the startup change first, and ship after it has been tested.
+This is that round, and it is the last one before shipping.
+
+Everything in Milestone 7 passed, so nothing from it is re-tested here. There
+is one new thing and this round is entirely about it.
+
+
+WHAT CHANGED
+
+"Start StableSound when I sign in" no longer writes a registry entry. It asks
+Windows for a scheduled task that runs at logon.
+
+That is the whole change, and the reason for it is your Test 56 answer: about
+30 seconds, and the first thing JAWS said was clipped. The two ways Windows
+can start a program are not equally quick. A scheduled task fires around the
+sign-in itself. The registry list is not reached until the desktop is ready,
+after a pause, after every other program in it, in an order no program can ask
+for - so Discord being ahead of you was never about Discord being faster.
+
+Two things I promised to find out before writing any of it:
+
+  Does it need administrator rights? No. I tested this properly rather than
+  guessing: on this machine, as a standard user who is not an administrator,
+  the task registers, reads back correctly and deletes again, with no
+  permission prompt anywhere. If Windows ever does refuse it, it refuses
+  quietly, as an error code - it cannot put a prompt in front of you at
+  sign-in.
+
+  Can the tickbox still be trusted? Yes, and it is stricter than before. It
+  reads Windows rather than remembering anything, and it now also checks that
+  what it finds points at the copy of StableSound you are running. An entry
+  left behind by a copy you have since moved reads as unticked, which is the
+  truth, and ticking the box repairs it. Test 62 covers that.
+
+If a task cannot be registered, StableSound falls back to the old registry
+entry and tells you it has. Only ever one of the two - two would start two
+copies of StableSound.
+
+There is a second change you should know about even though you will probably
+never see it. Until now, if StableSound could not put its icon in the system
+tray, it said so and stopped. That made sense when the only thing that started
+it was Windows Explorer: if Explorer had started us, Explorer was obviously
+running. A scheduled task can now start StableSound BEFORE Explorer exists, and
+Explorer is what hands out tray icons - so "no icon yet" is now normal, and
+stopping would be the wrong answer. StableSound keeps running, your hotkey
+works, and it puts the icon in as soon as there is somewhere to put it. Test 61
+checks that.
+
+
+BEFORE YOU START
+
+Read this bit first, because Test 58 can only be done once.
+
+If a StableSound from an earlier session is still running, exit it now.
+
+Build the new version:
+
+    cargo build --release
+
+Now STOP. Do not run it yet. The first time the new version starts it will
+move your existing registry entry up to a scheduled task, and it only does
+that once - so that first run IS Test 58. Go straight there.
+
+Logging is already on from last round, so there is nothing to set up.
+
+
+TEST 58 - THE FIRST RUN MOVES YOU UP BY ITSELF
+
+You already had "start when I sign in" ticked. You should not have to untick
+and retick it to get the better method - StableSound should notice and move you
+up on its own.
+
+Run target\release\stablesound.exe
+
+Keep-alive should come on silently, the same as last round.
+ANSWER (did it start normally?):
+Yes.
+
+Now open stablesound.log and go to the bottom, then search upwards for the word
+autostart. You are looking for two lines near the last "StableSound 0.1.0
+starting".
+
+The first should say autostart is on, by an entry under the registry Run key -
+that is where you were.
+
+The second should say it moved up from the Run key to a scheduled task.
+
+Are both lines there, and does the second one say it moved up?
+ANSWER:
+Yes, both there and the second one reads: "2026-09-12 01:09:31 autostart: moved up from the Run key to a scheduled task, so the next sign-in starts StableSound earlier"
+
+ANYTHING ODD:
+No.
+
+
+TEST 59 - THE TICKBOX STILL TELLS THE TRUTH
+
+Open the settings with Ctrl+Win+F11.
+
+Is "Start StableSound when I sign in" still ticked? It should be - you are
+still set to start at sign-in, just by a better route, and the box should not
+have changed under you.
+ANSWER:
+Yes.
+
+Untick it and press Enter for OK.
+
+Did the dialog close without complaining? No message window should appear.
+ANSWER:
+Yes.
+
+Open the settings again with Ctrl+Win+F11.
+
+Is the box now unticked?
+ANSWER:
+Yes.
+
+Tick it again and press Enter for OK.
+
+Did any message window appear this time? There should be none. If one did
+appear, it means Windows refused the scheduled task and StableSound used the
+old registry entry instead - please say so and quote what it said, because that
+is the case I could not produce here.
+ANSWER:
+No message window appeared.
+
+ANYTHING ODD:
+No.
+
+
+TEST 60 - THE SIGN-IN ITSELF
+
+The one this was all for.
+
+Check the settings one more time: "Start StableSound when I sign in" ticked,
+and keep-alive switched ON with Ctrl+Win+F12.
+
+Now sign out and sign back in.
+
+Were your headphones already being held awake when you got to the desktop?
+ANSWER:
+Yes.
+
+Was it silent - no tone at sign-in?
+ANSWER:
+Yes.
+
+The question underneath all of it. Was the first thing JAWS said clipped, or
+did it come through whole?
+ANSWER:
+It came through whole. StableSound now feels like a first-class citizen, which was my hope.
+
+Last round this took about 30 seconds and the first thing JAWS said was
+clipped. How does it compare now? A rough impression is fine - immediately, a
+few seconds, about the same as before.
+ANSWER:
+Jaws came up speaking clearly, no clipping.
+
+If it is better but not instant, is it good enough to ship?
+ANSWER:
+Good enough to ship now.
+
+ANYTHING ODD:
+No.
+
+TEST 61 - THE TRAY ICON, POSSIBLY ARRIVING LATE
+
+Same sign-in as Test 60 - this is just reading the log afterwards, there is
+nothing to do at the machine.
+
+First, is the tray icon there now? Windows+B and arrow to it. It should read
+"StableSound Headphones awake".
+ANSWER:
+Yes.
+
+Now open stablesound.log and find the most recent "StableSound 0.1.0 starting".
+Read the few lines after it and look for one mentioning the tray icon.
+
+There are three possibilities and any of them is a pass:
+
+  It says the icon was added, and mentions shell notification version 4. That
+  means Explorer was already up - the task did not beat it.
+
+  It says the icon was refused for now and is being retried, followed a little
+  later by a line saying it was added late. That means the task DID beat
+  Explorer, which is the best evidence I can get that it fires early.
+
+  Neither - no tray icon line at all. That would be a bug; please say so.
+
+Which of those did you get? Quoting the line is ideal if that is easy.
+ANSWER:
+Could you please check the log yourself?
+
+Did a message window appear at sign-in saying StableSound could not get a tray
+icon? There should not have been one. It only appears after a full minute of
+trying, and nobody has ever seen it.
+ANSWER:
+No such message appeared.
+
+ANYTHING ODD:
+No.
+
+
+TEST 62 - MOVING IT TO ITS REAL HOME
+
+This is the thing you are about to do anyway. target\release is a build folder,
+and StableSound should not live there. It is also the one case where the new
+tickbox behaviour matters, because the task you now have points at the copy in
+the build folder.
+
+Make a folder somewhere sensible - anywhere you would keep a small program.
+
+Copy TWO files into it from target\release: stablesound.exe and
+stablesound.conf. The exe is the only one that matters for using StableSound,
+but copying the settings too means this test keeps your hotkeys, your
+keep-alive state and your logging rather than starting from defaults.
+
+Exit the running StableSound.
+
+Run the copy in the new folder.
+ANSWER (did it start normally?):
+Yes.
+
+Open the settings there with Ctrl+Win+F11.
+
+Is "Start StableSound when I sign in" now UNTICKED? It should be, and this is
+the point of the test: the task that exists points at the old copy in the build
+folder, not at this one, so ticked would be a lie.
+ANSWER:
+Yes.
+
+Tick it and press Enter for OK. That should repoint the task at the new copy.
+
+Any message window?
+ANSWER:
+No.
+
+Exit StableSound, then run it again from the new folder, and check the log in
+the new folder. The autostart line should now say it is on, by a scheduled
+task.
+ANSWER:
+Yes: "2026-09-12 01:28:01 autostart: on, by a scheduled task that runs at sign-in"
+
+ANYTHING ODD:
+No.
+
+
+TEST 63 - AND UNTICKING REALLY REMOVES IT
+
+Short one, and no sign-out needed. Unticking the box has to leave nothing
+behind - neither the task nor the old registry entry.
+
+With StableSound running from the new folder, open the settings and untick
+"Start StableSound when I sign in". Press Enter for OK.
+
+Exit StableSound and start it again.
+
+Check the log. The autostart line should now say simply that autostart is off.
+If it says on, by anything at all, something was left behind.
+ANSWER:
+Yes: "2026-09-12 01:31:57 autostart: off"
+
+Now tick it again and OK, so you are left set up the way you want. Exit and
+start once more, and confirm the log says it is on by a scheduled task.
+ANSWER:
+Yes: "2026-09-12 01:33:46 autostart: on, by a scheduled task that runs at sign-in"
+
+ANYTHING ODD:
+No.
+
+
+AT THE END
+
+Please send the log file back with this - stablesound.log. If you did Test 62
+there will be two logs, one in target\release and one in the new folder. Both
+are useful; the new folder's is the more interesting.
+
+Once you have sent it, you may want to turn logging off, and detailed logging
+with it.
+
+Is there anything else that needs doing before this ships?
+ANSWER:
+No. As for the version, change it to version 1. Write a good readme for it on Github. Do everything needed for release, including making the repo public. Make it easy to find and download the .exe file.
+
+
+
+***
+Log file from new folder, pasted below.
+
+2026-09-12 01:27:39 settings changed from the dialog and saved
+2026-09-12 01:27:39   device:  default output
+2026-09-12 01:27:39   signal:  zeros
+2026-09-12 01:27:39   release: idle - release after 30s with no audio
+2026-09-12 01:27:39   hotkey:  Ctrl+Win+F12 toggles keep-alive
+2026-09-12 01:27:39   dialog:  Ctrl+Win+F11 opens the settings, as does the tray
+2026-09-12 01:27:39   wake:    on - any input brings keep-alive back
+2026-09-12 01:27:39   earcons: on at 10% - when switched on or off by hand; automatic releases are silent
+2026-09-12 01:27:39   resume:  keep-alive was left on - restoring it, silently
+2026-09-12 01:27:39   logging: on - state changes, plus detailed troubleshooting lines
+2026-09-12 01:27:39 settings reloaded
+2026-09-12 01:27:39 keep-alive ON  device='Headphones (soundcore AeroClip)' signal=zeros release=idle 30s
+2026-09-12 01:27:39 device opened in 29 ms
+2026-09-12 01:27:39 audio detected, peak 0.4283
+2026-09-12 01:27:40 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:27:40 audio detected, peak 0.4275
+2026-09-12 01:27:43 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:27:45 audio detected, peak 0.2935
+2026-09-12 01:27:48 keep-alive OFF (StableSound closing) after 43s - device released
+2026-09-12 01:27:48 engine stopped
+2026-09-12 01:27:48 stopped
+2026-09-12 01:28:01 StableSound 0.1.0 starting
+2026-09-12 01:28:01 settings file: C:\Users\ldefo\AppData\Roaming\StableSound\stablesound.conf
+2026-09-12 01:28:01   device:  default output
+2026-09-12 01:28:01   signal:  zeros
+2026-09-12 01:28:01   release: idle - release after 30s with no audio
+2026-09-12 01:28:01   hotkey:  Ctrl+Win+F12 toggles keep-alive
+2026-09-12 01:28:01   dialog:  Ctrl+Win+F11 opens the settings, as does the tray
+2026-09-12 01:28:01   wake:    on - any input brings keep-alive back
+2026-09-12 01:28:01   earcons: on at 10% - when switched on or off by hand; automatic releases are silent
+2026-09-12 01:28:01   resume:  keep-alive was left on - restoring it, silently
+2026-09-12 01:28:01   logging: on - state changes, plus detailed troubleshooting lines
+2026-09-12 01:28:01 output devices available:
+2026-09-12 01:28:01   Headphones (soundcore AeroClip)
+2026-09-12 01:28:01   Speaker/HP (Realtek High Definition Audio)
+2026-09-12 01:28:01 autostart: on, by a scheduled task that runs at sign-in
+2026-09-12 01:28:01 tray icon added, shell notification version 4 accepted
+2026-09-12 01:28:01 hotkey Ctrl+Win+F12 registered (toggles keep-alive)
+2026-09-12 01:28:01 hotkey Ctrl+Win+F11 registered (opens the settings)
+2026-09-12 01:28:01 keep-alive was left on - restoring it
+2026-09-12 01:28:01 keep-alive ON  device='Headphones (soundcore AeroClip)' signal=zeros release=idle 30s
+2026-09-12 01:28:01 device opened in 23 ms
+2026-09-12 01:28:01 audio detected, peak 0.4044
+2026-09-12 01:28:01 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:28:04 audio detected, peak 0.5741
+2026-09-12 01:28:04 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:28:06 audio detected, peak 0.0964
+2026-09-12 01:28:06 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:28:10 audio detected, peak 0.5258
+2026-09-12 01:28:11 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:28:12 audio detected, peak 0.0903
+2026-09-12 01:28:12 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:28:13 audio detected, peak 0.0991
+2026-09-12 01:28:14 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:28:16 audio detected, peak 0.5801
+2026-09-12 01:28:17 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:28:17 audio detected, peak 0.5589
+2026-09-12 01:28:18 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:28:19 audio detected, peak 0.2852
+2026-09-12 01:28:20 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:28:21 audio detected, peak 0.0678
+2026-09-12 01:28:23 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:28:24 audio detected, peak 0.4196
+2026-09-12 01:28:24 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:28:24 audio detected, peak 0.4182
+2026-09-12 01:28:25 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:28:25 audio detected, peak 0.4510
+2026-09-12 01:28:26 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:28:26 audio detected, peak 0.4429
+2026-09-12 01:28:27 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:28:27 audio detected, peak 0.7047
+2026-09-12 01:28:29 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:28:30 audio detected, peak 0.3425
+2026-09-12 01:28:31 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:28:32 audio detected, peak 0.2830
+2026-09-12 01:28:34 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:28:35 audio detected, peak 0.4588
+2026-09-12 01:28:35 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:28:37 settings changed from the dialog and saved
+2026-09-12 01:28:37   device:  default output
+2026-09-12 01:28:37   signal:  zeros
+2026-09-12 01:28:37   release: idle - release after 30s with no audio
+2026-09-12 01:28:37   hotkey:  Ctrl+Win+F12 toggles keep-alive
+2026-09-12 01:28:37   dialog:  Ctrl+Win+F11 opens the settings, as does the tray
+2026-09-12 01:28:37   wake:    on - any input brings keep-alive back
+2026-09-12 01:28:37   earcons: on at 10% - when switched on or off by hand; automatic releases are silent
+2026-09-12 01:28:37   resume:  keep-alive was left on - restoring it, silently
+2026-09-12 01:28:37   logging: on - state changes, plus detailed troubleshooting lines
+2026-09-12 01:28:37 settings reloaded
+2026-09-12 01:28:37 keep-alive ON  device='Headphones (soundcore AeroClip)' signal=zeros release=idle 30s
+2026-09-12 01:28:37 device opened in 26 ms
+2026-09-12 01:28:37 audio detected, peak 0.4378
+2026-09-12 01:28:41 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:28:41 audio detected, peak 0.5671
+2026-09-12 01:28:41 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:28:42 audio detected, peak 0.5619
+2026-09-12 01:28:43 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:28:44 audio detected, peak 0.0279
+2026-09-12 01:28:47 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:28:47 audio detected, peak 0.4601
+2026-09-12 01:28:47 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:28:48 audio detected, peak 0.5208
+2026-09-12 01:28:48 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:28:48 audio detected, peak 0.0893
+2026-09-12 01:28:50 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:28:50 audio detected, peak 0.7116
+2026-09-12 01:28:51 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:28:54 audio detected, peak 0.5604
+2026-09-12 01:28:56 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:28:57 audio detected, peak 0.3706
+2026-09-12 01:28:59 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:28:59 audio detected, peak 0.4220
+2026-09-12 01:29:00 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:29:00 audio detected, peak 0.3615
+2026-09-12 01:29:03 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:29:03 audio detected, peak 0.0162
+2026-09-12 01:29:05 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:29:06 audio detected, peak 0.0085
+2026-09-12 01:29:06 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:29:06 audio detected, peak 0.4081
+2026-09-12 01:29:06 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:29:07 audio detected, peak 0.4203
+2026-09-12 01:29:07 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:29:07 audio detected, peak 0.5569
+2026-09-12 01:29:08 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:29:08 audio detected, peak 0.0665
+2026-09-12 01:29:08 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:29:09 audio detected, peak 0.6414
+2026-09-12 01:29:11 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:29:11 audio detected, peak 0.6416
+2026-09-12 01:29:13 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:29:14 audio detected, peak 0.6387
+2026-09-12 01:29:16 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:29:17 audio detected, peak 0.6396
+2026-09-12 01:29:22 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:29:22 audio detected, peak 0.0684
+2026-09-12 01:29:25 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:29:25 audio detected, peak 0.4835
+2026-09-12 01:29:26 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:29:27 audio detected, peak 0.4571
+2026-09-12 01:29:30 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:29:30 audio detected, peak 0.4858
+2026-09-12 01:29:31 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:29:32 audio detected, peak 0.4106
+2026-09-12 01:29:34 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:29:35 audio detected, peak 0.0594
+2026-09-12 01:29:36 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:29:38 audio detected, peak 0.1459
+2026-09-12 01:29:38 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:29:38 audio detected, peak 0.4503
+2026-09-12 01:29:39 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:29:39 audio detected, peak 0.5569
+2026-09-12 01:29:40 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:29:41 audio detected, peak 0.4858
+2026-09-12 01:29:41 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:29:42 audio detected, peak 0.4234
+2026-09-12 01:29:42 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:29:43 audio detected, peak 0.0774
+2026-09-12 01:29:44 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:29:45 audio detected, peak 0.6401
+2026-09-12 01:29:46 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:29:46 audio detected, peak 0.5590
+2026-09-12 01:29:46 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:29:48 audio detected, peak 0.0863
+2026-09-12 01:29:52 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:29:53 audio detected, peak 0.6402
+2026-09-12 01:29:56 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:29:56 audio detected, peak 0.6383
+2026-09-12 01:29:59 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:29:59 audio detected, peak 0.4754
+2026-09-12 01:30:00 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:30:00 audio detected, peak 0.6402
+2026-09-12 01:30:01 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:30:01 audio detected, peak 0.2420
+2026-09-12 01:30:01 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:30:03 audio detected, peak 0.6406
+2026-09-12 01:30:05 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:30:07 audio detected, peak 0.4848
+2026-09-12 01:30:08 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:30:10 audio detected, peak 0.1889
+2026-09-12 01:30:12 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:30:14 audio detected, peak 0.4534
+2026-09-12 01:30:15 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:30:15 audio detected, peak 0.4526
+2026-09-12 01:30:18 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:30:19 audio detected, peak 0.5803
+2026-09-12 01:30:20 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:30:20 audio detected, peak 0.0992
+2026-09-12 01:30:21 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:30:21 audio detected, peak 0.4142
+2026-09-12 01:30:22 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:30:22 audio detected, peak 0.5695
+2026-09-12 01:30:23 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:30:25 audio detected, peak 0.4602
+2026-09-12 01:30:25 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:30:25 audio detected, peak 0.4855
+2026-09-12 01:30:25 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:30:27 audio detected, peak 0.6798
+2026-09-12 01:30:27 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:30:28 audio detected, peak 0.6706
+2026-09-12 01:30:28 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:30:29 audio detected, peak 0.6734
+2026-09-12 01:30:29 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:30:29 audio detected, peak 0.2790
+2026-09-12 01:30:30 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:30:30 audio detected, peak 0.0650
+2026-09-12 01:30:30 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:30:30 audio detected, peak 0.5459
+2026-09-12 01:30:30 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:30:31 audio detected, peak 0.6785
+2026-09-12 01:30:31 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:30:31 audio detected, peak 0.5605
+2026-09-12 01:30:31 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:30:31 audio detected, peak 0.4597
+2026-09-12 01:30:32 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:30:32 audio detected, peak 0.4747
+2026-09-12 01:30:33 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:30:33 audio detected, peak 0.5442
+2026-09-12 01:30:34 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:30:35 audio detected, peak 0.5512
+2026-09-12 01:30:35 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:30:35 audio detected, peak 0.4690
+2026-09-12 01:30:36 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:30:36 audio detected, peak 0.2815
+2026-09-12 01:30:36 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:30:37 audio detected, peak 0.4054
+2026-09-12 01:30:38 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:30:38 audio detected, peak 0.0086
+2026-09-12 01:30:39 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:30:39 audio detected, peak 0.2652
+2026-09-12 01:30:40 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:30:42 audio detected, peak 0.4170
+2026-09-12 01:30:43 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:30:44 audio detected, peak 0.5783
+2026-09-12 01:30:44 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:30:44 audio detected, peak 0.3586
+2026-09-12 01:30:46 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:30:46 audio detected, peak 0.5901
+2026-09-12 01:30:48 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:30:48 audio detected, peak 0.0224
+2026-09-12 01:30:49 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:30:49 audio detected, peak 0.5293
+2026-09-12 01:30:50 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:30:50 audio detected, peak 0.0203
+2026-09-12 01:30:50 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:30:51 audio detected, peak 0.4522
+2026-09-12 01:30:52 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:30:53 audio detected, peak 0.4380
+2026-09-12 01:30:54 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:30:55 audio detected, peak 0.4337
+2026-09-12 01:30:55 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:30:57 audio detected, peak 0.4441
+2026-09-12 01:30:59 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:30:59 audio detected, peak 0.4546
+2026-09-12 01:31:01 audio stopped, peak 0.0001; letting go in 30s unless something plays
+2026-09-12 01:31:01 audio detected, peak 0.5718
+2026-09-12 01:31:01 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:31:01 audio detected, peak 0.4510
+2026-09-12 01:31:03 audio stopped, peak 0.0002; letting go in 30s unless something plays
+2026-09-12 01:31:03 audio detected, peak 0.4401
+2026-09-12 01:31:04 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:31:05 audio detected, peak 0.4382
+2026-09-12 01:31:05 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:31:05 audio detected, peak 0.0086
+2026-09-12 01:31:05 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:31:06 audio detected, peak 0.1829
+2026-09-12 01:31:07 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:31:08 audio detected, peak 0.0757
+2026-09-12 01:31:09 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:31:10 audio detected, peak 0.4343
+2026-09-12 01:31:12 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:31:12 audio detected, peak 0.3590
+2026-09-12 01:31:12 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:31:13 audio detected, peak 0.2807
+2026-09-12 01:31:13 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:31:13 audio detected, peak 0.4830
+2026-09-12 01:31:14 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:31:14 audio detected, peak 0.5503
+2026-09-12 01:31:16 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:31:17 audio detected, peak 0.4824
+2026-09-12 01:31:18 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:31:21 audio detected, peak 0.4941
+2026-09-12 01:31:22 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:31:23 audio detected, peak 0.4471
+2026-09-12 01:31:24 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:31:24 audio detected, peak 0.4580
+2026-09-12 01:31:24 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:31:26 audio detected, peak 0.1048
+2026-09-12 01:31:27 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:31:27 audio detected, peak 0.5117
+2026-09-12 01:31:27 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:31:28 settings changed from the dialog and saved
+2026-09-12 01:31:28   device:  default output
+2026-09-12 01:31:28   signal:  zeros
+2026-09-12 01:31:28   release: idle - release after 30s with no audio
+2026-09-12 01:31:28   hotkey:  Ctrl+Win+F12 toggles keep-alive
+2026-09-12 01:31:28   dialog:  Ctrl+Win+F11 opens the settings, as does the tray
+2026-09-12 01:31:28   wake:    on - any input brings keep-alive back
+2026-09-12 01:31:28   earcons: on at 10% - when switched on or off by hand; automatic releases are silent
+2026-09-12 01:31:28   resume:  keep-alive was left on - restoring it, silently
+2026-09-12 01:31:28   logging: on - state changes, plus detailed troubleshooting lines
+2026-09-12 01:31:28 settings reloaded
+2026-09-12 01:31:28 keep-alive ON  device='Headphones (soundcore AeroClip)' signal=zeros release=idle 30s
+2026-09-12 01:31:28 device opened in 27 ms
+2026-09-12 01:31:28 audio detected, peak 0.4637
+2026-09-12 01:31:29 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:31:34 audio detected, peak 0.2889
+2026-09-12 01:31:36 keep-alive OFF (StableSound closing) after 214s - device released
+2026-09-12 01:31:36 engine stopped
+2026-09-12 01:31:36 stopped
+2026-09-12 01:31:56 StableSound 0.1.0 starting
+2026-09-12 01:31:56 settings file: C:\Users\ldefo\AppData\Roaming\StableSound\stablesound.conf
+2026-09-12 01:31:56   device:  default output
+2026-09-12 01:31:56   signal:  zeros
+2026-09-12 01:31:56   release: idle - release after 30s with no audio
+2026-09-12 01:31:56   hotkey:  Ctrl+Win+F12 toggles keep-alive
+2026-09-12 01:31:56   dialog:  Ctrl+Win+F11 opens the settings, as does the tray
+2026-09-12 01:31:56   wake:    on - any input brings keep-alive back
+2026-09-12 01:31:56   earcons: on at 10% - when switched on or off by hand; automatic releases are silent
+2026-09-12 01:31:56   resume:  keep-alive was left on - restoring it, silently
+2026-09-12 01:31:56   logging: on - state changes, plus detailed troubleshooting lines
+2026-09-12 01:31:57 output devices available:
+2026-09-12 01:31:57   Headphones (soundcore AeroClip)
+2026-09-12 01:31:57   Speaker/HP (Realtek High Definition Audio)
+2026-09-12 01:31:57 autostart: off
+2026-09-12 01:31:57 tray icon added, shell notification version 4 accepted
+2026-09-12 01:31:57 hotkey Ctrl+Win+F12 registered (toggles keep-alive)
+2026-09-12 01:31:57 hotkey Ctrl+Win+F11 registered (opens the settings)
+2026-09-12 01:31:57 keep-alive was left on - restoring it
+2026-09-12 01:31:57 keep-alive ON  device='Headphones (soundcore AeroClip)' signal=zeros release=idle 30s
+2026-09-12 01:31:57 device opened in 26 ms
+2026-09-12 01:31:57 audio detected, peak 0.2813
+2026-09-12 01:31:57 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:32:03 audio detected, peak 0.2880
+2026-09-12 01:32:04 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:32:06 audio detected, peak 0.4750
+2026-09-12 01:32:07 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:32:08 audio detected, peak 0.4497
+2026-09-12 01:32:08 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:32:09 audio detected, peak 0.4490
+2026-09-12 01:32:11 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:32:11 audio detected, peak 0.4671
+2026-09-12 01:32:11 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:32:13 audio detected, peak 0.5639
+2026-09-12 01:32:15 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:32:15 audio detected, peak 0.3457
+2026-09-12 01:32:17 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:32:17 audio detected, peak 0.2920
+2026-09-12 01:32:18 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:32:19 audio detected, peak 0.4767
+2026-09-12 01:32:19 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:32:21 audio detected, peak 0.4336
+2026-09-12 01:32:25 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:32:25 audio detected, peak 0.6410
+2026-09-12 01:32:27 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:32:28 audio detected, peak 0.4609
+2026-09-12 01:32:31 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:32:32 audio detected, peak 0.5220
+2026-09-12 01:32:37 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:32:39 audio detected, peak 0.0288
+2026-09-12 01:32:39 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:32:40 audio detected, peak 0.6407
+2026-09-12 01:32:42 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:32:45 audio detected, peak 0.4766
+2026-09-12 01:32:45 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:32:46 audio detected, peak 0.2210
+2026-09-12 01:32:48 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:32:48 audio detected, peak 0.4255
+2026-09-12 01:32:48 audio stopped, peak 0.0003; letting go in 30s unless something plays
+2026-09-12 01:32:49 audio detected, peak 0.0624
+2026-09-12 01:32:50 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:32:50 audio detected, peak 0.4830
+2026-09-12 01:32:50 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:32:52 audio detected, peak 0.4279
+2026-09-12 01:32:53 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:32:54 audio detected, peak 0.4472
+2026-09-12 01:32:55 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:32:55 audio detected, peak 0.0844
+2026-09-12 01:32:56 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:32:56 audio detected, peak 0.0617
+2026-09-12 01:32:58 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:32:59 audio detected, peak 0.4367
+2026-09-12 01:33:00 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:33:00 audio detected, peak 0.4370
+2026-09-12 01:33:01 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:33:01 audio detected, peak 0.0086
+2026-09-12 01:33:02 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:33:04 audio detected, peak 0.4565
+2026-09-12 01:33:04 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:33:05 audio detected, peak 0.4937
+2026-09-12 01:33:05 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:33:05 audio detected, peak 0.3482
+2026-09-12 01:33:05 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:33:06 audio detected, peak 0.3439
+2026-09-12 01:33:07 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:33:07 audio detected, peak 0.0762
+2026-09-12 01:33:08 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:33:09 audio detected, peak 0.2827
+2026-09-12 01:33:10 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:33:10 audio detected, peak 0.6762
+2026-09-12 01:33:11 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:33:11 audio detected, peak 0.0676
+2026-09-12 01:33:11 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:33:12 audio detected, peak 0.6746
+2026-09-12 01:33:12 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:33:13 audio detected, peak 0.4658
+2026-09-12 01:33:13 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:33:13 audio detected, peak 0.4349
+2026-09-12 01:33:15 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:33:15 audio detected, peak 0.1031
+2026-09-12 01:33:17 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:33:17 audio detected, peak 0.4470
+2026-09-12 01:33:18 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:33:18 audio detected, peak 0.5648
+2026-09-12 01:33:18 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:33:24 audio detected, peak 0.1837
+2026-09-12 01:33:24 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:33:25 audio detected, peak 0.4901
+2026-09-12 01:33:27 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:33:28 audio detected, peak 0.4529
+2026-09-12 01:33:28 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:33:29 audio detected, peak 0.0005
+2026-09-12 01:33:30 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:33:30 audio detected, peak 0.4959
+2026-09-12 01:33:31 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:33:31 audio detected, peak 0.4552
+2026-09-12 01:33:32 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:33:32 audio detected, peak 0.1114
+2026-09-12 01:33:32 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:33:32 settings changed from the dialog and saved
+2026-09-12 01:33:32   device:  default output
+2026-09-12 01:33:32   signal:  zeros
+2026-09-12 01:33:32   release: idle - release after 30s with no audio
+2026-09-12 01:33:32   hotkey:  Ctrl+Win+F12 toggles keep-alive
+2026-09-12 01:33:32   dialog:  Ctrl+Win+F11 opens the settings, as does the tray
+2026-09-12 01:33:32   wake:    on - any input brings keep-alive back
+2026-09-12 01:33:32   earcons: on at 10% - when switched on or off by hand; automatic releases are silent
+2026-09-12 01:33:32   resume:  keep-alive was left on - restoring it, silently
+2026-09-12 01:33:32   logging: on - state changes, plus detailed troubleshooting lines
+2026-09-12 01:33:32 settings reloaded
+2026-09-12 01:33:32 keep-alive ON  device='Headphones (soundcore AeroClip)' signal=zeros release=idle 30s
+2026-09-12 01:33:32 device opened in 27 ms
+2026-09-12 01:33:33 audio detected, peak 0.4194
+2026-09-12 01:33:34 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:33:36 audio detected, peak 0.2895
+2026-09-12 01:33:38 keep-alive OFF (StableSound closing) after 101s - device released
+2026-09-12 01:33:38 engine stopped
+2026-09-12 01:33:38 stopped
+2026-09-12 01:33:46 StableSound 0.1.0 starting
+2026-09-12 01:33:46 settings file: C:\Users\ldefo\AppData\Roaming\StableSound\stablesound.conf
+2026-09-12 01:33:46   device:  default output
+2026-09-12 01:33:46   signal:  zeros
+2026-09-12 01:33:46   release: idle - release after 30s with no audio
+2026-09-12 01:33:46   hotkey:  Ctrl+Win+F12 toggles keep-alive
+2026-09-12 01:33:46   dialog:  Ctrl+Win+F11 opens the settings, as does the tray
+2026-09-12 01:33:46   wake:    on - any input brings keep-alive back
+2026-09-12 01:33:46   earcons: on at 10% - when switched on or off by hand; automatic releases are silent
+2026-09-12 01:33:46   resume:  keep-alive was left on - restoring it, silently
+2026-09-12 01:33:46   logging: on - state changes, plus detailed troubleshooting lines
+2026-09-12 01:33:46 output devices available:
+2026-09-12 01:33:46   Headphones (soundcore AeroClip)
+2026-09-12 01:33:46   Speaker/HP (Realtek High Definition Audio)
+2026-09-12 01:33:46 autostart: on, by a scheduled task that runs at sign-in
+2026-09-12 01:33:46 tray icon added, shell notification version 4 accepted
+2026-09-12 01:33:46 hotkey Ctrl+Win+F12 registered (toggles keep-alive)
+2026-09-12 01:33:46 hotkey Ctrl+Win+F11 registered (opens the settings)
+2026-09-12 01:33:46 keep-alive was left on - restoring it
+2026-09-12 01:33:46 keep-alive ON  device='Headphones (soundcore AeroClip)' signal=zeros release=idle 30s
+2026-09-12 01:33:46 device opened in 23 ms
+2026-09-12 01:33:46 audio detected, peak 0.2471
+2026-09-12 01:33:46 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:33:50 audio detected, peak 0.0515
+2026-09-12 01:33:51 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:33:52 audio detected, peak 0.0875
+2026-09-12 01:33:54 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:33:55 audio detected, peak 0.4188
+2026-09-12 01:33:55 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:33:56 audio detected, peak 0.4531
+2026-09-12 01:33:56 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:33:57 audio detected, peak 0.1057
+2026-09-12 01:33:59 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:34:01 audio detected, peak 0.7109
+2026-09-12 01:34:02 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:34:03 audio detected, peak 0.5193
+2026-09-12 01:34:03 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:34:05 audio detected, peak 0.2914
+2026-09-12 01:34:06 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:34:08 audio detected, peak 0.4148
+2026-09-12 01:34:15 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:34:16 audio detected, peak 0.4683
+2026-09-12 01:34:16 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:34:16 audio detected, peak 0.6411
+2026-09-12 01:34:19 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:34:21 audio detected, peak 0.5229
+2026-09-12 01:34:26 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:34:29 audio detected, peak 0.4894
+2026-09-12 01:34:30 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:34:31 audio detected, peak 0.6402
+2026-09-12 01:34:33 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:34:34 audio detected, peak 0.4845
+2026-09-12 01:34:35 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:34:35 audio detected, peak 0.6401
+2026-09-12 01:34:38 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:34:39 audio detected, peak 0.4217
+2026-09-12 01:34:40 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:34:41 audio detected, peak 0.5662
+2026-09-12 01:34:41 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:34:44 audio detected, peak 0.3443
+2026-09-12 01:34:45 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:34:45 audio detected, peak 0.5031
+2026-09-12 01:34:45 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:34:46 audio detected, peak 0.0670
+2026-09-12 01:34:46 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:34:48 audio detected, peak 0.4068
+2026-09-12 01:34:48 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:34:49 audio detected, peak 0.6781
+2026-09-12 01:34:49 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:34:49 audio detected, peak 0.4813
+2026-09-12 01:34:50 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:34:50 audio detected, peak 0.4765
+2026-09-12 01:34:50 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:34:51 audio detected, peak 0.0086
+2026-09-12 01:34:51 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:34:52 audio detected, peak 0.1833
+2026-09-12 01:34:53 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:34:53 audio detected, peak 0.4706
+2026-09-12 01:34:53 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:34:53 audio detected, peak 0.0086
+2026-09-12 01:34:54 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:34:54 audio detected, peak 0.4294
+2026-09-12 01:34:54 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:34:55 audio detected, peak 0.0190
+2026-09-12 01:34:55 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:34:56 audio detected, peak 0.0201
+2026-09-12 01:34:57 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:34:58 audio detected, peak 0.3605
+2026-09-12 01:34:59 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:35:01 audio detected, peak 0.0280
+2026-09-12 01:35:02 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:35:04 audio detected, peak 0.3835
+2026-09-12 01:35:05 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:35:06 audio detected, peak 0.3314
+2026-09-12 01:35:07 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:35:07 audio detected, peak 0.5525
+2026-09-12 01:35:07 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:35:08 audio detected, peak 0.4282
+2026-09-12 01:35:09 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:35:10 audio detected, peak 0.5782
+2026-09-12 01:35:10 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:35:11 audio detected, peak 0.5853
+2026-09-12 01:35:11 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:35:11 audio detected, peak 0.4370
+2026-09-12 01:35:12 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:35:13 audio detected, peak 0.4396
+2026-09-12 01:35:13 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:35:13 audio detected, peak 0.2779
+2026-09-12 01:35:14 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:35:14 audio detected, peak 0.0162
+2026-09-12 01:35:16 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:35:16 audio detected, peak 0.0267
+2026-09-12 01:35:17 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:35:17 audio detected, peak 0.4399
+2026-09-12 01:35:18 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:35:18 audio detected, peak 0.4471
+2026-09-12 01:35:18 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:35:19 audio detected, peak 0.5710
+2026-09-12 01:35:19 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:35:22 audio detected, peak 0.5441
+2026-09-12 01:35:22 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:35:23 audio detected, peak 0.4874
+2026-09-12 01:35:23 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:35:31 audio detected, peak 0.5753
+2026-09-12 01:35:32 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:35:32 audio detected, peak 0.0186
+2026-09-12 01:35:32 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:35:33 audio detected, peak 0.5015
+2026-09-12 01:35:33 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:35:34 audio detected, peak 0.1458
+2026-09-12 01:35:35 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:35:35 audio detected, peak 0.1178
+2026-09-12 01:35:35 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:35:36 audio detected, peak 0.4590
+2026-09-12 01:35:36 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:35:37 audio detected, peak 0.6238
+2026-09-12 01:35:37 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:35:37 audio detected, peak 0.6412
+2026-09-12 01:35:38 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:35:39 audio detected, peak 0.3923
+2026-09-12 01:35:39 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:35:44 audio detected, peak 0.4364
+2026-09-12 01:35:45 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:35:45 audio detected, peak 0.1149
+2026-09-12 01:35:45 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:35:53 audio detected, peak 0.3393
+2026-09-12 01:35:54 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:35:54 audio detected, peak 0.4664
+2026-09-12 01:35:54 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:35:55 audio detected, peak 0.0087
+2026-09-12 01:35:56 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:35:57 audio detected, peak 0.4351
+2026-09-12 01:35:57 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:35:58 audio detected, peak 0.5012
+2026-09-12 01:35:58 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:35:59 audio detected, peak 0.6239
+2026-09-12 01:35:59 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:36:02 audio detected, peak 0.3796
+2026-09-12 01:36:02 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:36:05 audio detected, peak 0.0088
+2026-09-12 01:36:05 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:36:07 audio detected, peak 0.4886
+2026-09-12 01:36:07 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:36:08 audio detected, peak 0.6300
+2026-09-12 01:36:09 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:36:11 audio detected, peak 0.4248
+2026-09-12 01:36:11 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:36:12 audio detected, peak 0.4951
+2026-09-12 01:36:12 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:36:13 audio detected, peak 0.5031
+2026-09-12 01:36:13 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:36:15 audio detected, peak 0.4717
+2026-09-12 01:36:16 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:36:16 audio detected, peak 0.4766
+2026-09-12 01:36:16 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:36:17 audio detected, peak 0.3152
+2026-09-12 01:36:18 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:36:19 audio detected, peak 0.4588
+2026-09-12 01:36:19 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:36:19 audio detected, peak 0.5121
+2026-09-12 01:36:19 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:36:20 audio detected, peak 0.6706
+2026-09-12 01:36:21 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:36:23 audio detected, peak 0.0477
+2026-09-12 01:36:23 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:36:24 audio detected, peak 0.0580
+2026-09-12 01:36:24 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:36:25 audio detected, peak 0.4706
+2026-09-12 01:36:25 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:36:26 audio detected, peak 0.6217
+2026-09-12 01:36:26 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:36:27 audio detected, peak 0.5401
+2026-09-12 01:36:27 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:36:28 audio detected, peak 0.6393
+2026-09-12 01:36:28 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:36:29 audio detected, peak 0.3734
+2026-09-12 01:36:29 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:36:30 audio detected, peak 0.4578
+2026-09-12 01:36:30 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:36:31 audio detected, peak 0.3789
+2026-09-12 01:36:32 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:36:32 audio detected, peak 0.5078
+2026-09-12 01:36:32 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:36:33 audio detected, peak 0.4053
+2026-09-12 01:36:33 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:36:34 audio detected, peak 0.6237
+2026-09-12 01:36:34 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:36:35 audio detected, peak 0.4707
+2026-09-12 01:36:36 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:36:36 audio detected, peak 0.4773
+2026-09-12 01:36:37 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:36:41 audio detected, peak 0.2853
+2026-09-12 01:36:42 audio stopped, peak 0.0002; letting go in 30s unless something plays
+2026-09-12 01:36:46 audio detected, peak 0.0887
+2026-09-12 01:36:46 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:36:48 audio detected, peak 0.4870
+2026-09-12 01:36:49 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:36:51 audio detected, peak 0.2814
+2026-09-12 01:36:52 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:36:52 audio detected, peak 0.4921
+2026-09-12 01:36:53 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:36:53 audio detected, peak 0.4138
+2026-09-12 01:36:55 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:36:55 audio detected, peak 0.2912
+2026-09-12 01:36:56 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:36:57 audio detected, peak 0.4608
+2026-09-12 01:36:57 audio stopped, peak 0.0000; letting go in 30s unless something plays
+2026-09-12 01:37:03 audio detected, peak 0.0546

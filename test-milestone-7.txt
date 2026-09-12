@@ -1,0 +1,353 @@
+STABLESOUND - MILESTONE 7 HARDWARE ROUND
+Tests 52 to 57.
+
+The Milestone 6 round passed every test first time, and you asked for four
+things at the end of it. Three are built and are what this round checks. The
+fourth is a question I cannot answer for you, and it is at the bottom of this
+file with an ANSWER line of its own.
+
+This is a short round. There is only one new behaviour in it - StableSound
+now remembers whether keep-alive was on and comes back that way - but it is
+the kind of thing that fails invisibly, so most of the round is spent on the
+four different ways you can leave it and pick it up again.
+
+
+WHAT YOU ASKED FOR, AND WHAT HAPPENED
+
+1. "I would like the keep-alive state to persist between runs... so one could
+   basically start the machine and have keep-alive kick in automatically so
+   that it all becomes set it and forget it, with no tone playing if the app
+   starts with keep-alive already active."
+
+   Built. StableSound writes one line in stablesound.conf, keep_alive, every
+   time you switch keep-alive on or off, and reads it back at startup. If it
+   was on, it comes on again - with no tone, as you asked.
+
+   One decision I made that you should know about, because it changes what
+   you will see: what gets remembered is what YOU last chose, not whether the
+   headphones happened to be held at the moment you shut down. Letting go on
+   the 30-second timer does not count as switching off. If it did, the answer
+   would depend on whether anything had spoken in the half minute before you
+   closed the lid, which is not something anyone could predict. So: you
+   switched it on, it comes back on, even if it had gone quiet first. Tests
+   52 to 54 check each case separately.
+
+2. "Make sure to refer to the system tray instead of the notification area."
+
+   Done, everywhere you read: the help, the README, and the two messages the
+   app itself puts on screen. There is one exception I left in on purpose -
+   the help's tray section says in brackets that Windows itself calls it the
+   notification area - because Windows' own settings use that phrase and I did
+   not want you stranded if you went looking for it there. Say the word and
+   it goes.
+
+3. "The writing makes sense to me, but is maybe a bit dense for a new user."
+
+   Reworked, at the front rather than throughout - nothing was missing and the
+   headings worked, so the problem was the first two minutes. "Getting
+   started" is now the first section, ahead of "What it is for", and it is
+   three bullets and a note. It ends by saying the rest of the page is detail
+   you do not need. Test 57 asks whether that is enough.
+
+4. "Please confirm that only the .exe file needs to be distributed - I see
+   there's a whole lot in the release folder."
+
+   Confirmed: only stablesound.exe. Nothing else ships, and nothing else is
+   needed. The help document, the settings dialog and the icon are all
+   compiled inside the exe.
+
+   What you are seeing in target\release is a build folder, which is a
+   different thing from a release. Of the files in it:
+
+     stablesound.exe          the program. This, and only this.
+     stablesound.pdb          debug symbols, for reading a crash. Not needed.
+     stablesound.d            a list of source files, for cargo. Not needed.
+     deps\, build\,           the build cache, so a rebuild is quick.
+     incremental\,
+     .fingerprint\
+     stablesound.conf         your settings - written by the app, because you
+                              have been running it from that folder.
+     stablesound.log          your log - same reason.
+     stablesound-help.html    the help, written out each time you open it -
+                              same reason.
+
+   The last three are not part of the program. They are what the program
+   leaves behind wherever it runs, and if you copy the exe somewhere else it
+   will make its own. I have also corrected the help and the README, which
+   both said StableSound keeps two files beside itself. It keeps three - the
+   help copy was missing from the list.
+
+   For a release: one file, stablesound.exe.
+
+
+BEFORE YOU START
+
+Build the new version:
+
+    cargo build --release
+
+If a StableSound from an earlier session is still running, exit it first.
+
+Turn logging on before anything else, or there will be nothing to read
+afterwards:
+
+  1. Run target\release\stablesound.exe
+  2. Press Ctrl+Win+F11 to open the settings.
+  3. Tick "Write a log file, so a problem can be looked into later".
+  4. Tick "Detailed logging, for troubleshooting".
+  5. Press Enter for OK.
+
+Did that work, and did the dialog close?
+ANSWER:
+Yes.
+The log now has a new line in it near the top, starting with "resume:", which
+says what state StableSound started in. It is there so that if any of the
+tests below go oddly, the log says what it thought it was doing.
+
+
+TEST 52 - IT COMES BACK ON
+
+Press Ctrl+Win+F12 to switch keep-alive ON. You should hear the rising tone.
+ANSWER (did it come on?):
+Yes.
+Now exit StableSound - the tray menu, or the Exit button in the settings,
+whichever you prefer.
+
+Did you hear the off-tone on the way out, the same as last round?
+ANSWER:
+Yes.
+
+Start StableSound again.
+
+The important part. Did keep-alive come on by itself, without you pressing
+anything? Check with Windows+B and arrow to the icon - it should read
+"StableSound Headphones awake".
+ANSWER:
+Yes.
+
+Was it silent? There should be NO tone at all when it starts this way.
+ANSWER:
+Yes.
+
+ANYTHING ODD:
+No, works perfectly.
+
+TEST 53 - AND IT STAYS OFF
+
+The other half. With keep-alive currently on from the last test, press
+Ctrl+Win+F12 to switch it OFF by hand. You should hear the falling tone.
+ANSWER (did it go off?):
+Yes.
+
+Exit StableSound, then start it again.
+
+Did it stay off - icon reading "StableSound Headphones free", headphones still
+available to your iPhone?
+ANSWER:
+Yes.
+
+Does Ctrl+Win+F12 still switch it on normally from there?
+ANSWER:
+Yes.
+
+ANYTHING ODD:
+No, works perfectly.
+
+
+TEST 54 - LETTING GO ON THE TIMER IS NOT SWITCHING OFF
+
+This is the decision described at the top of the file, and the one most likely
+to feel wrong if I have judged it badly.
+
+Switch keep-alive ON with Ctrl+Win+F12.
+
+Now leave the machine quiet for a minute or so, long enough for the 30-second
+timer to let the headphones go on its own. You will hear nothing - automatic
+releases are silent. Check with Windows+B if you want to be sure it has gone
+to "Headphones free".
+ANSWER (did it release on its own?):
+Yes, it released on its own.
+
+Without pressing the hotkey, exit StableSound and start it again.
+
+Keep-alive should come back ON, because the last thing YOU did was switch it
+on - the timer letting go in the meantime does not count. Did it?
+ANSWER:
+Yes, all good as expected.
+
+Is that the behaviour you want? The alternative would be that a quiet spell
+before you shut down means it starts off next time. I think that would be
+unpredictable, but you are the one who has to live with it.
+ANSWER:
+This is exactly the behavior I want.
+
+ANYTHING ODD:
+No, perfect.
+
+
+TEST 55 - THE SETTINGS DIALOG DOES NOT UNDO IT
+
+A small one, guarding against a bug rather than checking a feature. The
+settings dialog has no control for the remembered state, and your hotkey keeps
+working while the dialog is open - so it would be easy for pressing OK to
+quietly put back whatever was true when you opened it.
+
+Switch keep-alive OFF with Ctrl+Win+F12, so it is off to start with.
+
+Open the settings with Ctrl+Win+F11 and leave the dialog open.
+
+With the dialog still open, press Ctrl+Win+F12 to switch keep-alive ON. It
+should come on with its tone, as it always has while the dialog is open.
+ANSWER (did it?):
+Yes.
+
+Now press Enter for OK on the dialog.
+
+Is keep-alive still on? It should not have been switched off by pressing OK.
+ANSWER:
+Yes, still on.
+
+Exit StableSound and start it again. Does it come back on?
+ANSWER:
+Yes.
+
+ANYTHING ODD:
+No.
+
+
+TEST 56 - SET IT AND FORGET IT
+
+The one this was all for. Only if you are willing to sign out and back in.
+
+Make sure "Start StableSound when I sign in" is ticked in the settings, and
+that keep-alive is switched ON. Then sign out and sign back in.
+
+Did StableSound start on its own, and were the headphones already being held
+when you got to the desktop? Windows+B and arrow to the icon to check.
+ANSWER:
+Stablesound did start up with keep-alive awake, just the behaviour I want. However, I did need to wait a bit for it to happen. I can live with that, but if it could be made to start earlier, that would be ideal.
+
+Was it silent? No tone at sign-in is the intended behaviour.
+ANSWER:
+Yes.
+
+Here is the question underneath all of it: was the first thing JAWS said after
+signing in clipped, or did it come through whole?
+ANSWER:
+The first thing Jaws said was clipped.
+
+How long after signing in did it take before things felt right? A rough
+impression is fine - immediately, a few seconds, longer.
+ANSWER:
+30 seconds. Slowish computer here.
+
+ANYTHING ODD:
+No.
+
+TEST 57 - THE HELP, READ AGAIN
+
+Open the help - the Help button in the settings, F1, or the tray menu.
+
+Read the first section, "Getting started". It is now the first thing in the
+document, ahead of "What it is for", and it is meant to be everything a new
+user needs before they stop reading.
+
+If you were meeting StableSound for the first time, would that section be
+enough to use it?
+ANSWER:
+Yes, very nice.
+
+Is anything in it wrong, or missing, or still too dense?
+ANSWER:
+No, good for now. This is a vibecoded app and I don't mind the documentation being written in AI-identifiable language. Its clear and accurate and readable.
+
+Press H a few times through the whole document. Does the order still make
+sense with Getting started first?
+ANSWER:
+Yes.
+
+The document now says "system tray" throughout. Did you find any place that
+still says notification area, other than the one in brackets in the tray
+section that says Windows calls it that?
+ANSWER:
+No.
+There are two new pieces of writing about the remembered state - one under
+"Switching it on and off" called "It starts the way you left it", and one in
+the troubleshooting section called "It was already holding the headphones when
+I signed in". Do they explain it properly?
+ANSWER:
+Yes.
+
+ANYTHING ODD:
+No.
+
+
+THE ONE I COULD NOT ANSWER - STARTING EARLIER AT SIGN-IN
+
+You wrote: "would it be possible to have the app start up earlier in the
+startup sequence? Currently, other apps like Discord, which take time to get
+going, are first in the queue. As sound is my only means of reading the
+screen, I'd like that to be right as early as possible."
+
+Yes, probably - but it is a real change and I did not want to make it inside a
+shipping round without asking you first.
+
+The reason StableSound is late is not that it is slow. It starts in a fraction
+of a second. It is that "start when I sign in" writes an entry in the registry
+Run key, and Windows Explorer works through those AFTER the desktop is ready,
+with a pause before it starts and a gap between each one. Which order they go
+in is not something a program can ask for. Discord is not ahead of us because
+it is quicker; it is ahead of us because Explorer got to it first.
+
+The way round it is a scheduled task set to run at logon. Those are not
+Explorer's to delay - they fire around the sign-in itself, which should put
+StableSound seconds earlier rather than fractions of a second.
+
+Three things make me want your say-so first:
+
+  - Creating the task might need administrator rights. Scheduled tasks live in
+    a folder normal users cannot write to. I could not test this from where I
+    was working, so I genuinely do not know whether it will just work, prompt
+    you for permission at an awkward moment, or fail.
+
+  - The tickbox has to keep telling the truth. Right now it reads the registry
+    directly, so it can never claim StableSound will start when it will not.
+    Two mechanisms means two places to check, and a half-created task would be
+    a tickbox that says yes while nothing starts.
+
+  - The failure is lopsided. Starting ten seconds late costs you the first few
+    announcements. Not starting at all costs you the whole session, silently -
+    and the registry entry has worked in every round since Milestone 4.
+
+My suggestion is to ship as it stands, and do this straight afterwards as its
+own small change with its own test: try to create the task, fall back to the
+registry entry if that is refused, and have the tickbox report whichever one
+is actually in force. That way the worst case is what you have now.
+
+Which would you rather?
+  (a) Ship now, do the startup change next, on its own.
+  (b) Do the startup change first, and ship after it has been tested.
+  (c) Leave it alone - ten seconds is not worth the risk.
+ANSWER:
+b
+
+One more thing worth knowing, in case it changes your answer: if the delay
+turns out to be Windows' general startup pause rather than Discord in
+particular, there is a single Windows setting that removes that pause for
+every startup program at once. I have not touched it and would not have
+StableSound touch it - it would be changing something about your whole sign-in
+on one program's behalf. But it exists, and you may want to try it yourself
+before deciding any of this is worth it.
+
+
+AT THE END
+
+Please send the log file back with this - stablesound.log, beside
+stablesound.exe. It will have the "resume:" lines in it, which say what state
+StableSound thought it was starting in each time.
+
+Once you have sent it, you may want to turn logging back off.
+
+Is there anything else that needs doing before this goes out?
+ANSWER:
+You should have access to the log, please check it out as needed.

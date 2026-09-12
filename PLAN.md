@@ -1,28 +1,37 @@
 # StableSound - research findings and build plan
 
-## 0. Where we are (updated 2026-09-08)
+## 0. Where we are (updated 2026-09-12, after shipping 1.0.0)
 
 **Read this first when picking the project up.**
 
-Milestones 0 to 5 are complete, hardware rounds included, and so is the small
-follow-up round 5.1. Milestone 3 took **three** rounds. Milestones 4, 5 and
-5.1 took one each and all three passed.
+**StableSound 1.0.0 has shipped.** Public repository, GitHub release, the exe
+as its one asset. Milestones 0 to 8 are complete, hardware rounds included,
+plus the small follow-up round 5.1. Milestone 3 took **three** rounds;
+Milestones 4, 5, 5.1, 6, 7 and 8 took one each and all six passed.
 
-**Milestone 5.1 passed cleanly - every test, first time.** The tray icon reads
-its state once however many times it changes, a hotkey works on a punctuation
-key, a refused setting is read back with the arrow keys, and the two reversed
-defaults are what a new user meets. The tester's verdict on the whole app:
-"all works really well and I'm very pleased", and on the plan for Milestone 6:
-"this will be a great first version." Raw results in
-`test-milestone-5-1.txt`, Tests 39-43.
+**Milestone 8 answered the question the project was started to answer.**
+Milestone 7's Test 56 had found the one place StableSound was still failing at
+exactly what it exists for: started from the `Run` key it was about **30
+seconds** late at sign-in, and the first thing JAWS said was **clipped**.
+Autostart was rebuilt on a Task Scheduler logon task, keeping `Run` as a
+fallback, and the round confirmed it: "It came through whole... JAWS came up
+speaking clearly, no clipping." Keep-alive was holding the headset **17
+seconds** before anything spoke. Raw results in `test-milestone-8.txt`, Tests
+58-63; questions 33-35 have the reading of the log; the design is 6.8.
 
-**One thing came back from it**, and it is built: the heading over the message
-window now says what kind of message it is rather than how to read it. See
-4.7.
+**There is no work outstanding and no round pending.** The tester was asked
+directly whether anything was left before shipping and said no.
+
+**If you are picking this up to change something**, the two things most worth
+knowing are that the tolerant tray-icon retry path has still never run on
+hardware (question 35 - the task did not beat Explorer after all, so keep it as
+insurance but do not call it proven), and that the audio endpoint at sign-in
+opened in 256 ms against 23-29 ms on a settled desktop (question 34 - ready
+that early, but the margin is not large).
 
 ### What exists and works
 
-A finished app, waiting on its last hardware round. It keeps the headphones
+A finished, shipped app. It keeps the headphones
 awake, releases them on a timer, wakes again when you touch the machine, has a
 tray icon, a global hotkey, a real settings dialog and a help document, and can
 log to `stablesound.log` next to the exe.
@@ -30,7 +39,8 @@ log to `stablesound.log` next to the exe.
 **No console window since Milestone 6**, and no window of its own at all until
 it is asked for one. Where the console's output went is described in 6.1.
 
-Release binary is **294 KB**, against a ~1 MB budget.
+Release binary is **316 KB**, against a ~1 MB budget. The kilobyte over the
+315 KB of Milestone 7 is the version resource added for 1.0.0.
 
 ### What is proven on hardware
 
@@ -57,6 +67,22 @@ Release binary is **294 KB**, against a ~1 MB budget.
   on-tone audible from its start. Signed off in the second round.
 - Automatic transitions are silent and stay silent. "I heard no tones, which
   was perfect."
+- The remembered keep-alive state survives every way of leaving the app,
+  including a full sign-out, and comes back silently. Milestone 7, Tests 52-56.
+- **The `Run` key is too late.** Started that way, StableSound was holding the
+  headphones about 30 seconds after sign-in, and the first thing JAWS said was
+  clipped. Milestone 7, Test 56 - the measurement Milestone 8 exists to fix.
+- **A logon task is early enough, and that was the whole point.** Started that
+  way instead, keep-alive was on one second after the process began and 17
+  seconds before anything spoke, and JAWS "came up speaking clearly, no
+  clipping". The audio endpoint exists that early (256 ms to open, against
+  23-29 ms on a settled desktop) and the tray icon was not even refused.
+  Milestone 8, Tests 60-61.
+- **Autostart migrates itself, tells the truth, and cleans up after itself.**
+  An existing `Run` entry is promoted to a task on first run without being
+  asked; the tickbox reads unticked when the task points at a copy of the exe
+  that is no longer this one, and ticking repoints it; unticking leaves neither
+  mechanism behind. Milestone 8, Tests 58, 62 and 63.
 - The tray works from the keyboard. One icon, read once and correctly, `Enter`
   toggles once per press, the menu opens on the Applications key.
 - **Waking still works with the mouse handling gone**, and the trade it cost
@@ -128,22 +154,33 @@ And two things were confirmed for later rather than acted on now:
 - Behaviour across Windows sleep/resume, and on battery (question 7).
 - Whether the reworded message heading reads well under JAWS (question 26).
   Checked the same way its predecessor was - by reading what UI Automation
-  hands a screen reader - but not heard spoken. It rides along with the
-  Milestone 6 round.
+  hands a screen reader - but not heard spoken. Rode along with the Milestone 6
+  round and drew no comment.
+- **The tolerant tray-icon path has never run.** The task did not beat
+  Explorer on the one machine it has been tried on, so the icon has never
+  actually been refused, retried and added late - and the one-minute failure
+  window at the end of that path has never been seen by anyone. Question 35.
+  Insurance against a machine ordered differently from this one; keep it, but
+  do not describe it as proven.
+- **The audio endpoint at sign-in has little margin.** It was ready, but ten
+  times slower to open than on a settled desktop. A slower machine could
+  plausibly arrive before it exists, in which case device-loss recovery is what
+  has to catch it - a path proven for mid-session disconnects but not for
+  startup. Question 34.
 
 ### What is next
 
-**The Milestone 6 hardware round, and then shipping.** Milestone 6 is built:
-the console is gone and the binary is a windows subsystem one, there is a help
-document in HTML with buttons in both the dialog and the tray menu, a second
-copy of the app is prevented and says so, the README and LICENSE are written,
-and the antivirus question has been researched and answered (6.5).
+**Nothing is planned.** 1.0.0 is out and every milestone is closed.
 
-The script is `test-milestone-6.txt`, Tests 44-51. It carries question 26 - the
-reworded message heading, built after the 5.1 round and still unheard - along
-with everything Milestone 6 added.
+What would come back to this document is real-world use by someone who is not
+the tester: a headset that is not an AeroClip, a screen reader that is not
+JAWS, or Windows 10. The residual risks below are the places to look first if
+a report arrives, and the one open question that is not a risk is 30 - the
+three failure windows nobody has ever been able to provoke.
 
-**Nothing else is outstanding.** After that round it ships.
+Anything new should keep the shape the rounds established: build it, script a
+hardware round in a `test-milestone-*.txt` file with `ANSWER:` lines, fold the
+answers back in here, then ship.
 
 ### Things a fresh session should not re-litigate
 
@@ -162,6 +199,17 @@ with everything Milestone 6 added.
 - **Telling the keyboard from the mouse is closed.** Four rounds, three
   mechanisms, the tester's own decision to drop it. Do not reopen it without
   being asked.
+- **The remembered keep-alive state is what the user last chose**, not whether
+  the headset happened to be held at shutdown. An automatic release on the
+  timer does not count as switching off. Put to the tester as the decision most
+  likely to feel wrong, and endorsed: "This is exactly the behavior I want."
+- **A logon task needs no elevation**, and a refusal arrives as an `HRESULT`
+  rather than a UAC prompt. Verified twice on 2026-09-12 as a standard,
+  non-administrator user - see 6.8. Do not re-research it; there is an
+  `#[ignore]`d test that re-runs the proof on demand.
+- **A refused tray icon is not fatal.** It is the ordinary case when a logon
+  task beats Explorer, and exiting would take the hotkey with it. The window
+  and the hotkey are still fatal if they fail; the icon is retried. 6.8.
 ---
 
 **Date:** 2026-08-29
@@ -965,23 +1013,34 @@ Raw results are in `test-milestone-5-1.txt`, Tests 39-43. Every one passed.
     asked for. Verified through UI Automation, not heard. Riding along with
     the Milestone 6 round as Test 47.
 
-### Opened by Milestone 6, for its round
+### Resolved by the Milestone 6 round (2026-09-08)
 
-27. **Does the help document work as a document?** The whole reason it is HTML
-    in a browser rather than a text file or a read-only edit is heading
-    navigation - `H` between headings, `Insert+F6` for the list. That has been
-    reasoned about and never heard. If it turns out not to help, the format
-    was the wrong choice and a plain text file would have been simpler. Test
-    46.
+Raw results in `test-milestone-6.txt`, Tests 44-51. Every one passed.
 
-28. **Is `Exit StableSound` in a safe place?** It is last in tab order, after
-    OK and Cancel, so tabbing one stop too far past the settings reaches OK
-    rather than the button that quits. That is a judgement made without being
-    able to feel it. Test 48 asks directly.
+26. ~~Does the reworded message heading read well?~~ **Yes.** JAWS reads "What
+    went wrong and how to fix it", and the tester's verdict was "perfect". The
+    message is still reviewable with the arrow keys and the focus still
+    returns to the field that was wrong. The Milestone 5.1 complaint - the
+    same fact said twice, once by the heading and once by "read only edit" -
+    is closed.
 
-29. **Is anything about the console actually missed?** It was the diagnostic
-    interface for four milestones and the tester was fluent in it. The
-    settings dialog and the log are meant to cover everything it did. Test 51.
+27. ~~Does the help document work as a document?~~ **Yes, and the format was
+    the right call.** `H` moves between headings, `Insert+F6` lists them, and
+    the list was usable: "could you find what you wanted from it?" - "Yes."
+    Nothing was missing. One thing was wrong with it and one was thin, both
+    now fixed: it said "notification area" where the tester says system tray,
+    and it was "maybe a bit dense for a new user". See 6.7.
+
+28. ~~Is `Exit StableSound` in a safe place?~~ **Yes.** "Its perfect." Last in
+    tab order after OK and Cancel, so overshooting the settings by one stop
+    reaches OK rather than the button that quits, is the order to keep.
+
+29. ~~Is anything about the console actually missed?~~ **No.** Asked directly
+    after living with the app for a while: "Is there anything about not having
+    the console window that you miss?" - "No." Four milestones of diagnostic
+    interface replaced by the settings dialog and the log, with nothing owed.
+
+### Still open after the Milestone 6 round
 
 30. **Do the failure windows read well?** Three of them - a tray icon that
     cannot be created, a hotkey another program holds, settings that cannot be
@@ -989,6 +1048,71 @@ Raw results are in `test-milestone-5-1.txt`, Tests 39-43. Every one passed.
     hotkey one is the likeliest to be met in real use. Not scripted; it will
     have to be caught when it happens, which is the reason each one names the
     path or the combination involved rather than merely saying it failed.
+
+### Resolved by the Milestone 7 round (2026-09-12)
+
+31. **Can StableSound start earlier at sign-in, and is it worth what it
+    costs?** **Answered (b): yes, and do it before shipping.** The `Run` key
+    measured about 30 seconds on this machine with the first thing JAWS said
+    clipped, which settled the "is it worth it" half. The elevation half -
+    which 6.7 said had to be tried rather than reasoned about - was then tried
+    and answered: a standard, non-administrator user registers a logon task
+    with no prompt and no elevation. Built in 6.8.
+
+32. **Does the remembered keep-alive state survive the ways a machine actually
+    ends?** **Yes, all four.** Exiting from the tray or the dialog, a manual
+    switch-off, an automatic release on the timer, and a full sign-out. It
+    comes back on silently in every case where the last thing the *user* did
+    was switch it on, and stays off when they switched it off. The settings
+    dialog does not undo it: the hotkey works while the dialog is open and
+    pressing OK leaves the new state alone.
+
+    The deliberate decision inside it - that the 30-second timer letting go
+    does not count as switching off - was put to the tester as the one most
+    likely to feel wrong, and endorsed without reservation: "This is exactly
+    the behavior I want." Closed; do not reopen it.
+
+### Resolved by the Milestone 8 round (2026-09-12)
+
+Raw results in `test-milestone-8.txt`, Tests 58-63. Every one passed.
+
+33. ~~Does the logon task actually fire earlier, and is the first thing JAWS
+    says still clipped?~~ **Yes, and no - it is not clipped.** The question the
+    app exists for, answered at the one moment it was still failing. Against
+    Test 56's roughly 30 seconds with a clipped first word: "It came through
+    whole... JAWS came up speaking clearly, no clipping." The tester's verdict
+    on the change was "StableSound now feels like a first-class citizen, which
+    was my hope", and on shipping it, "Good enough to ship now."
+
+    The log puts numbers under the impression. At the sign-in, keep-alive was
+    on at 01:16:30, one second after the process started, and the first audio
+    the meter saw was at 01:16:47 - **17 seconds** of the headset already being
+    held before anything spoke. On the `Run` key that ordering was the other
+    way round.
+
+34. ~~Is the audio device ready that early?~~ **Yes.** The risk created by
+    fixing the old one did not materialise: WASAPI had an endpoint at sign-in
+    and `device opened in 256 ms`, with no device-loss recovery needed. It is
+    worth recording that 256 ms is about **ten times** the 23-29 ms the same
+    machine takes on a settled desktop - so the endpoint is ready that early,
+    but only just, and the margin is not large. If a slower machine ever does
+    arrive before the endpoint exists, device-loss recovery is what catches it.
+
+35. ~~Does the tray icon arrive, and arrive late?~~ **It arrives; it did not
+    need to arrive late.** The log reads `tray icon added, shell notification
+    version 4 accepted`, immediately, on the sign-in boot - the first of the
+    three outcomes the test allowed, and a pass. Explorer was already handing
+    out icons by the time the task started us.
+
+    So the best evidence for the task beating Explorer is the one piece of
+    evidence the round did *not* produce, and the honest reading is that the
+    task fires early but not that early - early enough to beat JAWS' first
+    utterance by 17 seconds, which is the thing that mattered, and not early
+    enough to beat the shell. **The tolerant retry path is therefore still
+    unexercised on hardware.** It is not dead code - it is insurance against a
+    machine slower or differently ordered than this one, which is exactly where
+    it would be needed - but nobody has seen it run. Keep it; do not claim it
+    is proven.
 
 ### Noted, not a defect
 
@@ -1298,8 +1422,10 @@ afterwards.
 
 **Hard release. DEFERRED, probably not needed.** Soft release was confirmed sufficient on the AeroClip (see 2.4), so this is no longer planned work. Revisit only if another headset needs it, or if the 3-second handover becomes annoying. Reference if it ever happens: `m2jean/ToothTray`.
 
-**Milestone 6 - ship. BUILT (2026-09-08), hardware round outstanding.**
-Branch `m6-ship`, script `test-milestone-6.txt`, Tests 44-51.
+**Milestone 6 - ship. DONE (2026-09-08), round passed.**
+Branch `m6-ship`, script `test-milestone-6.txt`, Tests 44-51. Every test
+passed first time. Questions 26 to 29 closed; questions 31 and 32 opened, and
+Milestone 7 exists to answer them.
 
 Everything the milestone asked for is built: the console dropped and the
 subsystem switched (6.1), a guard against a second copy (6.2), a test for the
@@ -1344,6 +1470,92 @@ work raised before any of it was written:
    to a feature.
 3. **Antivirus: document it now, research signing and write it up.**
 4. **Public repo, version stays 0.1.0.** A first public cut, not a 1.0 claim.
+   *Superseded:* the repo went public at **1.0.0**, because Milestones 7 and 8
+   happened in between and the last thing that was still broken got fixed and
+   tested. See Milestone 9.
+
+**Milestone 7 - what the shipping round asked for. DONE (2026-09-12), round
+passed.** Branch `m7-follow-ups`, script `test-milestone-7.txt`, Tests 52-57.
+
+**Every test passed first time.** The remembered keep-alive state survives all
+four ways of leaving and picking the app up again, the sign-out included, and
+the settings dialog does not undo it. The decision that the 30-second timer
+letting go does not count as switching off was explicitly endorsed: "This is
+exactly the behavior I want." The reworked help opens well enough - "Yes, very
+nice" - and no stray "notification area" survives.
+
+**Test 56 is why there is a Milestone 8.** StableSound did start at sign-in
+with keep-alive already on and silent, exactly as designed, but about 30
+seconds in - and the first thing JAWS said was clipped. That is the problem the
+app exists to solve, met at the one moment it is hardest to avoid. The answer
+to question 31 was **(b): do the startup change first, and ship after it has
+been tested.**
+
+Four things came back from the Milestone 6 round. Three are built and one is a
+question:
+
+1. **Remember the keep-alive state between runs.** 6.6.
+2. **"System tray", not "notification area".** Everything the user reads now
+   says system tray: the help, the README, and the two message strings in
+   `main.rs` that name the route to the icon. The one exception is a
+   parenthesis in the help's own tray section, which says Windows calls it the
+   notification area - because Windows' own settings do, and somebody looking
+   for it there should not be stranded by our vocabulary. Code comments still
+   use the Win32 term, which is what `Shell_NotifyIcon` is documented as.
+3. **The help was too dense to start with.** 6.7.
+4. **Start earlier at sign-in.** Question 31, researched in 6.7 and answered
+   (b) by the round. Built in Milestone 8.
+
+**Milestone 8 - starting at the sign-in itself. DONE (2026-09-12), round
+passed.** Branch `m7-follow-ups`, script `test-milestone-8.txt`, Tests 58-63.
+The last thing before shipping. Written up in 6.8.
+
+Autostart now asks Task Scheduler for a logon task and keeps the `Run` key as
+a fallback, and a refused tray icon is no longer fatal - because a task can
+start StableSound before Explorer exists to give it one.
+
+**Every test passed first time, and the one that mattered answered the
+question the project was started to answer.** The first thing JAWS said at
+sign-in came through whole. Questions 33-35 have the detail; the short version
+is that the task fires early enough, the audio endpoint is ready when it does,
+and the tray icon was not even refused.
+
+Three things the round settled beyond the timing:
+
+1. **The move happens by itself.** An existing `Run` entry was found on first
+   run and promoted to a task, with nothing for the user to untick and retick.
+   Test 58, and it could only ever be run once.
+2. **The tickbox tells the truth across a move.** Copied out of `target
+elease`
+   into a real folder, the box read *unticked* - because the task pointed at the
+   old copy - and ticking it repointed the task at the new one. Test 62. This
+   is the behaviour 6.8 argued for over remembering a flag.
+3. **Unticking leaves nothing behind.** Neither mechanism survives it; the log
+   reads `autostart: off`. Test 63.
+
+Nothing was outstanding after it, and the tester confirmed as much when asked
+directly: "Is there anything else that needs doing before this ships?" - "No."
+
+**Milestone 9 - shipping 1.0.0. DONE (2026-09-12).** No hardware round; this
+is the release itself, asked for in the same breath as the Milestone 8 results:
+"change it to version 1... Do everything needed for release, including making
+the repo public. Make it easy to find and download the .exe file."
+
+- **1.0.0**, not the 0.1.0 that 6.5 planned. That recommendation was made
+  before there was a passing round on the one thing still broken; eight rounds
+  of hardware testing is not a 0.x claim.
+- **A version resource in the exe.** There was none. With no installer and no
+  About box, the Properties page is the only place a downloaded copy can say
+  what it is, and that is worth a kilobyte against the antivirus problem 6.5
+  describes. The four numbers in `stablesound.rc` are not checked against
+  `Cargo.toml` by anything - keep them in step by hand.
+- **The README leads with the download**, by the
+  `/releases/latest/download/stablesound.exe` form, which does not need editing
+  for each release. Its keyboard table became a list: a two-column table with
+  an empty header row makes a screen reader announce the blank headers before
+  every cell, which is the project's own rule being broken on its front page.
+- **The repository is public**, and the release carries the exe as its one
+  asset.
 
 ### 6.1 The console is gone (2026-09-07)
 
@@ -1576,7 +1788,10 @@ app with this many users:
 - Ship releases from one place, so what reputation does accumulate accumulates
   in one place rather than being scattered across re-uploads.
 
-**Recommendation: ship 0.1.0 unsigned, with the README section, and revisit.**
+**Recommendation: ship unsigned, with the README section, and revisit.**
+(Written as "ship 0.1.0"; it shipped as 1.0.0, for the reason in Milestone 9.
+Nothing else in this recommendation changed - it is unsigned, and the README
+section is there.)
 Signing is a subscription and an ongoing obligation, its headline benefit was
 withdrawn two years ago, and nothing about it is easier to do later than now.
 If SmartScreen or an antivirus actually turns out to be stopping people using
@@ -1592,13 +1807,244 @@ console window and no visible window of its own, and no `conhost` is spawned.
 reads, and the three failure windows, which need a combination to be taken by
 another program to provoke.
 
-**Current position (2026-09-08):** Milestones 0 to 5.1 complete and
-hardware-tested, with nothing outstanding behind them, and Milestone 6 built
-and waiting on the round that closes it.
+**Current position (2026-09-08, after the Milestone 6 round):** Milestones 0
+to 6 complete and hardware-tested, with nothing outstanding behind them. The
+shipping round passed every test first time and asked for four more things;
+three are built as Milestone 7 and the fourth is question 31, which needs a
+decision rather than a test.
 
-That round is the last one. It carries question 26 from 5.1 and questions 27
-to 30 from Milestone 6, and if it passes there is nothing between here and a
-first release: "this will be a great first version."
+45 unit tests, `cargo clippy -- -D warnings` clean, release binary 298 KB.
+
+### 6.6 Keep-alive that outlives the run (2026-09-08)
+
+Asked for by the Milestone 6 round, in the tester's words: "I would like the
+keep-alive state to persist between runs. This could just be saved in the
+settings file, so one could basically start the machine and have keep-alive
+kick in automatically so that it all becomes 'set it and forget it', with no
+tone playing if the app starts with keep-alive already active."
+
+Built as one line in `stablesound.conf`, `keep_alive`, and about thirty lines
+of code. Three decisions were needed and none of them is obvious.
+
+**What is remembered is the standing intent, not the stream.** These come
+apart almost all of the time. With the default 30-second idle release,
+keep-alive is *switched on* all afternoon while the stream is actually open
+for a fraction of it - so remembering "was a stream open when the process
+ended" would give an answer that depended on whether the machine happened to
+have spoken in the last half minute before shutdown. Nobody could predict
+that, and the same afternoon would restore differently on different days. What
+is written down is `armed` in the engine: on when the user switched it on, off
+when the user switched it off by hand, unmoved by every automatic release and
+every wake in between. That flag already existed for a closely related reason
+- so that letting the phone have the headset is not undone by the next
+keypress - and this is the same question asked across a restart.
+
+**Quitting is not switching off.** This one nearly shipped as a bug. The exit
+path called `set_intent_off` with `StopReason::Requested`, which is what plays
+the off-tone on the way out that Test 49 confirmed. It also clears `armed` -
+so with the state now being written down, every exit would have overwritten
+the file with "off", and the setting could never once have been on at the next
+start. The feature would have failed silently and completely, with an off-tone
+still playing on exit to suggest everything was normal. Hence
+`StopReason::Quit`: it sounds identical, and is recorded differently.
+`is_deliberate()` is what the earcon now asks, so the tone follows "the user
+asked for this" and the memory follows "the user asked to be left alone".
+
+**The dialog must not write this line.** There is no control for it - the
+hotkey *is* the control - so what comes back from the dialog on OK is whatever
+was true when it opened, and the toggle hotkey deliberately goes on working
+while the dialog is up. Pressing OK five minutes later would otherwise undo a
+toggle made in between. `apply_settings` takes the live value over the
+dialog's before saving.
+
+Restoring goes through `set_intent_on` with a third `Source`, `Restored`,
+rather than setting the flags directly: at sign-in the headset is usually
+still connecting, and the ordinary path already retries an open that fails and
+recovers when the device turns up. `Restored` announces nothing, which is what
+was asked for and also the rule the earcons have followed since Milestone 3 -
+a tone means something you just did.
+
+The save happens on the message-loop thread, not in the engine. That thread
+already owns the settings file, because the dialog writes it from there, and
+one writer means the two cannot race to produce a half-written file. A failed
+save only reaches the log, unlike the same failure from the dialog, which
+opens a window: pressing OK is a request to save and its failing is news,
+whereas this rides on a hotkey press whose whole point is that it needs no
+attention.
+
+**Needs hardware.** The unit tests cover the round trip through the file and
+the missing-key default. What they cannot cover is the part that matters - a
+sign-out, a shutdown and a restart, with the state written at the moment of
+the toggle. Tests 52-55, with Test 56 the sign-in case it was asked for.
+
+### 6.7 The three answers, and the one question (2026-09-08)
+
+**"System tray", not "notification area".** Done everywhere the user reads:
+the help, the README, and the two message strings in `main.rs` that describe
+how to reach the icon. The help's tray section keeps one parenthesis saying
+Windows itself calls it the notification area, because Windows' own settings
+do and somebody hunting for it there should not be stranded by our
+vocabulary. Code comments keep the Win32 term - it is what `Shell_NotifyIcon`
+is documented as, and that audience has the API docs open beside them.
+
+**The help was too dense to start with.** The verdict was "the writing makes
+sense to me, but is maybe a bit dense for a new user", which is a complaint
+about the first two minutes rather than about the whole document - nothing was
+missing, the headings worked, and `Insert+F6` found what was wanted. So the
+fix is at the front, not throughout:
+
+- **Getting started is now the first section**, ahead of "What it is for", and
+  it is three bullets: the toggle hotkey, that it lets go on its own and comes
+  back when you type, and the settings hotkey. It ends with a sentence saying
+  the rest of the page is detail. A new user can stop reading there.
+- **The longest entries in "The settings, one by one" now lead with what to
+  do** - "Leave it on Digital silence" - and put the reasoning in a second
+  sentence after a break, rather than opening with a paragraph of comparison.
+- **Three new pieces of documentation**: the remembered keep-alive state, in
+  Getting started and again under its own heading; a troubleshooting entry for
+  meeting it unexpectedly ("It was already holding the headphones when I
+  signed in"); and a correct file list.
+
+**The file list was wrong**, in both the help and the README: both said two
+files, and there are three. `stablesound-help.html` is written out beside the
+exe every time the help is opened. Worth fixing on its own, and it also
+answers the tester's third question directly - "please confirm that only the
+.exe file needs to be distributed" - which it does. `target\release` looks
+alarming because it is a build directory: the `.pdb` is debug symbols, the
+`.d` is a dependency list for `cargo`, and `deps/`, `build/`, `incremental/`
+and `.fingerprint/` are the build cache. `stablesound.conf`,
+`stablesound.log` and `stablesound-help.html` are in there because the app
+itself wrote them while being tested from that folder. A release is
+`stablesound.exe` and nothing else. The help now says so in its own words.
+
+**Starting earlier at sign-in - question 31, researched and not built.** The
+request: "would it be possible to have the app start up earlier in the startup
+sequence? Currently, other apps like Discord, which take time to get going,
+are first in the queue. As sound is my only means of reading the screen, I'd
+like that to be right as early as possible."
+
+The reason it is late is not StableSound. Autostart is an `HKCU\...\Run`
+value (see `startup.rs`), and Explorer processes `Run` and the Startup folder
+*after* the desktop is ready, with a delay before it begins and throttling
+between the items it finds. Order within `Run` is not something an
+application can choose. So no amount of making StableSound faster helps: it
+is not slow, it is queued.
+
+The lever that exists is **Task Scheduler**. A logon-triggered task is not
+Explorer's to delay, and fires around the logon event rather than after the
+shell has settled - which is the improvement being asked for, and it should be
+seconds rather than a fraction of one.
+
+Three things stop this being an obvious yes:
+
+1. **Registering the task may need elevation.** Tasks live in
+   `%WINDIR%\System32\Tasks`, which a standard user cannot write to; whether a
+   per-user logon task can be registered without a prompt is exactly the sort
+   of thing that must be *tried* rather than reasoned about, and it could not
+   be tried from the session that wrote this. If it needs elevation, the
+   tickbox either raises a UAC prompt at an odd moment or quietly fails.
+2. **The checkbox must not lie.** `startup.rs` reads the registry directly and
+   deliberately keeps no copy in the config, so the box always reports the
+   truth. Two mechanisms means two places to read and a fallback path, and a
+   half-registered task would be a box that says yes while nothing starts.
+3. **The failure is asymmetric.** Starting ten seconds late costs the first
+   few announcements of a session. Not starting at all costs the whole
+   session, silently, for somebody whose only route to the screen is sound.
+   The `Run` key has worked in every round since Milestone 4.
+
+**Recommendation: try it, but as its own change with its own round**, keeping
+the `Run` key as the fallback whenever a task cannot be registered, and with
+the settings checkbox reporting whichever of the two is actually in force.
+Not folded into a shipping round. If the delay turns out to be the ordinary
+Explorer startup delay rather than Discord specifically, there is also a
+one-value user setting that removes it for every startup app at once -
+mentioned for completeness, not recommended: it is a machine-wide change made
+on one program's behalf, and this project does not get to make that call for
+somebody's whole sign-in.
+
+**The round chose (b) - do it first, ship after it is tested.** Built in 6.8,
+which also settles the elevation question this section could only guess at.
+
+### 6.8 Starting at the sign-in itself (2026-09-12)
+
+Question 31, built. The measurement that forced it: Test 56 put the `Run` key
+at **about 30 seconds** after sign-in on this machine, with the first thing
+JAWS said clipped.
+
+**Registering a logon task needs no elevation.** This was the section above's
+first objection and the one it insisted had to be *tried* rather than reasoned
+about. Tried, on this machine, on 2026-09-12: as a standard, unelevated user
+who is **not** a member of Administrators, the task registers, reads back with
+its settings intact, and deletes again. No UAC prompt at any point. Verified
+twice - once through PowerShell against `Schedule.Service` to answer the
+question at all, and then through the app's own COM code in
+`startup::tests::a_real_task_can_be_registered_read_back_and_removed`, which
+is `#[ignore]`d (it writes to the real Task Scheduler library) and runs under a
+task name of its own so it cannot disturb a user's.
+
+This also disposes of the worst shape of the objection. A refusal arrives as an
+`HRESULT` from a COM call, not as a prompt, so nothing in `startup.rs` can put
+a dialog on screen at sign-in whatever Windows decides.
+
+**The other two objections are answered by design, not by luck.**
+
+- *The checkbox must not lie.* `current()` reads Windows, as before, and now
+  also checks that what it finds points at **this** exe. An entry left behind
+  by a copy that has since moved reads as off, and ticking the box repairs it.
+  Exactly one mechanism is ever left in place: both would start two copies, and
+  the second stops itself with a message window - at sign-in, in front of
+  somebody who cannot see it.
+- *The failure is asymmetric.* Still true, which is why the `Run` key is still
+  here. Refusal falls back to it, `set` reports which route took effect, and
+  the dialog says so in words when it is the slower one. The worst case is what
+  shipped in Milestone 4.
+
+**Anybody who had already ticked the box is moved up automatically.**
+`upgrade_run_to_task()` runs once at startup: the dialog only acts when the
+checkbox *changes*, and for an existing user it is already ticked, so without
+this they would keep the slow route for ever. It is safe to attempt on every
+run - the worst case is a refused COM call and the `Run` entry left as it was -
+and it writes one line to the log either way.
+
+**Two settings in the task description are load-bearing**, and have a test of
+their own because both fail slowly enough to escape a hardware round:
+
+- `ExecutionTimeLimit` must be `PT0S`. The default is **three days**, and Task
+  Scheduler ends a task that outlives its limit. Left at the default,
+  keep-alive would stop dead after a long uptime.
+- Both battery settings must be off. This is a laptop, and a task that will not
+  start on battery, or stops when the charger comes out, is a screen reader
+  going quiet at the worst moment.
+
+Schema version 1.2, so nothing needs a Windows newer than
+`stablesound.manifest` already claims. Windows rewrites the trigger's `UserId`
+as a SID when it stores the task and keeps the principal's as the name given;
+neither is read back, because `task_command()` wants the `<Command>` and
+nothing else.
+
+**A refused tray icon is no longer fatal, and that is the subtle half of this
+change.** Until now `Tray::create` propagated a failed `NIM_ADD` and `main`
+ended the run with a message window. That was defensible while Explorer was
+the only thing that started us - if Explorer had put us there, Explorer was up.
+A logon task can beat the shell by seconds, so the same refusal becomes the
+*ordinary* case, and a shipping app that exits at every sign-in is a far worse
+failure than a late one.
+
+So: the window and the icons are still fatal if they fail, because the hotkey
+needs the window and the hotkey is the primary interface (CLAUDE.md 3). The
+icon is not. It is retried once a second for a minute on the message loop's
+existing 100ms tick - which also covers the race where a shell broadcasts
+`TaskbarCreated` before our window exists to hear it, exactly the order a logon
+task can arrive in - and if it never comes the app says so in a window and
+keeps running. `TaskbarCreated` still puts it back whenever Explorer returns.
+
+**Still not touched: the machine-wide startup delay.** Mentioned to the tester
+and deliberately left alone. If a task turns out not to be enough, the
+remaining delay is Windows' own pause before it lets startup programs run, and
+removing it is a change to somebody's whole sign-in made on one program's
+behalf. The help says it exists and says StableSound will not change it.
+
+Release build **315 KB**, up 21 KB, against a ~1 MB budget.
 ---
 
 ## 8. Sources
