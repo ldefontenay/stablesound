@@ -24,3 +24,6 @@ desktop.ini
 # Scratch
 /scratch/
 /tmp/
+
+# Personal session notes, not part of the project
+after-release-*.txt
