@@ -608,6 +608,40 @@ mod tests {
         );
     }
 
+    /// Read whatever this machine actually has, and say so.
+    ///
+    /// `#[ignore]`d because it reports on the machine rather than on the code,
+    /// so it has no business in a plain `cargo test`. It writes nothing. Its
+    /// value is that `run_value` parses a real `REG_SZ` - counted bytes, a
+    /// UTF-16 payload and a terminator to find - and getting that wrong would
+    /// show up as a checkbox reading the wrong way rather than as a crash.
+    ///
+    /// ```text
+    /// cargo test -- --ignored --nocapture
+    /// ```
+    #[test]
+    #[ignore = "reports on this machine's own state; run with --ignored"]
+    fn what_this_machine_is_set_up_with() {
+        match run_value() {
+            Some(command) => {
+                let path = unquote(&command);
+                println!("Run value: {command}");
+                println!("  parsed as: {}", path.display());
+                println!("  exists:    {}", path.exists());
+                assert!(
+                    path.extension()
+                        .is_some_and(|e| e.eq_ignore_ascii_case("exe")),
+                    "a Run value that does not parse to an .exe means the reader is wrong"
+                );
+            }
+            None => println!("Run value: absent"),
+        }
+        match task_command(TASK_NAME) {
+            Some(path) => println!("Task command: {}", path.display()),
+            None => println!("Task: absent"),
+        }
+    }
+
     #[test]
     fn the_run_keys_quoting_is_undone_before_comparing() {
         let exe = Path::new(r"C:\Program Files\StableSound\stablesound.exe");

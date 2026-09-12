@@ -41,7 +41,7 @@ log to `stablesound.log` next to the exe.
 **No console window since Milestone 6**, and no window of its own at all until
 it is asked for one. Where the console's output went is described in 6.1.
 
-Release binary is **312 KB**, against a ~1 MB budget.
+Release binary is **315 KB**, against a ~1 MB budget.
 
 ### What is proven on hardware
 
@@ -1962,7 +1962,7 @@ remaining delay is Windows' own pause before it lets startup programs run, and
 removing it is a change to somebody's whole sign-in made on one program's
 behalf. The help says it exists and says StableSound will not change it.
 
-Release build **312 KB**, up 18 KB, against a ~1 MB budget.
+Release build **315 KB**, up 21 KB, against a ~1 MB budget.
 ---
 
 ## 8. Sources

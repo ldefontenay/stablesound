@@ -1,0 +1,260 @@
+STABLESOUND - MILESTONE 8 HARDWARE ROUND
+Tests 58 to 63.
+
+You chose (b): do the startup change first, and ship after it has been tested.
+This is that round, and it is the last one before shipping.
+
+Everything in Milestone 7 passed, so nothing from it is re-tested here. There
+is one new thing and this round is entirely about it.
+
+
+WHAT CHANGED
+
+"Start StableSound when I sign in" no longer writes a registry entry. It asks
+Windows for a scheduled task that runs at logon.
+
+That is the whole change, and the reason for it is your Test 56 answer: about
+30 seconds, and the first thing JAWS said was clipped. The two ways Windows
+can start a program are not equally quick. A scheduled task fires around the
+sign-in itself. The registry list is not reached until the desktop is ready,
+after a pause, after every other program in it, in an order no program can ask
+for - so Discord being ahead of you was never about Discord being faster.
+
+Two things I promised to find out before writing any of it:
+
+  Does it need administrator rights? No. I tested this properly rather than
+  guessing: on this machine, as a standard user who is not an administrator,
+  the task registers, reads back correctly and deletes again, with no
+  permission prompt anywhere. If Windows ever does refuse it, it refuses
+  quietly, as an error code - it cannot put a prompt in front of you at
+  sign-in.
+
+  Can the tickbox still be trusted? Yes, and it is stricter than before. It
+  reads Windows rather than remembering anything, and it now also checks that
+  what it finds points at the copy of StableSound you are running. An entry
+  left behind by a copy you have since moved reads as unticked, which is the
+  truth, and ticking the box repairs it. Test 62 covers that.
+
+If a task cannot be registered, StableSound falls back to the old registry
+entry and tells you it has. Only ever one of the two - two would start two
+copies of StableSound.
+
+There is a second change you should know about even though you will probably
+never see it. Until now, if StableSound could not put its icon in the system
+tray, it said so and stopped. That made sense when the only thing that started
+it was Windows Explorer: if Explorer had started us, Explorer was obviously
+running. A scheduled task can now start StableSound BEFORE Explorer exists, and
+Explorer is what hands out tray icons - so "no icon yet" is now normal, and
+stopping would be the wrong answer. StableSound keeps running, your hotkey
+works, and it puts the icon in as soon as there is somewhere to put it. Test 61
+checks that.
+
+
+BEFORE YOU START
+
+Read this bit first, because Test 58 can only be done once.
+
+If a StableSound from an earlier session is still running, exit it now.
+
+Build the new version:
+
+    cargo build --release
+
+Now STOP. Do not run it yet. The first time the new version starts it will
+move your existing registry entry up to a scheduled task, and it only does
+that once - so that first run IS Test 58. Go straight there.
+
+Logging is already on from last round, so there is nothing to set up.
+
+
+TEST 58 - THE FIRST RUN MOVES YOU UP BY ITSELF
+
+You already had "start when I sign in" ticked. You should not have to untick
+and retick it to get the better method - StableSound should notice and move you
+up on its own.
+
+Run target\release\stablesound.exe
+
+Keep-alive should come on silently, the same as last round.
+ANSWER (did it start normally?):
+
+Now open stablesound.log and go to the bottom, then search upwards for the word
+autostart. You are looking for two lines near the last "StableSound 0.1.0
+starting".
+
+The first should say autostart is on, by an entry under the registry Run key -
+that is where you were.
+
+The second should say it moved up from the Run key to a scheduled task.
+
+Are both lines there, and does the second one say it moved up?
+ANSWER:
+
+ANYTHING ODD:
+
+
+TEST 59 - THE TICKBOX STILL TELLS THE TRUTH
+
+Open the settings with Ctrl+Win+F11.
+
+Is "Start StableSound when I sign in" still ticked? It should be - you are
+still set to start at sign-in, just by a better route, and the box should not
+have changed under you.
+ANSWER:
+
+Untick it and press Enter for OK.
+
+Did the dialog close without complaining? No message window should appear.
+ANSWER:
+
+Open the settings again with Ctrl+Win+F11.
+
+Is the box now unticked?
+ANSWER:
+
+Tick it again and press Enter for OK.
+
+Did any message window appear this time? There should be none. If one did
+appear, it means Windows refused the scheduled task and StableSound used the
+old registry entry instead - please say so and quote what it said, because that
+is the case I could not produce here.
+ANSWER:
+
+ANYTHING ODD:
+
+
+TEST 60 - THE SIGN-IN ITSELF
+
+The one this was all for.
+
+Check the settings one more time: "Start StableSound when I sign in" ticked,
+and keep-alive switched ON with Ctrl+Win+F12.
+
+Now sign out and sign back in.
+
+Were your headphones already being held awake when you got to the desktop?
+ANSWER:
+
+Was it silent - no tone at sign-in?
+ANSWER:
+
+The question underneath all of it. Was the first thing JAWS said clipped, or
+did it come through whole?
+ANSWER:
+
+Last round this took about 30 seconds and the first thing JAWS said was
+clipped. How does it compare now? A rough impression is fine - immediately, a
+few seconds, about the same as before.
+ANSWER:
+
+If it is better but not instant, is it good enough to ship?
+ANSWER:
+
+ANYTHING ODD:
+
+
+TEST 61 - THE TRAY ICON, POSSIBLY ARRIVING LATE
+
+Same sign-in as Test 60 - this is just reading the log afterwards, there is
+nothing to do at the machine.
+
+First, is the tray icon there now? Windows+B and arrow to it. It should read
+"StableSound Headphones awake".
+ANSWER:
+
+Now open stablesound.log and find the most recent "StableSound 0.1.0 starting".
+Read the few lines after it and look for one mentioning the tray icon.
+
+There are three possibilities and any of them is a pass:
+
+  It says the icon was added, and mentions shell notification version 4. That
+  means Explorer was already up - the task did not beat it.
+
+  It says the icon was refused for now and is being retried, followed a little
+  later by a line saying it was added late. That means the task DID beat
+  Explorer, which is the best evidence I can get that it fires early.
+
+  Neither - no tray icon line at all. That would be a bug; please say so.
+
+Which of those did you get? Quoting the line is ideal if that is easy.
+ANSWER:
+
+Did a message window appear at sign-in saying StableSound could not get a tray
+icon? There should not have been one. It only appears after a full minute of
+trying, and nobody has ever seen it.
+ANSWER:
+
+ANYTHING ODD:
+
+
+TEST 62 - MOVING IT TO ITS REAL HOME
+
+This is the thing you are about to do anyway. target\release is a build folder,
+and StableSound should not live there. It is also the one case where the new
+tickbox behaviour matters, because the task you now have points at the copy in
+the build folder.
+
+Make a folder somewhere sensible - anywhere you would keep a small program.
+
+Copy TWO files into it from target\release: stablesound.exe and
+stablesound.conf. The exe is the only one that matters for using StableSound,
+but copying the settings too means this test keeps your hotkeys, your
+keep-alive state and your logging rather than starting from defaults.
+
+Exit the running StableSound.
+
+Run the copy in the new folder.
+ANSWER (did it start normally?):
+
+Open the settings there with Ctrl+Win+F11.
+
+Is "Start StableSound when I sign in" now UNTICKED? It should be, and this is
+the point of the test: the task that exists points at the old copy in the build
+folder, not at this one, so ticked would be a lie.
+ANSWER:
+
+Tick it and press Enter for OK. That should repoint the task at the new copy.
+
+Any message window?
+ANSWER:
+
+Exit StableSound, then run it again from the new folder, and check the log in
+the new folder. The autostart line should now say it is on, by a scheduled
+task.
+ANSWER:
+
+ANYTHING ODD:
+
+
+TEST 63 - AND UNTICKING REALLY REMOVES IT
+
+Short one, and no sign-out needed. Unticking the box has to leave nothing
+behind - neither the task nor the old registry entry.
+
+With StableSound running from the new folder, open the settings and untick
+"Start StableSound when I sign in". Press Enter for OK.
+
+Exit StableSound and start it again.
+
+Check the log. The autostart line should now say simply that autostart is off.
+If it says on, by anything at all, something was left behind.
+ANSWER:
+
+Now tick it again and OK, so you are left set up the way you want. Exit and
+start once more, and confirm the log says it is on by a scheduled task.
+ANSWER:
+
+ANYTHING ODD:
+
+
+AT THE END
+
+Please send the log file back with this - stablesound.log. If you did Test 62
+there will be two logs, one in target\release and one in the new folder. Both
+are useful; the new folder's is the more interesting.
+
+Once you have sent it, you may want to turn logging off, and detailed logging
+with it.
+
+Is there anything else that needs doing before this ships?
+ANSWER:
