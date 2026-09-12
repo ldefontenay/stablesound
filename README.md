@@ -3,8 +3,25 @@
 Keeps Bluetooth headphones awake so screen reader speech is not cut off at the
 start, and lets go of them again so your phone can take over.
 
-A single Windows executable, about 310 KB. No installer, no runtime to install,
+A single Windows executable, about 316 KB. No installer, no runtime to install,
 and nothing outside its own folder unless you ask it to start when you sign in.
+
+## Download
+
+**[Download stablesound.exe][latest]** — always the newest version, direct.
+
+[latest]: https://github.com/ldefontenay/stablesound/releases/latest/download/stablesound.exe
+
+That is the whole program. Put it anywhere you keep small programs and run it.
+There is nothing to install and nothing to uninstall.
+
+The [releases page][releases] has the same file with its release notes, and
+every earlier version. Please read [Antivirus and SmartScreen](#antivirus-and-smartscreen)
+below before the first run — the file is unsigned, and Windows will say so once.
+
+[releases]: https://github.com/ldefontenay/stablesound/releases
+
+Windows 10 or 11, 64-bit. Requires no administrator rights.
 
 ## The problem
 
@@ -23,14 +40,13 @@ the headset becomes available to your phone again within a few seconds.
 
 ## Using it
 
-Run `StableSound.exe`. It has no window; it puts an icon in the system tray
+Run `stablesound.exe`. It has no window; it puts an icon in the system tray
 and waits.
 
-| | |
-|---|---|
-| `Ctrl+Win+F12` | switch keep-alive on and off |
-| `Ctrl+Win+F11` | open the settings |
-| `Windows+B`, then arrows | reach the icon; `Enter` toggles, `Applications` opens its menu |
+- `Ctrl+Win+F12` — switch keep-alive on and off.
+- `Ctrl+Win+F11` — open the settings.
+- `Windows+B`, then the arrow keys, reaches the tray icon. `Enter` toggles
+  keep-alive, and the `Applications` key opens its menu.
 
 Both combinations can be changed, and the settings one can be turned off if you
 would rather not spend a hotkey on it.
@@ -64,6 +80,11 @@ with and for a JAWS user, and every part of it has been tested by one.
   heard far too often to live with.
 - Messages appear in a window whose text can be reviewed with the arrow keys,
   rather than a message box that speaks once and cannot be gone back over.
+- **It is awake before your screen reader speaks.** "Start when I sign in" asks
+  Windows for a task that runs at the sign-in itself, not an entry in the
+  startup list that waits for the desktop to settle. The difference was
+  measured on hardware: about thirty seconds and a clipped first word, against
+  speech that comes through whole.
 
 ## Antivirus and SmartScreen
 
@@ -78,7 +99,7 @@ doing them. If yours quarantines it, its own interface will have a way to
 report a false positive.
 
 Both are reasonable defences behaving as designed. Download StableSound only
-from this repository's releases page.
+from [this repository's releases page][releases].
 
 ## What has actually been tested
 
@@ -89,6 +110,8 @@ Honest scope, because much of this can only be checked on real hardware:
   seconds, and pure digital silence is enough to stop the clipping — no
   inaudible tone needed.
 - **Screen reader:** JAWS, on Windows 11.
+- **Starting at sign-in**, by scheduled task, with the headphones already held
+  and nothing clipped by the time JAWS speaks.
 - **Not tested:** other headsets, other screen readers, Windows 10, behaviour
   across sleep and resume, and behaviour on battery.
 
@@ -97,7 +120,7 @@ keep-alive signals before you give up on it.
 
 ## Files
 
-Only `StableSound.exe` is distributed. Everything else it needs — the help, the
+Only `stablesound.exe` is distributed. Everything else it needs — the help, the
 dialog template, the icon — is compiled into it. What appears beside it appears
 because the program wrote it, in that folder or in `%APPDATA%\StableSound` if
 that one cannot be written to:
@@ -115,9 +138,11 @@ when you untick the box.
 
 The task is preferred because it runs at the sign-in itself, while `Run` is not
 reached until the desktop is ready and every other startup program has had its
-turn — about half a minute on a slow machine, which is half a minute of clipped
-speech. Registering it needs no administrator rights, and the tickbox reports
-whichever of the two is actually in force rather than what it last tried to do.
+turn — about half a minute on the machine this was measured on, which is half a
+minute of clipped speech. Registering it needs no administrator rights, and the
+tickbox reports whichever of the two is actually in force rather than what it
+last tried to do. Move the exe somewhere else and the box reads unticked, which
+is the truth; ticking it again repoints the task at where the program now is.
 
 ## Building
 
@@ -128,18 +153,24 @@ cargo build --release
 ```
 
 `build.rs` runs `rc.exe` over `stablesound.rc`, which compiles the dialog
-template and the application manifest into the binary. `embed-resource` is the
-only dependency that is not the `windows` crate, and it is build-time only —
-nothing of it ships.
+template, the version resource and the application manifest into the binary.
+`embed-resource` is the only dependency that is not the `windows` crate, and it
+is build-time only — nothing of it ships.
 
 ```
 cargo test                      # unit tests
 cargo clippy -- -D warnings     # kept clean
 ```
 
+Two tests are `#[ignore]`d because they touch the machine they run on rather
+than only the code: one registers a real scheduled task and removes it again,
+the other reports what this machine is currently set up with. `cargo test --
+--ignored` runs them.
+
 `PLAN.md` is the design record: what was tried, what failed on hardware, and
 why each decision went the way it did. It is worth reading before changing
-anything.
+anything. The `test-milestone-*.txt` files are the raw hardware results behind
+it, kept because they record behaviour that cannot be reproduced from code.
 
 ## Known issues
 
