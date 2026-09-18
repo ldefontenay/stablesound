@@ -1822,10 +1822,43 @@ mark-of-the-web through extraction, so the SmartScreen prompt should still
 appear once on the extracted exe. The README says so rather than implying the
 zip makes everything smooth.
 
-**Untested.** Neither half of that has been checked on this machine: not that
-Edge accepts the zip without complaint, and not that the extracted exe still
-raises SmartScreen exactly once. Both are from documented behaviour, not
-observation. `test-download-edge.txt` has the steps.
+**Tested on hardware 2026-09-19** (`test-download-edge.txt`), on the
+development machine, in Edge with JAWS. Both halves hold, and one thing nobody
+had predicted turned up.
+
+- **Edge takes the zip silently.** The download completed on its own, with no
+  banner, no dialog and nothing in the flyout to dismiss. Zero extra steps.
+- **Edge does block the exe**, as expected: a warning, then "stablesound.exe
+  is not commonly downloaded" in the downloads section with a Keep to choose.
+  The author's words: *"Significant friction for a new screenreader user."*
+- **The zip is the easier path in Edge**, asked directly and answered directly.
+  The README's advice stands.
+- **SmartScreen still appears on the extracted exe**, as predicted, and *More
+  info* then *Run anyway* got past it. Worth noting this happened on the
+  machine StableSound was built on, where the program has been run many times -
+  the mark-of-the-web on a freshly extracted copy is enough on its own.
+
+**The unpredicted finding: a silent gap after Run anyway.** Defender then said
+it needed to run a cloud scan, which could take ten seconds. The app started
+normally afterwards and passed the scan - but *nothing audible marked the end
+of it*. For a sighted user that is a progress dialog closing. For a blind user
+it is ten seconds of silence with no way to tell whether the program is
+starting, waiting, or was blocked.
+
+This is the same class of problem as the clipped first word: the information
+exists, it is simply not offered in audio. The fix is documentation rather than
+code - tell the first-time user to confirm the program is running by pressing
+the toggle hotkey (`Ctrl+Win+F12`) and listening for the tone, which is
+audible proof, rather than waiting for a silence to end. The README now says
+so. The built-in help has the same section and has *not* been updated, because
+it is a compiled resource and only reaches users in a new release.
+
+(The test answer named `Ctrl+Shift+F12` for that check. The default toggle is
+`Ctrl+Win+F12` - see `hotkey.rs` - and that is what went into the README.)
+
+Sections 2.1 to 2.3 were left blank, so how the zip was extracted, and how
+navigable extraction is with JAWS, is still unrecorded. Question 3.3 covers the
+premise well enough that this does not block anything.
 
 **Verified:** release binary **275 KB**, down from 297 KB. The PE subsystem
 field reads 2, `IMAGE_SUBSYSTEM_WINDOWS_GUI`. The exe starts, stays up with no

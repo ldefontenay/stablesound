@@ -29,28 +29,29 @@ https://github.com/ldefontenay/stablesound/releases/latest/download/stablesound.
 Did the download complete on its own, or did Edge object to it in any way?
 
 ANSWER:
-
+The download completed on its own with no objections from Edge.
 
 1.2 If Edge said anything at all - in the downloads flyout, as a banner, or as
 a dialog - what exactly did it say?
 
 ANSWER:
-
+Nothing.
 
 1.3 How many keystrokes or steps did it take from pressing Enter on the link
 to having the file on disk? An approximate count is fine.
 
 ANSWER:
-
+None, it downloaded immediately and was present in the downloads folder.
 
 1.4 Did JAWS announce the download finishing, and was the announcement clear
 enough that you knew where the file had gone?
 
 ANSWER:
+Jaws issue, not relevant, just normal behaviour.
 
 
 ANYTHING ODD IN THIS SECTION:
-
+No
 
 SECTION 2 - EXTRACTING IT AND RUNNING IT
 
@@ -78,22 +79,22 @@ ANSWER:
 as the README describes?
 
 ANSWER:
-
+Smart screen dialogue came up, and I had to select more info and run anyway. I then received a notification that Microsoft needed to run a cloud scan on the app, which could take 10 seconds. The app then loaded without any problems, with no audible indication that the cloud scan was complete. So a new  user may not know that this had happened, and should therefor be encouraged to verify that the app had loaded by pressing ctrl+shift+f12.
 
 2.5 If it did not appear at all, say so here - that would mean the README is
 overstating the problem, which is worth knowing.
 
 ANSWER:
-
+See above.
 
 2.6 Did the program start normally afterwards, with the tray icon present and
 the hotkeys working?
 
 ANSWER:
-
+Yes, no issues apart from the cloud scan, which it passed.
 
 ANYTHING ODD IN THIS SECTION:
-
+No.
 
 SECTION 3 - THE EXE, FOR COMPARISON
 
@@ -107,23 +108,23 @@ https://github.com/ldefontenay/stablesound/releases/latest/download/stablesound.
 What did Edge do?
 
 ANSWER:
-
+It gave a warning. Then, in the downloads section, it said that stablesound.exe is not commonly downloaded and offers the expected options, where one needs to choose to keep the download. Significant friction for a new screenreader user.
 
 3.2 If it refused to keep the file, describe the steps needed to make it keep
 it, and how hard they were to find with JAWS.
 
 ANSWER:
-
+See above.
 
 3.3 Having done both, is the README's advice right? That is: is the zip
 genuinely the easier path in Edge, or is it about the same once you count the
 extraction?
 
 ANSWER:
-
+The zip is easier with Edge.
 
 ANYTHING ODD IN THIS SECTION:
-
+No.
 
 SECTION 4 - ANYTHING ELSE
 
@@ -131,9 +132,10 @@ SECTION 4 - ANYTHING ELSE
 before? If so, say which, because it affects how much section 2 proves.
 
 ANSWER:
-
+Yes, this was done on the development machine.
 
 4.2 Anything else worth recording - another browser, a different antivirus, a
 prompt neither of us expected.
 
 ANSWER:
+No.

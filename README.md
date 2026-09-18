@@ -107,6 +107,15 @@ StableSound is not signed with a code-signing certificate. The first time you
 run it, Windows SmartScreen may show **Windows protected your PC**; *More info*
 then *Run anyway* gets past it, once per machine.
 
+Defender may then say it is running a cloud scan, and that this could take
+about ten seconds. It passes, and StableSound starts normally — but nothing
+announces the end of the scan, so with a screen reader those ten seconds are
+just silence, and there is no way to tell a program that is starting from one
+that was blocked. Don't wait for a sound that isn't coming: press
+`Ctrl+Win+F12`. A rising tone means it is running and keep-alive just came on;
+press it again for the falling tone to put it back. Either tone is proof.
+`Windows+B` and the arrow keys will also find the tray icon if it is there.
+
 Microsoft Edge objects earlier, at the download itself, and will not keep an
 unsigned program without the two-step *Keep* described under
 [Download](#download). The [zip][zip] avoids that, because Edge does not treat
@@ -133,6 +142,10 @@ Honest scope, because much of this can only be checked on real hardware:
 - **Screen reader:** JAWS, on Windows 11.
 - **Starting at sign-in**, by scheduled task, with the headphones already held
   and nothing clipped by the time JAWS speaks.
+- **Both downloads, in Edge with JAWS.** The zip arrives with no objection at
+  all; the exe is stopped with "not commonly downloaded" and has to be kept by
+  hand. SmartScreen still appears on the extracted exe, followed by a Defender
+  cloud scan that ends without a sound.
 - **Not tested:** other headsets, other screen readers, Windows 10, behaviour
   across sleep and resume, and behaviour on battery.
 
