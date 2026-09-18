@@ -8,16 +8,31 @@ and nothing outside its own folder unless you ask it to start when you sign in.
 
 ## Download
 
-**[Download stablesound.exe][latest]** — always the newest version, direct.
+Two files, always the newest version, direct. They contain exactly the same
+program. Take the zip if you use Microsoft Edge, and the exe otherwise.
 
+**[Download stablesound.zip][zip]** — for Edge, or any browser that objects to
+a downloaded program.
+
+**[Download stablesound.exe][latest]** — the program on its own, nothing to
+unzip.
+
+[zip]: https://github.com/ldefontenay/stablesound/releases/latest/download/stablesound.zip
 [latest]: https://github.com/ldefontenay/stablesound/releases/latest/download/stablesound.exe
+
+The zip exists because Edge will not keep a downloaded unsigned program unless
+you open its downloads flyout, find *Keep*, and confirm a second time — fiddly
+with a screen reader, and alarming if you have not met it before. Edge has no
+such objection to a zip; other browsers are less awkward about the exe. The zip
+holds one file and nothing else, so extracting it gives you `stablesound.exe`.
 
 That is the whole program. Put it anywhere you keep small programs and run it.
 There is nothing to install and nothing to uninstall.
 
-The [releases page][releases] has the same file with its release notes, and
+The [releases page][releases] has both files with their release notes, and
 every earlier version. Please read [Antivirus and SmartScreen](#antivirus-and-smartscreen)
-below before the first run — the file is unsigned, and Windows will say so once.
+below before the first run — the program is unsigned, and Windows will say so
+once, whichever file you took.
 
 [releases]: https://github.com/ldefontenay/stablesound/releases
 
@@ -92,6 +107,12 @@ StableSound is not signed with a code-signing certificate. The first time you
 run it, Windows SmartScreen may show **Windows protected your PC**; *More info*
 then *Run anyway* gets past it, once per machine.
 
+Microsoft Edge objects earlier, at the download itself, and will not keep an
+unsigned program without the two-step *Keep* described under
+[Download](#download). The [zip][zip] avoids that, because Edge does not treat
+a zip the same way. It does not avoid the SmartScreen prompt above: Windows
+carries the mark through extraction, so that one still happens once.
+
 An antivirus program may also object. A small unsigned program that opens audio
 devices, registers global hotkeys and can start itself at sign-in matches the
 shape of things worth being suspicious of, and heuristics cannot tell why it is
@@ -120,7 +141,8 @@ keep-alive signals before you give up on it.
 
 ## Files
 
-Only `stablesound.exe` is distributed. Everything else it needs — the help, the
+Only `stablesound.exe` is distributed, on its own or inside `stablesound.zip`
+with nothing else in it. Everything else it needs — the help, the
 dialog template, the icon — is compiled into it. What appears beside it appears
 because the program wrote it, in that folder or in `%APPDATA%\StableSound` if
 that one cannot be written to:

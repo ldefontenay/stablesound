@@ -1798,6 +1798,35 @@ If SmartScreen or an antivirus actually turns out to be stopping people using
 it, that is the moment to spend the money - and by then it will be known which
 of the two routes is open.
 
+**A second obstacle, earlier than SmartScreen: Edge blocks the download itself
+(2026-09-19).** SmartScreen at first run was treated above as the whole
+problem. It is not. Microsoft Edge refuses to keep a downloaded unsigned
+executable unless the user opens the downloads flyout, finds *Keep*, and
+confirms a second time. That is a worse obstacle than the SmartScreen screen
+for the audience this app is for: the flyout is fiddly with a screen reader,
+the wording is alarming, and it arrives before the user has any of the
+reassurance the README gives them. Edge is the default browser on Windows, so
+this is the common path, not an edge case.
+
+**Mitigation, done:** `stablesound.zip` is now a second asset on the v1.0.0
+release, holding the identical `stablesound.exe` and nothing else — the
+published binary was downloaded and zipped rather than rebuilt, and its
+SHA-256 still matches the release digest
+(`dd0457b6…b108d5b5`). The `.exe` asset was left in place, so existing links
+keep working. The README leads with the zip for Edge users and keeps the exe
+for everyone else, and the Antivirus and SmartScreen section explains both
+obstacles.
+
+This buys the download, not the first run: Windows propagates the
+mark-of-the-web through extraction, so the SmartScreen prompt should still
+appear once on the extracted exe. The README says so rather than implying the
+zip makes everything smooth.
+
+**Untested.** Neither half of that has been checked on this machine: not that
+Edge accepts the zip without complaint, and not that the extracted exe still
+raises SmartScreen exactly once. Both are from documented behaviour, not
+observation. `test-download-edge.txt` has the steps.
+
 **Verified:** release binary **275 KB**, down from 297 KB. The PE subsystem
 field reads 2, `IMAGE_SUBSYSTEM_WINDOWS_GUI`. The exe starts, stays up with no
 console window and no visible window of its own, and no `conhost` is spawned.

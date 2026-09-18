@@ -1,0 +1,139 @@
+TEST - DOWNLOADING THE ZIP, AND WHETHER IT ACTUALLY HELPS
+
+Written 2026-09-19, after adding stablesound.zip to the v1.0.0 release.
+
+Why this test exists. The README now tells people to take the zip if they use
+Microsoft Edge, on the grounds that Edge refuses to keep a downloaded unsigned
+program without a fiddly two-step Keep, and does not object to a zip. It also
+tells them the zip does not save them the SmartScreen prompt on first run.
+Neither of those claims has been checked on this machine. They come from
+documented behaviour, not from watching it happen. If either is wrong the
+README is wrong, so it is worth twenty minutes.
+
+Before you start. Do this on a machine, or a user account, where StableSound
+has not been run before if you can - a copy that has already been run and
+trusted will not prompt again, which would make the test tell you nothing. If
+that is not practical, use a new folder and say so in the notes at the end.
+
+Please answer in your own words rather than yes or no where there is room for
+it. What the wording of a prompt actually was matters more than whether one
+appeared.
+
+
+SECTION 1 - DOWNLOADING THE ZIP IN EDGE
+
+1.1 Open Microsoft Edge and go to this address:
+
+https://github.com/ldefontenay/stablesound/releases/latest/download/stablesound.zip
+
+Did the download complete on its own, or did Edge object to it in any way?
+
+ANSWER:
+
+
+1.2 If Edge said anything at all - in the downloads flyout, as a banner, or as
+a dialog - what exactly did it say?
+
+ANSWER:
+
+
+1.3 How many keystrokes or steps did it take from pressing Enter on the link
+to having the file on disk? An approximate count is fine.
+
+ANSWER:
+
+
+1.4 Did JAWS announce the download finishing, and was the announcement clear
+enough that you knew where the file had gone?
+
+ANSWER:
+
+
+ANYTHING ODD IN THIS SECTION:
+
+
+SECTION 2 - EXTRACTING IT AND RUNNING IT
+
+2.1 Extract stablesound.exe from the zip, however you would normally do it.
+What did you use - the Extract All wizard, copying the file out of the zip
+folder, or something else?
+
+ANSWER:
+
+
+2.2 Was the extraction step navigable with JAWS without difficulty? This
+matters, because the whole point of recommending the zip is that it is less
+awkward than Edge's Keep flyout, and extraction is the cost of that.
+
+ANSWER:
+
+
+2.3 Now run the extracted stablesound.exe. Did Windows show the "Windows
+protected your PC" screen?
+
+ANSWER:
+
+
+2.4 If it did, what did it say, and did More info then Run anyway get past it
+as the README describes?
+
+ANSWER:
+
+
+2.5 If it did not appear at all, say so here - that would mean the README is
+overstating the problem, which is worth knowing.
+
+ANSWER:
+
+
+2.6 Did the program start normally afterwards, with the tray icon present and
+the hotkeys working?
+
+ANSWER:
+
+
+ANYTHING ODD IN THIS SECTION:
+
+
+SECTION 3 - THE EXE, FOR COMPARISON
+
+Only worth doing if you have the patience. It is the claim the zip is being
+recommended against, so one observation of it is worth having on record.
+
+3.1 In Edge, go to this address:
+
+https://github.com/ldefontenay/stablesound/releases/latest/download/stablesound.exe
+
+What did Edge do?
+
+ANSWER:
+
+
+3.2 If it refused to keep the file, describe the steps needed to make it keep
+it, and how hard they were to find with JAWS.
+
+ANSWER:
+
+
+3.3 Having done both, is the README's advice right? That is: is the zip
+genuinely the easier path in Edge, or is it about the same once you count the
+extraction?
+
+ANSWER:
+
+
+ANYTHING ODD IN THIS SECTION:
+
+
+SECTION 4 - ANYTHING ELSE
+
+4.1 Was this run on a machine or account where StableSound had been run
+before? If so, say which, because it affects how much section 2 proves.
+
+ANSWER:
+
+
+4.2 Anything else worth recording - another browser, a different antivirus, a
+prompt neither of us expected.
+
+ANSWER:
